@@ -1,0 +1,645 @@
+---
+title: "Embedding Explorations"
+format:
+  pdf:
+    code-fold: false
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+** USING FULL EMBEDDINGS (17 parquet segments) **
+
+## Setup
+
+```{python}
+import polars as pl
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from pathlib import Path
+
+# Paths relative to project root
+DATA_DIR = Path("../../data")
+
+# --- Full embeddings (17 parquet segments) ---
+embeddings_df = pl.read_parquet(DATA_DIR / "full_embeddings" / "*.parquet")
+
+# --- Sampled embeddings (uncomment to switch back) ---
+# embeddings_df = pl.read_csv(DATA_DIR / "sampled_embeddings.csv")
+
+# Embedding columns
+emb_cols = [f"a{str(i).zfill(2)}" for i in range(64)]
+
+# Drop rare rows with NaN embeddings (< 0.01% of full data)
+embeddings_df = embeddings_df.filter(
+    ~pl.any_horizontal(pl.col(c).is_null() | pl.col(c).is_nan() for c in emb_cols)
+)
+
+print(f"Embeddings shape: {embeddings_df.shape}")
+print(f"Years: {sorted(embeddings_df['embedding_year'].unique().to_list())}")
+print(f"Unique block groups: {embeddings_df['census_block_group'].n_unique()}")
+```
+
+## Question 1: How do embeddings for a specific block group change over time? 
+
+Do a dimensionality reduction on the 64 dimensions of the embeddings for a single block group across the years 2017-2025, then plot for a few different block groups. Limit each plot to 5 block groups for interpretability, using a different color to distinguish them. Plot 4 different samples of 5 block groups each so I can see different patterns. 
+
+```{python}
+# Reduce all embeddings to 2D via PCA (fit on full dataset for consistent projection)
+pca = PCA(n_components=2, random_state=42)
+emb_matrix = embeddings_df.select(emb_cols).to_numpy()
+coords_2d = pca.fit_transform(emb_matrix)
+
+embeddings_df = embeddings_df.with_columns(
+    pl.Series("pc1", coords_2d[:, 0]),
+    pl.Series("pc2", coords_2d[:, 1]),
+)
+
+# Get block groups that have data for all years
+years = sorted(embeddings_df["embedding_year"].unique().to_list())
+bg_counts = embeddings_df.group_by("census_block_group").agg(pl.len().alias("n"))
+full_bgs = bg_counts.filter(pl.col("n") == len(years))["census_block_group"].to_list()
+
+# Sample 4 groups of 5 block groups each
+rng = np.random.default_rng(42)
+sampled_bgs = rng.choice(full_bgs, size=min(20, len(full_bgs)), replace=False)
+bg_groups = [sampled_bgs[i * 5 : (i + 1) * 5] for i in range(4)]
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+colors = plt.cm.tab10(np.linspace(0, 1, 10))
+
+for ax, bg_group in zip(axes.flat, bg_groups):
+    for idx, bg in enumerate(bg_group):
+        bg_data = (
+            embeddings_df
+            .filter(pl.col("census_block_group") == str(bg))
+            .sort("embedding_year")
+        )
+        x = bg_data["pc1"].to_numpy()
+        y = bg_data["pc2"].to_numpy()
+        yr = bg_data["embedding_year"].to_numpy()
+
+        # Plot path with arrows
+        ax.plot(x, y, "-o", color=colors[idx], label=str(bg), markersize=4, linewidth=1.2)
+        # Label start and end year
+        ax.annotate(str(yr[0]), (x[0], y[0]), fontsize=7, color=colors[idx], fontweight='bold')
+        ax.annotate(str(yr[-1]), (x[-1], y[-1]), fontsize=7, color=colors[idx], fontweight='bold')
+
+    ax.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.1%} var)")
+    ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.1%} var)")
+    ax.legend(fontsize=7, title="Block Group", title_fontsize=8)
+    ax.set_title("Block Group Trajectories Over Time")
+
+plt.suptitle("PCA of Block Group Embeddings Over Time (2017–2024)", fontsize=14, fontweight="bold")
+plt.tight_layout()
+plt.show()
+```
+
+## Question 2: How much variability is there in embeddings across block groups for a given year? 
+
+Use dimensionality reduction to reduce to 2 dimensions, then plot the distribution of embeddings for a given year. Color by census subregions.
+
+```{python}
+# Census division mapping by state FIPS code
+# https://www2.census.gov/geo/pdfs/maps-data/maps/reference/us_regdiv.pdf
+STATE_FIPS_TO_DIVISION = {
+    # New England
+    "09": "New England", "23": "New England", "25": "New England",
+    "33": "New England", "44": "New England", "50": "New England",
+    # Middle Atlantic
+    "34": "Middle Atlantic", "36": "Middle Atlantic", "42": "Middle Atlantic",
+    # East North Central
+    "17": "East North Central", "18": "East North Central",
+    "26": "East North Central", "39": "East North Central",
+    "55": "East North Central",
+    # West North Central
+    "19": "West North Central", "20": "West North Central",
+    "27": "West North Central", "29": "West North Central",
+    "31": "West North Central", "38": "West North Central",
+    "46": "West North Central",
+    # South Atlantic
+    "10": "South Atlantic", "11": "South Atlantic", "12": "South Atlantic",
+    "13": "South Atlantic", "24": "South Atlantic", "37": "South Atlantic",
+    "45": "South Atlantic", "51": "South Atlantic", "54": "South Atlantic",
+    # East South Central
+    "01": "East South Central", "21": "East South Central",
+    "28": "East South Central", "47": "East South Central",
+    # West South Central
+    "05": "West South Central", "22": "West South Central",
+    "40": "West South Central", "48": "West South Central",
+    # Mountain
+    "04": "Mountain", "08": "Mountain", "16": "Mountain",
+    "30": "Mountain", "32": "Mountain", "35": "Mountain",
+    "49": "Mountain", "56": "Mountain",
+    # Pacific
+    "02": "Pacific", "06": "Pacific", "15": "Pacific",
+    "41": "Pacific", "53": "Pacific",
+    # Territories
+    "60": "Territories", "66": "Territories", "69": "Territories",
+    "72": "Territories", "78": "Territories",
+}
+
+# Add state FIPS and census division
+embeddings_df = embeddings_df.with_columns(
+    pl.col("census_block_group").cast(pl.Utf8).str.slice(0, 2).alias("state_fips")
+).with_columns(
+    pl.col("state_fips").replace_strict(STATE_FIPS_TO_DIVISION, default="Unknown").alias("census_division")
+)
+
+# Plot for a single year (most recent: 2024)
+year_to_plot = 2024
+year_data = embeddings_df.filter(pl.col("embedding_year") == year_to_plot)
+
+fig, ax = plt.subplots(figsize=(12, 9))
+
+divisions = sorted(year_data["census_division"].unique().to_list())
+cmap = plt.cm.tab20(np.linspace(0, 1, len(divisions)))
+
+for i, div in enumerate(divisions):
+    div_data = year_data.filter(pl.col("census_division") == div)
+    ax.scatter(
+        div_data["pc1"].to_numpy(),
+        div_data["pc2"].to_numpy(),
+        c=[cmap[i]],
+        label=div,
+        alpha=0.6,
+        s=20,
+        edgecolors="none",
+    )
+
+ax.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.1%} var)")
+ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.1%} var)")
+ax.set_title(f"PCA of Block Group Embeddings — {year_to_plot}\nColored by Census Division", fontsize=13, fontweight="bold")
+ax.legend(fontsize=8, markerscale=2, title="Census Division", bbox_to_anchor=(1.02, 1), loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+## Question 3: How much variability is there in embeddings across census tracts for a given year?
+
+For this, I'll need to combine block group embeddings via an area-weighted average into census tracts. The ID for census tracts is equivalent to the first 11 digits of the FIPS code for block groups. 
+
+```{python}
+# Create census tract ID (first 11 digits of block group FIPS)
+embeddings_df = embeddings_df.with_columns(
+    pl.col("census_block_group").cast(pl.Utf8).str.slice(0, 11).alias("census_tract")
+)
+
+# Compute area-weighted average embeddings at the tract level for a given year
+year_to_plot = 2024
+year_data = embeddings_df.filter(pl.col("embedding_year") == year_to_plot)
+
+# Area-weighted average: for each tract, weight each block group's embedding by its area
+tract_embeddings = (
+    year_data
+    .with_columns([
+        (pl.col(c) * pl.col("area_km2")).alias(f"{c}_weighted") for c in emb_cols
+    ])
+    .group_by("census_tract")
+    .agg(
+        [pl.col(f"{c}_weighted").sum().alias(c) for c in emb_cols]
+        + [pl.col("area_km2").sum().alias("total_area")]
+        + [pl.col("state_fips").first()]
+    )
+    .with_columns([
+        (pl.col(c) / pl.col("total_area")).alias(c) for c in emb_cols
+    ])
+    .with_columns(
+        pl.col("state_fips").replace_strict(STATE_FIPS_TO_DIVISION, default="Unknown").alias("census_division")
+    )
+)
+
+# PCA on tract-level embeddings
+tract_emb_matrix = tract_embeddings.select(emb_cols).to_numpy()
+pca_tract = PCA(n_components=2, random_state=42)
+tract_coords = pca_tract.fit_transform(tract_emb_matrix)
+
+tract_embeddings = tract_embeddings.with_columns(
+    pl.Series("pc1", tract_coords[:, 0]),
+    pl.Series("pc2", tract_coords[:, 1]),
+)
+
+fig, ax = plt.subplots(figsize=(12, 9))
+
+divisions = sorted(tract_embeddings["census_division"].unique().to_list())
+cmap = plt.cm.tab20(np.linspace(0, 1, len(divisions)))
+
+for i, div in enumerate(divisions):
+    div_data = tract_embeddings.filter(pl.col("census_division") == div)
+    ax.scatter(
+        div_data["pc1"].to_numpy(),
+        div_data["pc2"].to_numpy(),
+        c=[cmap[i]],
+        label=div,
+        alpha=0.6,
+        s=20,
+        edgecolors="none",
+    )
+
+ax.set_xlabel(f"PC1 ({pca_tract.explained_variance_ratio_[0]:.1%} var)")
+ax.set_ylabel(f"PC2 ({pca_tract.explained_variance_ratio_[1]:.1%} var)")
+ax.set_title(
+    f"PCA of Census Tract Embeddings (Area-Weighted) — {year_to_plot}\nColored by Census Division",
+    fontsize=13, fontweight="bold"
+)
+ax.legend(fontsize=8, markerscale=2, title="Census Division", bbox_to_anchor=(1.02, 1), loc="upper left")
+plt.tight_layout()
+plt.show()
+
+print(f"Number of tracts: {tract_embeddings.shape[0]}")
+print(f"Variance explained: PC1={pca_tract.explained_variance_ratio_[0]:.1%}, PC2={pca_tract.explained_variance_ratio_[1]:.1%}")
+```
+
+## Question 4: How much variability in each health outcome from PLACES data is there across tracts within 2025?
+
+Please plot the distribution of each health outcome across tracts within 2025 using a violin plot or similar.
+
+*Note: The PLACES 2025 release contains data from years 2022–2023. Using the most recent year available (2023).*
+
+```{python}
+# Load PLACES data
+places_df = pl.read_csv(
+    DATA_DIR / "PLACES__Local_Data_for_Better_Health__Census_Tract_Data__2025_release.csv",
+    infer_schema_length=5000,
+)
+
+# Filter to most recent year and crude prevalence
+places_latest = places_df.filter(
+    (pl.col("Year") == pl.col("Year").max()) &
+    (pl.col("DataValueTypeID") == "CrdPrv")
+)
+
+# Get unique measures
+measures = sorted(places_latest["Short_Question_Text"].unique().to_list())
+print(f"Number of health outcome measures: {len(measures)}")
+print(f"Data year: {places_latest['Year'].unique().to_list()}")
+
+# Pivot to wide format: one row per tract, one column per measure
+places_wide = places_latest.pivot(
+    on="Short_Question_Text",
+    index="LocationID",
+    values="Data_Value",
+).drop_nulls()
+
+# Create violin plots - split into multiple figures for readability
+n_measures = len(measures)
+n_per_fig = 10
+n_figs = (n_measures + n_per_fig - 1) // n_per_fig
+
+for fig_idx in range(n_figs):
+    start = fig_idx * n_per_fig
+    end = min(start + n_per_fig, n_measures)
+    fig_measures = measures[start:end]
+
+    fig, ax = plt.subplots(figsize=(14, max(5, len(fig_measures) * 0.7)))
+
+    data_arrays = []
+    labels = []
+    for m in fig_measures:
+        if m in places_wide.columns:
+            vals = places_wide[m].drop_nulls().to_numpy()
+            if len(vals) > 0:
+                data_arrays.append(vals)
+                labels.append(m)
+
+    if data_arrays:
+        parts = ax.violinplot(data_arrays, vert=False, showmedians=True, showextrema=True)
+
+        # Style the violins
+        for pc in parts["bodies"]:
+            pc.set_facecolor("#5B8DEF")
+            pc.set_alpha(0.7)
+        parts["cmedians"].set_color("#E74C3C")
+        parts["cmedians"].set_linewidth(2)
+
+        ax.set_yticks(range(1, len(labels) + 1))
+        ax.set_yticklabels(labels, fontsize=9)
+        ax.set_xlabel("Crude Prevalence (%)", fontsize=11)
+        ax.set_title(
+            f"Distribution of Health Outcomes Across Census Tracts (PLACES 2025 Release)\n"
+            f"Part {fig_idx + 1}/{n_figs}",
+            fontsize=12, fontweight="bold",
+        )
+        ax.grid(axis="x", alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+```
+
+## Question 5: How do ReADI (Reproducible Area Deprivation Index) values vary across census tracts in 2022?
+
+```{python}
+# Load ReADI data
+readi_df = pl.read_csv(DATA_DIR / "ReADI_CT_2022.csv", infer_schema_length=10000)
+
+# The ReADI national rank is the main summary measure 
+# (1 = least deprived, 100 = most deprived)
+readi_clean = readi_df.select([
+    pl.col("GEOID").cast(pl.Utf8).alias("census_tract"),
+    pl.col("State"),
+    pl.col("ReADI_CT_NR").cast(pl.Float64, strict=False).alias("readi_national_rank"),
+    pl.col("ReADI_CT_Raw").cast(pl.Float64, strict=False).alias("readi_raw"),
+]).drop_nulls(subset=["readi_national_rank"])
+
+# Add census division
+readi_clean = readi_clean.with_columns(
+    pl.col("census_tract").str.slice(0, 2).alias("state_fips")
+).with_columns(
+    pl.col("state_fips").replace_strict(STATE_FIPS_TO_DIVISION, default="Unknown").alias("census_division")
+).filter(pl.col("census_division") != "Unknown")
+
+print(f"Number of tracts with ReADI data: {readi_clean.shape[0]}")
+print(f"ReADI National Rank range: {readi_clean['readi_national_rank'].min()} – {readi_clean['readi_national_rank'].max()}")
+
+# --- Plot 1: Overall distribution ---
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+# Histogram of national rank
+axes[0].hist(
+    readi_clean["readi_national_rank"].to_numpy(),
+    bins=50, color="#5B8DEF", edgecolor="white", alpha=0.8,
+)
+axes[0].set_xlabel("ReADI National Rank (1=least deprived, 100=most deprived)", fontsize=10)
+axes[0].set_ylabel("Number of Census Tracts", fontsize=10)
+axes[0].set_title("Distribution of ReADI National Rank\nAcross All Census Tracts (2022)", fontsize=12, fontweight="bold")
+axes[0].axvline(
+    readi_clean["readi_national_rank"].median(), color="#E74C3C", linewidth=2,
+    linestyle="--", label=f'Median: {readi_clean["readi_national_rank"].median():.0f}',
+)
+axes[0].legend()
+
+# Histogram of raw score
+axes[1].hist(
+    readi_clean["readi_raw"].to_numpy(),
+    bins=50, color="#2ECC71", edgecolor="white", alpha=0.8,
+)
+axes[1].set_xlabel("ReADI Raw Score", fontsize=10)
+axes[1].set_ylabel("Number of Census Tracts", fontsize=10)
+axes[1].set_title("Distribution of ReADI Raw Score\nAcross All Census Tracts (2022)", fontsize=12, fontweight="bold")
+axes[1].axvline(
+    readi_clean["readi_raw"].median(), color="#E74C3C", linewidth=2,
+    linestyle="--", label=f'Median: {readi_clean["readi_raw"].median():.2f}',
+)
+axes[1].legend()
+
+plt.tight_layout()
+plt.show()
+
+# --- Plot 2: ReADI by Census Division (violin plot) ---
+divisions = sorted(readi_clean["census_division"].unique().to_list())
+div_data = [
+    readi_clean.filter(pl.col("census_division") == d)["readi_national_rank"].to_numpy()
+    for d in divisions
+]
+
+fig, ax = plt.subplots(figsize=(14, 7))
+parts = ax.violinplot(div_data, vert=False, showmedians=True, showextrema=True)
+
+for pc in parts["bodies"]:
+    pc.set_facecolor("#9B59B6")
+    pc.set_alpha(0.7)
+parts["cmedians"].set_color("#E74C3C")
+parts["cmedians"].set_linewidth(2)
+
+ax.set_yticks(range(1, len(divisions) + 1))
+ax.set_yticklabels(divisions, fontsize=10)
+ax.set_xlabel("ReADI National Rank (1=least, 100=most deprived)", fontsize=11)
+ax.set_title("ReADI Deprivation Index by Census Division (2022)", fontsize=13, fontweight="bold")
+ax.grid(axis="x", alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+```
+
+## Question 6: Is there an obvious relationship between the spatial embeddings and ReADI? 
+
+Use the first 10 principal components of the spatial embeddings to explore this question. Produce a visualization of predicted vs observed ReADI values for *out-of-sample* census tracts.
+
+```{python}
+from sklearn.linear_model import Ridge
+from sklearn.metrics import r2_score, mean_absolute_error
+
+# --- Compute 2022 tract-level embeddings for temporal alignment ---
+# ReADI is 2022, so we use 2022 embeddings and 2022 PLACES data
+pred_year = 2022
+year_data_2022 = embeddings_df.filter(pl.col("embedding_year") == pred_year)
+
+tract_emb_2022 = (
+    year_data_2022
+    .with_columns([(pl.col(c) * pl.col("area_km2")).alias(f"{c}_weighted") for c in emb_cols])
+    .group_by("census_tract")
+    .agg(
+        [pl.col(f"{c}_weighted").sum().alias(c) for c in emb_cols]
+        + [pl.col("area_km2").sum().alias("total_area")]
+        + [pl.col("state_fips").first()]
+    )
+    .with_columns([(pl.col(c) / pl.col("total_area")).alias(c) for c in emb_cols])
+)
+
+# Compute 10 PCs from 2022 tract-level embeddings
+pca_10 = PCA(n_components=10, random_state=42)
+tract_pcs = pca_10.fit_transform(tract_emb_2022.select(emb_cols).to_numpy())
+
+tract_pc_df = tract_emb_2022.select("census_tract", "state_fips").with_columns(
+    [pl.Series(f"pc{i}", tract_pcs[:, i]) for i in range(10)]
+)
+pc_cols = [f"pc{i}" for i in range(10)]
+
+print(f"Using {pred_year} embeddings ({tract_emb_2022.shape[0]} tracts)")
+print(f"Variance explained by 10 PCs: {pca_10.explained_variance_ratio_.sum():.1%}")
+
+# --- State-level train/test split to avoid spatial leakage ---
+all_states = sorted(tract_pc_df["state_fips"].unique().to_list())
+rng_states = np.random.default_rng(42)
+n_holdout = max(1, round(len(all_states) * 0.2))
+holdout_states = set(rng_states.choice(all_states, size=n_holdout, replace=False))
+train_states = set(all_states) - holdout_states
+
+print(f"Total states: {len(all_states)}")
+print(f"Holdout states ({len(holdout_states)}): {sorted(holdout_states)}")
+print(f"Train states ({len(train_states)}): {sorted(train_states)}")
+
+# Join with ReADI data on census_tract
+merged_readi = tract_pc_df.join(
+    readi_clean.select("census_tract", "readi_national_rank"),
+    on="census_tract",
+    how="inner",
+)
+
+train_mask = merged_readi["state_fips"].is_in(list(train_states))
+test_mask = merged_readi["state_fips"].is_in(list(holdout_states))
+
+X_train = merged_readi.filter(train_mask).select(pc_cols).to_numpy()
+y_train = merged_readi.filter(train_mask)["readi_national_rank"].to_numpy()
+X_test = merged_readi.filter(test_mask).select(pc_cols).to_numpy()
+y_test = merged_readi.filter(test_mask)["readi_national_rank"].to_numpy()
+
+print(f"\nReADI — Train tracts: {len(y_train)}, Test tracts (held-out states): {len(y_test)}")
+
+# Train on in-sample states, predict on held-out states
+model = Ridge(alpha=1.0)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+r2 = r2_score(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
+
+# Plot predicted vs observed
+fig, ax = plt.subplots(figsize=(8, 8))
+ax.scatter(y_test, y_pred, alpha=0.3, s=8, color="#5B8DEF", edgecolors="none")
+
+lims = [min(y_test.min(), y_pred.min()), max(y_test.max(), y_pred.max())]
+ax.plot(lims, lims, "--", color="#E74C3C", linewidth=1.5, label="Perfect prediction")
+
+ax.set_xlabel("Observed ReADI National Rank", fontsize=12)
+ax.set_ylabel("Predicted ReADI National Rank", fontsize=12)
+ax.set_title(
+    f"Predicting ReADI from Spatial Embeddings (10 PCs)\n"
+    f"State-Level Holdout: R² = {r2:.3f}, MAE = {mae:.1f}\n"
+    f"({len(holdout_states)} held-out states, {len(y_test)} test tracts)",
+    fontsize=12, fontweight="bold",
+)
+ax.legend(fontsize=10)
+ax.set_aspect("equal")
+plt.tight_layout()
+plt.show()
+```
+
+## Question 7: Is there an obvious relationship between the spatial embeddings and health outcomes?
+
+Use the first 10 principal components of the spatial embeddings to explore this question. Produce a visualization of predicted vs observed health outcomes for *out-of-sample* census tracts. Only produce the 3 worst- and best-predicted health outcomes.   
+
+```{python}
+# Use 2022 PLACES data to match the 2022 embeddings and ReADI
+places_2022 = places_df.filter(
+    (pl.col("Year") == pred_year) &
+    (pl.col("DataValueTypeID") == "CrdPrv")
+).pivot(
+    on="Short_Question_Text",
+    index="LocationID",
+    values="Data_Value",
+).drop_nulls()
+
+# Cast LocationID to string to match census_tract
+places_2022_str = places_2022.with_columns(
+    pl.col("LocationID").cast(pl.Utf8).alias("census_tract")
+).drop("LocationID")
+
+print(f"PLACES {pred_year}: {places_2022_str.shape[0]} tracts")
+
+merged_health = tract_pc_df.join(
+    places_2022_str,
+    on="census_tract",
+    how="inner",
+)
+
+# Also join ReADI as a baseline predictor
+merged_health = merged_health.join(
+    readi_clean.select("census_tract", "readi_national_rank"),
+    on="census_tract",
+    how="left",
+)
+
+# Get available health measures (non-PC, non-meta columns)
+meta_cols = pc_cols + ["census_tract", "state_fips", "readi_national_rank"]
+health_measures = [c for c in merged_health.columns if c not in meta_cols]
+print(f"Tracts with both embeddings and PLACES: {merged_health.shape[0]}")
+print(f"Health measures to evaluate: {len(health_measures)}")
+
+# Use the same state-level holdout split as Q6
+train_health = merged_health.filter(pl.col("state_fips").is_in(list(train_states)))
+test_health = merged_health.filter(pl.col("state_fips").is_in(list(holdout_states)))
+
+X_train_h = train_health.select(pc_cols).to_numpy()
+X_test_h = test_health.select(pc_cols).to_numpy()
+
+# ReADI features (single column)
+readi_train = train_health["readi_national_rank"].to_numpy().astype(float)
+readi_test = test_health["readi_national_rank"].to_numpy().astype(float)
+
+print(f"Train tracts: {train_health.shape[0]}, Test tracts: {test_health.shape[0]}")
+
+results = []
+for measure in health_measures:
+    y_train_m = train_health[measure].to_numpy().astype(float)
+    y_test_m = test_health[measure].to_numpy().astype(float)
+
+    # Need valid rows for both outcome AND ReADI
+    train_valid = ~np.isnan(y_train_m) & ~np.isnan(readi_train)
+    test_valid = ~np.isnan(y_test_m) & ~np.isnan(readi_test)
+    if train_valid.sum() < 50 or test_valid.sum() < 10:
+        continue
+    if np.std(y_train_m[train_valid]) < 1e-6:
+        continue
+
+    # --- Embedding-based prediction ---
+    model_emb = Ridge(alpha=1.0)
+    model_emb.fit(X_train_h[train_valid], y_train_m[train_valid])
+    y_pred_emb = model_emb.predict(X_test_h[test_valid])
+    y_obs_m = y_test_m[test_valid]
+
+    r2_emb = r2_score(y_obs_m, y_pred_emb)
+    mae_emb = mean_absolute_error(y_obs_m, y_pred_emb)
+
+    # --- ReADI-based prediction (baseline) ---
+    model_readi = Ridge(alpha=1.0)
+    model_readi.fit(readi_train[train_valid].reshape(-1, 1), y_train_m[train_valid])
+    y_pred_readi = model_readi.predict(readi_test[test_valid].reshape(-1, 1))
+    r2_readi = r2_score(y_obs_m, y_pred_readi)
+
+    results.append({
+        "measure": measure,
+        "r2": r2_emb,
+        "mae": mae_emb,
+        "r2_readi": r2_readi,
+        "y_obs": y_obs_m,
+        "y_pred": y_pred_emb,
+    })
+
+# Sort by R²
+results.sort(key=lambda x: x["r2"], reverse=True)
+
+# Print all R² values with ReADI comparison
+print(f"\n--- All Health Outcomes ranked by R² (state-level holdout) ---")
+print(f"  {'Measure':40s}  {'Emb R²':>8s}  {'ReADI R²':>8s}")
+for r in results:
+    print(f"  {r['measure']:40s}  {r['r2']:8.3f}  {r['r2_readi']:8.3f}")
+
+# Select 3 best and 3 worst
+best_3 = results[:3]
+worst_3 = results[-3:]
+selected = best_3 + worst_3
+
+fig, axes = plt.subplots(2, 3, figsize=(18, 11))
+
+for ax, res in zip(axes.flat, selected):
+    ax.scatter(res["y_obs"], res["y_pred"], alpha=0.3, s=8, color="#5B8DEF", edgecolors="none")
+    lims = [
+        min(res["y_obs"].min(), res["y_pred"].min()),
+        max(res["y_obs"].max(), res["y_pred"].max()),
+    ]
+    ax.plot(lims, lims, "--", color="#E74C3C", linewidth=1.5)
+    ax.set_xlabel("Observed (%)", fontsize=9)
+    ax.set_ylabel("Predicted (%)", fontsize=9)
+    ax.set_title(
+        f"{res['measure']}\n"
+        f"Embeddings R² = {res['r2']:.3f}  |  ReADI R² = {res['r2_readi']:.3f}",
+        fontsize=10, fontweight="bold",
+    )
+    ax.set_aspect("equal")
+
+axes[0, 0].annotate("BEST PREDICTED", xy=(0.5, 1.15), xycoords="axes fraction",
+                     fontsize=12, fontweight="bold", color="#27AE60", ha="center")
+axes[1, 0].annotate("WORST PREDICTED", xy=(0.5, 1.15), xycoords="axes fraction",
+                     fontsize=12, fontweight="bold", color="#E74C3C", ha="center")
+
+plt.suptitle(
+    f"Predicting Health Outcomes from Spatial Embeddings (10 PCs)\n"
+    f"State-Level Holdout ({len(holdout_states)} states held out)  —  ReADI R² shown for comparison",
+    fontsize=14, fontweight="bold", y=1.02,
+)
+plt.tight_layout()
+plt.show()
+```
+
