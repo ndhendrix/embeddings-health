@@ -9,6 +9,12 @@ We disagregate this into two research questions:
 
 ## Log
 
+### 26-05-11
+A minimal version of paper 1 has been implemented using ReADI and CDC PLACES data. Next steps are:
+1. Add individual-level analysis using secure server
+2. Add SDI and SVI to all analyses
+3. Currently uses a mix of 2022 and 2023 data from PLACES -- find complete 2022 data if possible
+
 ### 26-05-08
 1. Paper 1: Guidance for integrating spatial embeddings in epi analyses and proof that it's worth doing so
 	1. What is the correlation between satellite embeddings and the data elements from ACS that make up major area-based social risk indices? (see table of elements here: https://www.perplexity.ai/search/please-create-a-table-of-the-e-eCRKF361Ro._BO971qPZ3w)
