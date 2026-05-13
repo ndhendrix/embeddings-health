@@ -9,6 +9,10 @@ We disagregate this into two research questions:
 
 ## Log
 
+### 26-05-13
+1. Corrected "jam codes" issue. ACS uses negative values with repeated numbers (e.g., -222222222) as codes for missing or suppressed data. This was causing extreme correlations for some fields. 
+2. Converted SDI and SVI to percentiles prior to use in regressions so that they're treated like ReADI
+
 ### 26-05-11
 A minimal version of paper 1 has been implemented using ReADI and CDC PLACES data. Next steps are:
 1. Add individual-level analysis using secure server
