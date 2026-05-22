@@ -424,8 +424,11 @@ def main() -> None:
                         help="Override state bbox: W S E N in WGS84. Single state only.")
     parser.add_argument("--year", type=int, default=2022)
     parser.add_argument("--model", choices=["olmoearth", "prithvi"], default="olmoearth")
-    parser.add_argument("--resolution", type=int, default=10,
-                        help="Output pixel resolution in metres (default 10)")
+    parser.add_argument("--resolution", type=int, default=None,
+                        help="Output pixel resolution in metres. Defaults to 10 m for "
+                             "OlmoEarth (trained on 10 m S2) and 30 m for Prithvi "
+                             "(trained on 30 m HLS data). Override only if you have "
+                             "a specific reason to.")
     parser.add_argument("--max-cloud-cover", type=int, default=30,
                         help="Maximum scene-level cloud cover %% to include (default 30). "
                              "Lower values reduce memory usage by filtering more scenes.")
@@ -442,17 +445,20 @@ def main() -> None:
 
     client = pystac_client.Client.open(STAC_ENDPOINT)
 
+    # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (native HLS)
+    resolution = args.resolution or (10 if args.model == "olmoearth" else 30)
     max_scenes = None if args.max_scenes_per_month == 0 else args.max_scenes_per_month
 
     if args.all_states:
         states = list(STATE_BBOXES.items())
         print(f"Running all {len(states)} CONUS states  year={args.year}  "
-              f"model={args.model}  max_cloud={args.max_cloud_cover}%  "
+              f"model={args.model}  resolution={resolution}m  "
+              f"max_cloud={args.max_cloud_cover}%  "
               f"max_tile={args.max_tile_km:.0f}km  "
               f"max_scenes/month={max_scenes or 'unlimited'}")
         for state, bbox in states:
             process_state(client, state, bbox, args.model, args.year,
-                          args.resolution, args.output_dir,
+                          resolution, args.output_dir,
                           args.max_cloud_cover, args.max_tile_km, max_scenes)
         print("\nAll states complete.")
     else:
@@ -464,7 +470,7 @@ def main() -> None:
         else:
             raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
         process_state(client, state, bbox, args.model, args.year,
-                      args.resolution, args.output_dir,
+                      resolution, args.output_dir,
                       args.max_cloud_cover, args.max_tile_km, max_scenes)
 
 

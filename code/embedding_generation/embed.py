@@ -5,8 +5,8 @@ Processes the raster in non-overlapping 128×128 pixel chips, extracts spatial
 patch embeddings from the encoder, assembles them into a multi-band COG, then
 optionally PCA-compresses to 64 dimensions.
 
-OlmoEarth output resolution:  160 m/pixel  (patch_size=8 × 10 m input = 16 px/token × 10 m)
-Prithvi output resolution:     ~480 m/pixel (patch_size=16 × 30 m input = 480 m/token)
+OlmoEarth output resolution:   80 m/pixel  (patch_size=8 × 10 m input = 8 px/token × 10 m)
+Prithvi output resolution:    480 m/pixel  (patch_size=16 × 30 m input = 16 px/token × 30 m)
 
 Usage (OlmoEarth):
   python embed.py --model olmoearth \\
