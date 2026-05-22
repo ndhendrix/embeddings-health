@@ -19,6 +19,7 @@ import rasterio
 import rasterio.errors
 import pystac_client
 import odc.stac
+from dask.diagnostics import ProgressBar
 
 from utils.cloud_mask import mask_s2_l2a
 
@@ -160,9 +161,10 @@ def load_and_composite(
     masked = mask_s2_l2a(ds, scl_band="scl")
 
     # Pixel-wise temporal median; drop time dim
-    print("    Computing temporal median (this may take a moment)...")
+    print("    Computing temporal median…")
     try:
-        median = masked.median(dim="time").compute()
+        with ProgressBar():
+            median = masked.median(dim="time").compute()
     except Exception:
         print("    ERROR during dask compute:")
         traceback.print_exc()
