@@ -148,7 +148,7 @@ def load_and_composite(
         resolution=resolution,
         bbox=bbox,
         groupby="solar_day",
-        chunks={"time": 1, "x": 2048, "y": 2048},
+        chunks={"time": 1, "x": 512, "y": 512},
     )
 
     # Mask clouds using SCL
