@@ -124,6 +124,31 @@ def bbox_to_utm_epsg(bbox: tuple[float, float, float, float]) -> str:
     return f"EPSG:{32600 + zone}"
 
 
+def sample_scenes_per_month(items: list, max_per_month: int) -> list:
+    """Return at most max_per_month scenes per calendar month.
+
+    Within each month, scenes are ranked by ascending cloud cover so the
+    clearest observations are always preferred. This keeps the dask task
+    graph small while preserving full temporal coverage across the year.
+    """
+    from collections import defaultdict
+
+    by_month: dict = defaultdict(list)
+    for item in items:
+        key = (item.datetime.year, item.datetime.month)
+        by_month[key].append(item)
+
+    sampled = []
+    for key in sorted(by_month):
+        month_items = sorted(
+            by_month[key],
+            key=lambda i: i.properties.get("eo:cloud_cover", 100),
+        )
+        sampled.extend(month_items[:max_per_month])
+
+    return sampled
+
+
 def load_and_composite(
     client: pystac_client.Client,
     bbox: tuple[float, float, float, float],
@@ -132,6 +157,7 @@ def load_and_composite(
     crs: str,
     resolution: int,
     max_cloud_cover: int = 30,
+    max_scenes_per_month: int | None = 3,
 ) -> np.ndarray | None:
     """Query STAC, cloud-mask, and return pixel-wise median as (C, H, W) float32.
 
@@ -147,6 +173,11 @@ def load_and_composite(
     print(f"    {len(items)} scenes found for {datetime_str}")
     if not items:
         return None, None, None
+
+    if max_scenes_per_month is not None:
+        items = sample_scenes_per_month(items, max_scenes_per_month)
+        print(f"    → {len(items)} scenes after sampling "
+              f"({max_scenes_per_month}/month max)")
 
     all_bands = bands + ["scl"]
     ds = odc.stac.load(
@@ -288,6 +319,7 @@ def _run_composite(
     out_path: Path,
     resolution: int,
     max_cloud_cover: int,
+    max_scenes_per_month: int | None = 3,
     label: str = "",
 ) -> None:
     """Composite one time window over a list of tiles, merging if necessary.
@@ -307,7 +339,8 @@ def _run_composite(
     if n == 1:
         print(f"{prefix} Compositing ({len(bands)} bands)…")
         arr, transform, out_crs = load_and_composite(
-            client, tiles[0], datetime_str, bands, crs, resolution, max_cloud_cover
+            client, tiles[0], datetime_str, bands, crs, resolution,
+            max_cloud_cover, max_scenes_per_month,
         )
         if arr is not None:
             save_tif(arr, transform, out_crs, bands, out_path)
@@ -322,7 +355,8 @@ def _run_composite(
         else:
             print(f"{prefix} Tile {idx + 1}/{n} ({len(bands)} bands)…")
             arr, transform, out_crs = load_and_composite(
-                client, tile_bbox, datetime_str, bands, crs, resolution, max_cloud_cover
+                client, tile_bbox, datetime_str, bands, crs, resolution,
+                max_cloud_cover, max_scenes_per_month,
             )
             if arr is None:
                 print(f"{prefix} WARNING: tile {idx + 1}/{n} returned no data, skipping")
@@ -348,6 +382,7 @@ def process_state(
     output_dir: Path,
     max_cloud_cover: int = 30,
     max_tile_km: float = 200.0,
+    max_scenes_per_month: int | None = 3,
 ) -> None:
     """Run composite generation for a single state, tiling automatically if needed."""
     crs = bbox_to_utm_epsg(bbox)
@@ -363,7 +398,7 @@ def process_state(
             client, tiles, OLMOEARTH_BANDS, crs,
             f"{year}-01-01/{year}-12-31",
             output_dir / f"s2_annual_{state}_{year}_olmoearth.tif",
-            resolution, max_cloud_cover,
+            resolution, max_cloud_cover, max_scenes_per_month,
         )
 
     elif model == "prithvi":
@@ -372,7 +407,7 @@ def process_state(
                 client, tiles, PRITHVI_BANDS, crs,
                 f"{year}-{start}/{year}-{end}",
                 output_dir / f"s2_{season}_{state}_{year}_prithvi.tif",
-                resolution, max_cloud_cover,
+                resolution, max_cloud_cover, max_scenes_per_month,
                 label=season,
             )
 
@@ -398,20 +433,27 @@ def main() -> None:
                         help="Maximum tile side length in km (default 200). States wider "
                              "than this are split into a grid of tiles and merged after "
                              "compositing. Reduce if you still hit memory limits.")
+    parser.add_argument("--max-scenes-per-month", type=int, default=3,
+                        help="Keep at most N scenes per calendar month, choosing the "
+                             "clearest (lowest cloud cover) first (default 3). "
+                             "Use 0 to disable sampling and use all available scenes.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
     client = pystac_client.Client.open(STAC_ENDPOINT)
 
+    max_scenes = None if args.max_scenes_per_month == 0 else args.max_scenes_per_month
+
     if args.all_states:
         states = list(STATE_BBOXES.items())
         print(f"Running all {len(states)} CONUS states  year={args.year}  "
               f"model={args.model}  max_cloud={args.max_cloud_cover}%  "
-              f"max_tile={args.max_tile_km:.0f}km")
+              f"max_tile={args.max_tile_km:.0f}km  "
+              f"max_scenes/month={max_scenes or 'unlimited'}")
         for state, bbox in states:
             process_state(client, state, bbox, args.model, args.year,
                           args.resolution, args.output_dir,
-                          args.max_cloud_cover, args.max_tile_km)
+                          args.max_cloud_cover, args.max_tile_km, max_scenes)
         print("\nAll states complete.")
     else:
         state = args.state or "RI"
@@ -423,7 +465,7 @@ def main() -> None:
             raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
         process_state(client, state, bbox, args.model, args.year,
                       args.resolution, args.output_dir,
-                      args.max_cloud_cover, args.max_tile_km)
+                      args.max_cloud_cover, args.max_tile_km, max_scenes)
 
 
 if __name__ == "__main__":
