@@ -10,15 +10,20 @@ For Prithvi:   writes three seasonal-median GeoTIFFs (spring/summer/fall, 6 band
 Output files land in --output-dir.
 """
 import argparse
+import traceback
+import warnings
 from pathlib import Path
 
 import numpy as np
 import rasterio
-from rasterio.transform import from_origin
+import rasterio.errors
 import pystac_client
 import odc.stac
 
 from utils.cloud_mask import mask_s2_l2a
+
+# Treat NotGeoreferencedWarning as a printed warning only — never as an error.
+warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
 
 STAC_ENDPOINT = "https://earth-search.aws.element84.com/v1"
@@ -156,15 +161,39 @@ def load_and_composite(
 
     # Pixel-wise temporal median; drop time dim
     print("    Computing temporal median (this may take a moment)...")
-    median = masked.median(dim="time").compute()
+    try:
+        median = masked.median(dim="time").compute()
+    except Exception:
+        print("    ERROR during dask compute:")
+        traceback.print_exc()
+        return None, None, None
+
+    print(f"    Median dataset dims: {dict(median.dims)}")
 
     # Stack into (C, H, W)
-    arr = np.stack([median[b].values for b in bands], axis=0).astype("float32")
+    try:
+        arr = np.stack([median[b].values for b in bands], axis=0).astype("float32")
+    except Exception:
+        print("    ERROR stacking bands:")
+        traceback.print_exc()
+        return None, None, None
+
+    print(f"    Array shape: {arr.shape}  dtype={arr.dtype}  "
+          f"nan_frac={np.isnan(arr).mean():.1%}")
+
+    if arr.shape[1] == 0 or arr.shape[2] == 0:
+        print("    WARNING: empty spatial extent — skipping.")
+        return None, None, None
 
     # Extract geotransform from odc-stac Dataset
-    geobox = ds.odc.geobox
-    transform = geobox.transform
-    out_crs = geobox.crs.to_wkt()
+    try:
+        geobox = ds.odc.geobox
+        transform = geobox.transform
+        out_crs = geobox.crs.to_wkt()
+    except Exception:
+        print("    ERROR extracting geobox:")
+        traceback.print_exc()
+        return None, None, None
 
     return arr, transform, out_crs
 
