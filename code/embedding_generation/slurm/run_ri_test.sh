@@ -10,7 +10,7 @@
 #SBATCH --error=logs/embed_ri_%j.err
 
 # ----------------Load Modules--------------------
-module load anaconda/3
+module load anaconda3
 module load cuda
 
 set -euo pipefail
