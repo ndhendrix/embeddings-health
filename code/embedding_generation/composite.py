@@ -128,7 +128,7 @@ def load_and_composite(
     bands: list[str],
     crs: str,
     resolution: int,
-    max_cloud_cover: int = 80,
+    max_cloud_cover: int = 30,
 ) -> np.ndarray | None:
     """Query STAC, cloud-mask, and return pixel-wise median as (C, H, W) float32.
 
@@ -227,6 +227,7 @@ def process_state(
     year: int,
     resolution: int,
     output_dir: Path,
+    max_cloud_cover: int = 30,
 ) -> None:
     """Run composite generation for a single state."""
     crs = bbox_to_utm_epsg(bbox)
@@ -242,7 +243,7 @@ def process_state(
             return
         print(f"  Annual composite ({len(bands)} bands)…")
         arr, transform, out_crs = load_and_composite(
-            client, bbox, datetime_str, bands, crs, resolution
+            client, bbox, datetime_str, bands, crs, resolution, max_cloud_cover
         )
         if arr is not None:
             save_tif(arr, transform, out_crs, bands, out_path)
@@ -257,7 +258,7 @@ def process_state(
             datetime_str = f"{year}-{start}/{year}-{end}"
             print(f"  Season: {season}  ({datetime_str}, {len(bands)} bands)…")
             arr, transform, out_crs = load_and_composite(
-                client, bbox, datetime_str, bands, crs, resolution
+                client, bbox, datetime_str, bands, crs, resolution, max_cloud_cover
             )
             if arr is not None:
                 save_tif(arr, transform, out_crs, bands, out_path)
@@ -277,6 +278,9 @@ def main() -> None:
     parser.add_argument("--model", choices=["olmoearth", "prithvi"], default="olmoearth")
     parser.add_argument("--resolution", type=int, default=10,
                         help="Output pixel resolution in metres (default 10)")
+    parser.add_argument("--max-cloud-cover", type=int, default=30,
+                        help="Maximum scene-level cloud cover %% to include (default 30). "
+                             "Lower values reduce memory usage by filtering more scenes.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
@@ -284,10 +288,10 @@ def main() -> None:
 
     if args.all_states:
         states = list(STATE_BBOXES.items())
-        print(f"Running all {len(states)} CONUS states  year={args.year}  model={args.model}")
+        print(f"Running all {len(states)} CONUS states  year={args.year}  model={args.model}  max_cloud={args.max_cloud_cover}%")
         for state, bbox in states:
             process_state(client, state, bbox, args.model, args.year,
-                          args.resolution, args.output_dir)
+                          args.resolution, args.output_dir, args.max_cloud_cover)
         print("\nAll states complete.")
     else:
         state = args.state or "RI"
@@ -298,7 +302,7 @@ def main() -> None:
         else:
             raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
         process_state(client, state, bbox, args.model, args.year,
-                      args.resolution, args.output_dir)
+                      args.resolution, args.output_dir, args.max_cloud_cover)
 
 
 if __name__ == "__main__":
