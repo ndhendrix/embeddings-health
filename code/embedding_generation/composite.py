@@ -10,6 +10,7 @@ For Prithvi:   writes three seasonal-median GeoTIFFs (spring/summer/fall, 6 band
 Output files land in --output-dir.
 """
 import argparse
+import math
 import traceback
 import warnings
 from pathlib import Path
@@ -17,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import rasterio
 import rasterio.errors
+from rasterio.merge import merge as rio_merge
 import pystac_client
 import odc.stac
 from dask.diagnostics import ProgressBar
@@ -221,6 +223,121 @@ def save_tif(arr: np.ndarray, transform, crs: str, bands: list[str], path: Path)
     print(f"    Saved → {path}  shape={arr.shape}")
 
 
+def split_bbox_into_tiles(
+    bbox: tuple[float, float, float, float],
+    crs: str,
+    max_tile_km: float = 200.0,
+) -> list[tuple[float, float, float, float]]:
+    """Split a WGS84 bbox into a grid of tiles at most max_tile_km on each side.
+
+    Tile edges are computed in the projected CRS so each tile has a uniform
+    metric size. Returns a flat list of WGS84 (lon_min, lat_min, lon_max, lat_max)
+    sub-bboxes. Returns [bbox] unchanged when no tiling is needed.
+    """
+    from pyproj import Transformer
+
+    t_fwd = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    t_inv = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+
+    lon_min, lat_min, lon_max, lat_max = bbox
+    x_min, y_min = t_fwd.transform(lon_min, lat_min)
+    x_max, y_max = t_fwd.transform(lon_max, lat_max)
+
+    max_tile_m = max_tile_km * 1_000
+    n_x = max(1, math.ceil((x_max - x_min) / max_tile_m))
+    n_y = max(1, math.ceil((y_max - y_min) / max_tile_m))
+
+    if n_x == 1 and n_y == 1:
+        return [bbox]
+
+    xs = np.linspace(x_min, x_max, n_x + 1)
+    ys = np.linspace(y_min, y_max, n_y + 1)
+
+    tiles = []
+    for i in range(n_x):
+        for j in range(n_y):
+            lon1, lat1 = t_inv.transform(xs[i],     ys[j])
+            lon2, lat2 = t_inv.transform(xs[i + 1], ys[j + 1])
+            tiles.append((
+                min(lon1, lon2), min(lat1, lat2),
+                max(lon1, lon2), max(lat1, lat2),
+            ))
+
+    return tiles
+
+
+def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> None:
+    """Mosaic completed tile TIFs into a single output file, then delete the tiles."""
+    datasets = [rasterio.open(p) for p in tile_paths]
+    merged_arr, merged_transform = rio_merge(datasets, nodata=np.nan)
+    out_crs = datasets[0].crs.to_wkt()
+    for ds in datasets:
+        ds.close()
+    save_tif(merged_arr.astype("float32"), merged_transform, out_crs, bands, out_path)
+    for p in tile_paths:
+        p.unlink()
+        print(f"      Removed tile: {p.name}")
+
+
+def _run_composite(
+    client: pystac_client.Client,
+    tiles: list[tuple[float, float, float, float]],
+    bands: list[str],
+    crs: str,
+    datetime_str: str,
+    out_path: Path,
+    resolution: int,
+    max_cloud_cover: int,
+    label: str = "",
+) -> None:
+    """Composite one time window over a list of tiles, merging if necessary.
+
+    Tile TIFs are named <out_path.stem>_tile###.tif and deleted after merging.
+    Individual tiles that already exist are skipped, enabling resume after
+    interruption mid-merge.
+    """
+    prefix = f"  [{label}]" if label else " "
+
+    if out_path.exists():
+        print(f"{prefix} Already exists, skipping: {out_path.name}")
+        return
+
+    n = len(tiles)
+
+    if n == 1:
+        print(f"{prefix} Compositing ({len(bands)} bands)…")
+        arr, transform, out_crs = load_and_composite(
+            client, tiles[0], datetime_str, bands, crs, resolution, max_cloud_cover
+        )
+        if arr is not None:
+            save_tif(arr, transform, out_crs, bands, out_path)
+        return
+
+    # --- tiled path ---
+    tile_paths = []
+    for idx, tile_bbox in enumerate(tiles):
+        tile_path = out_path.with_name(f"{out_path.stem}_tile{idx:03d}.tif")
+        if tile_path.exists():
+            print(f"{prefix} Tile {idx + 1}/{n} already exists, skipping")
+        else:
+            print(f"{prefix} Tile {idx + 1}/{n} ({len(bands)} bands)…")
+            arr, transform, out_crs = load_and_composite(
+                client, tile_bbox, datetime_str, bands, crs, resolution, max_cloud_cover
+            )
+            if arr is None:
+                print(f"{prefix} WARNING: tile {idx + 1}/{n} returned no data, skipping")
+                continue
+            save_tif(arr, transform, out_crs, bands, tile_path)
+        tile_paths.append(tile_path)
+
+    if not tile_paths:
+        print(f"{prefix} WARNING: no tiles produced data for {out_path.name}")
+        return
+
+    print(f"{prefix} Merging {len(tile_paths)}/{n} tiles → {out_path.name}…")
+    _merge_tiles(tile_paths, bands, out_path)
+
+
 def process_state(
     client: pystac_client.Client,
     state: str,
@@ -230,40 +347,34 @@ def process_state(
     resolution: int,
     output_dir: Path,
     max_cloud_cover: int = 30,
+    max_tile_km: float = 200.0,
 ) -> None:
-    """Run composite generation for a single state."""
+    """Run composite generation for a single state, tiling automatically if needed."""
     crs = bbox_to_utm_epsg(bbox)
+    tiles = split_bbox_into_tiles(bbox, crs, max_tile_km)
+    n_tiles = len(tiles)
+
     print(f"\n{'='*60}")
-    print(f"State: {state}  Year: {year}  Model: {model}  CRS: {crs}")
+    tile_info = f"  {n_tiles} tiles" if n_tiles > 1 else ""
+    print(f"State: {state}  Year: {year}  Model: {model}  CRS: {crs}{tile_info}")
 
     if model == "olmoearth":
-        bands = OLMOEARTH_BANDS
-        datetime_str = f"{year}-01-01/{year}-12-31"
-        out_path = output_dir / f"s2_annual_{state}_{year}_olmoearth.tif"
-        if out_path.exists():
-            print(f"  Annual composite already exists, skipping: {out_path}")
-            return
-        print(f"  Annual composite ({len(bands)} bands)…")
-        arr, transform, out_crs = load_and_composite(
-            client, bbox, datetime_str, bands, crs, resolution, max_cloud_cover
+        _run_composite(
+            client, tiles, OLMOEARTH_BANDS, crs,
+            f"{year}-01-01/{year}-12-31",
+            output_dir / f"s2_annual_{state}_{year}_olmoearth.tif",
+            resolution, max_cloud_cover,
         )
-        if arr is not None:
-            save_tif(arr, transform, out_crs, bands, out_path)
 
     elif model == "prithvi":
-        bands = PRITHVI_BANDS
         for season, (start, end) in SEASONS.items():
-            out_path = output_dir / f"s2_{season}_{state}_{year}_prithvi.tif"
-            if out_path.exists():
-                print(f"  Season {season} already exists, skipping: {out_path}")
-                continue
-            datetime_str = f"{year}-{start}/{year}-{end}"
-            print(f"  Season: {season}  ({datetime_str}, {len(bands)} bands)…")
-            arr, transform, out_crs = load_and_composite(
-                client, bbox, datetime_str, bands, crs, resolution, max_cloud_cover
+            _run_composite(
+                client, tiles, PRITHVI_BANDS, crs,
+                f"{year}-{start}/{year}-{end}",
+                output_dir / f"s2_{season}_{state}_{year}_prithvi.tif",
+                resolution, max_cloud_cover,
+                label=season,
             )
-            if arr is not None:
-                save_tif(arr, transform, out_crs, bands, out_path)
 
 
 def main() -> None:
@@ -283,6 +394,10 @@ def main() -> None:
     parser.add_argument("--max-cloud-cover", type=int, default=30,
                         help="Maximum scene-level cloud cover %% to include (default 30). "
                              "Lower values reduce memory usage by filtering more scenes.")
+    parser.add_argument("--max-tile-km", type=float, default=200.0,
+                        help="Maximum tile side length in km (default 200). States wider "
+                             "than this are split into a grid of tiles and merged after "
+                             "compositing. Reduce if you still hit memory limits.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
@@ -290,10 +405,13 @@ def main() -> None:
 
     if args.all_states:
         states = list(STATE_BBOXES.items())
-        print(f"Running all {len(states)} CONUS states  year={args.year}  model={args.model}  max_cloud={args.max_cloud_cover}%")
+        print(f"Running all {len(states)} CONUS states  year={args.year}  "
+              f"model={args.model}  max_cloud={args.max_cloud_cover}%  "
+              f"max_tile={args.max_tile_km:.0f}km")
         for state, bbox in states:
             process_state(client, state, bbox, args.model, args.year,
-                          args.resolution, args.output_dir, args.max_cloud_cover)
+                          args.resolution, args.output_dir,
+                          args.max_cloud_cover, args.max_tile_km)
         print("\nAll states complete.")
     else:
         state = args.state or "RI"
@@ -304,7 +422,8 @@ def main() -> None:
         else:
             raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
         process_state(client, state, bbox, args.model, args.year,
-                      args.resolution, args.output_dir, args.max_cloud_cover)
+                      args.resolution, args.output_dir,
+                      args.max_cloud_cover, args.max_tile_km)
 
 
 if __name__ == "__main__":
