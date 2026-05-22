@@ -1,7 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=embed-ri-test
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:a100:1
+#SBATCH --partition=normal
+#SBATCH --gres=gpu:1
+#SBATCH -C GPU_SKU:A100_PCIE
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=02:00:00
