@@ -9,6 +9,9 @@ We disagregate this into two research questions:
 
 ## Log
 
+### 26-05-22
+Started running code to produce embeddings for Prithvi-EO-2.0 and OlmoEarth 1.1. This is a two stage process. I use my NAS to pull and aggregate sensor data, which I then upload to Carina and run through the open-weight models.
+
 ### 26-05-13
 1. Corrected "jam codes" issue. ACS uses negative values with repeated numbers (e.g., -222222222) as codes for missing or suppressed data. This was causing extreme correlations for some fields. 
 2. Converted SDI and SVI to percentiles prior to use in regressions so that they're treated like ReADI
