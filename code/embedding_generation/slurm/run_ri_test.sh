@@ -2,7 +2,6 @@
 #SBATCH --job-name=embed-ri-test
 #SBATCH --partition=normal
 #SBATCH --gres=gpu:1
-#SBATCH -C GPU_SKU:A100_PCIE
 #SBATCH --ntasks=8
 #SBATCH --nodes=1
 #SBATCH --mem=64G
@@ -12,6 +11,7 @@
 
 # ----------------Load Modules--------------------
 module load anaconda/3
+module load cuda
 
 set -euo pipefail
 
