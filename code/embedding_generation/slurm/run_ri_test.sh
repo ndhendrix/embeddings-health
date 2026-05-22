@@ -3,13 +3,15 @@
 #SBATCH --partition=normal
 #SBATCH --gres=gpu:1
 #SBATCH -C GPU_SKU:A100_PCIE
-#SBATCH --ntasks=1
+#SBATCH --ntasks=8
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/embed_ri_%j.out
 #SBATCH --error=logs/embed_ri_%j.err
+
+# ----------------Load Modules--------------------
+module load anaconda/3
 
 set -euo pipefail
 
