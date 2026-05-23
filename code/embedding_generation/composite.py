@@ -247,6 +247,7 @@ def save_tif(arr: np.ndarray, transform, crs: str, bands: list[str], path: Path)
         crs=crs,
         transform=transform,
         compress="lzw",
+        BIGTIFF="IF_SAFER",
     ) as dst:
         dst.write(arr)
         dst.update_tags(band_names=",".join(bands))
