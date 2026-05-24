@@ -123,6 +123,33 @@ def load_prithvi(variant: str = "300M"):
 
 
 # ---------------------------------------------------------------------------
+# NaN imputation
+# ---------------------------------------------------------------------------
+
+def _impute_nan(chips: np.ndarray) -> np.ndarray:
+    """Replace NaN pixels with the per-band mean of valid pixels in that chip.
+
+    Works for any shape (..., C, H, W). Each chip × band combination is
+    imputed independently. If an entire band is NaN for a chip, fills with 0.
+
+    Transformer attention is not NaN-safe — even one NaN pixel in a patch
+    corrupts the full chip embedding via the softmax operation.
+    """
+    out = chips.copy()
+    C = out.shape[-3]
+    hw = out.shape[-2] * out.shape[-1]
+    flat = out.reshape(-1, C, hw)          # (N, C, H*W)
+    for i in range(flat.shape[0]):
+        for c in range(C):
+            band = flat[i, c]
+            nan_mask = np.isnan(band)
+            if nan_mask.any():
+                fill = band[~nan_mask].mean() if not nan_mask.all() else 0.0
+                band[nan_mask] = fill
+    return out.reshape(chips.shape)
+
+
+# ---------------------------------------------------------------------------
 # OlmoEarth batch inference
 # ---------------------------------------------------------------------------
 
@@ -147,6 +174,7 @@ def run_olmoearth_batch(
     from olmoearth_pretrain.datatypes import OlmoEarthSample, MaskedOlmoEarthSample
     from olmoearth_pretrain.nn.flexi_vit import PoolingType
 
+    chips = _impute_nan(chips)             # fill NaN before model sees them
     B, C, H, W = chips.shape
     # Permute (B, C, H, W) → (B, H, W, T=1, C)
     chip_t = torch.from_numpy(chips).permute(0, 2, 3, 1).unsqueeze(3).to(device)
@@ -182,6 +210,7 @@ def run_prithvi_batch(
     TODO: verify output structure from ibm-nasa-geospatial/Prithvi-EO-2.0-300M
           — the actual attribute name and shape of the encoder's hidden state.
     """
+    chips = _impute_nan(chips)             # fill NaN before model sees them
     tensor = torch.from_numpy(chips).to(device)   # (B, T, C, H, W)
     with torch.no_grad():
         output = model(pixel_values=tensor)
