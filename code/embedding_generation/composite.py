@@ -71,44 +71,46 @@ def _https_to_s3(href: str) -> str:
     return href
 
 
-def _ensure_s3_credentials() -> None:
-    """Mint or refresh NASA LP DAAC temporary S3 credentials (valid ~1 h).
+def _ensure_s3_credentials(force: bool = False) -> None:
+    """Mint or refresh NASA LP DAAC temporary S3 credentials.
 
-    Direct S3 access to lp-prod-protected requires the caller to be in AWS
-    us-west-2 (NASA's same-region IAM policy).  Credentials are refreshed
-    automatically with a 60-second buffer so they never expire mid-tile.
-    The resulting AWS_* env vars are read by GDAL's /vsis3/ driver in every
-    dask worker thread.
+    Calls earthaccess.login() each time to keep the earthaccess session alive
+    (it can expire independently of the S3 token), then calls
+    get_s3_credentials() to get fresh AWS STS tokens.
 
-    Also sets GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR because NASA's bucket
-    policy allows s3:GetObject but explicitly denies s3:ListBucket.
+    Skips the network calls if credentials are still valid with a 5-minute
+    buffer, unless force=True (used at the start of each tile to guarantee
+    freshness regardless of the cached expiry).
     """
     global _s3_creds_expiry
-    if time.time() < _s3_creds_expiry - 60:
-        return  # still valid
+    if not force and time.time() < _s3_creds_expiry - 300:
+        return  # valid for at least 5 more minutes
     import earthaccess
-    creds = earthaccess.get_s3_credentials(provider="LPCLOUD")
-    os.environ.update({
-        "AWS_ACCESS_KEY_ID":            creds["accessKeyId"],
-        "AWS_SECRET_ACCESS_KEY":        creds["secretAccessKey"],
-        "AWS_SESSION_TOKEN":            creds["sessionToken"],
-        "AWS_DEFAULT_REGION":           "us-west-2",
-        # Suppress /vsis3/ directory probes — only s3:GetObject is allowed
-        "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
-    })
-    # Use the actual expiry time returned by NASA rather than assuming 1 h —
-    # some tokens are issued with shorter lifetimes.
-    expiry_str = creds.get("expiration", "")
-    if expiry_str:
-        try:
-            expiry_dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
-            _s3_creds_expiry = expiry_dt.timestamp()
-        except ValueError:
+    try:
+        # Re-login refreshes the earthaccess session token, which can expire
+        # independently of the S3 STS credentials.
+        earthaccess.login(strategy="environment")
+        creds = earthaccess.get_s3_credentials(provider="LPCLOUD")
+        os.environ.update({
+            "AWS_ACCESS_KEY_ID":            creds["accessKeyId"],
+            "AWS_SECRET_ACCESS_KEY":        creds["secretAccessKey"],
+            "AWS_SESSION_TOKEN":            creds["sessionToken"],
+            "AWS_DEFAULT_REGION":           "us-west-2",
+            "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+        })
+        expiry_str = creds.get("expiration", "")
+        if expiry_str:
+            try:
+                expiry_dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+                _s3_creds_expiry = expiry_dt.timestamp()
+            except ValueError:
+                _s3_creds_expiry = time.time() + 3600
+        else:
             _s3_creds_expiry = time.time() + 3600
-    else:
-        _s3_creds_expiry = time.time() + 3600
-    remaining = int(_s3_creds_expiry - time.time())
-    print(f"  HLS: S3 credentials refreshed (expire in {remaining // 60} min).")
+        remaining = int(_s3_creds_expiry - time.time())
+        print(f"  HLS: S3 credentials refreshed (expire in {remaining // 60} min).")
+    except Exception as e:
+        print(f"  WARNING: S3 credential refresh failed: {e}  (will retry)")
 
 
 # AWS Element84 STAC uses common names as asset keys (not B01/B02/... codes).
@@ -373,18 +375,21 @@ def load_and_composite_hls(
     clear = (fmask & 0b00001110) == 0
     masked = ds[HLS_PRITHVI_BANDS].where(clear)
 
-    # Refresh credentials immediately before compute(), then keep refreshing
-    # every 2 minutes in a background thread.  A single tile's compute() can
-    # outlast the credential lifetime (typically ~1 h) on large states, so a
-    # one-shot refresh before compute() is not sufficient.
-    _ensure_s3_credentials()
+    # Force-refresh credentials at the start of every tile (not just when close
+    # to expiry) so we always enter compute() with a full-lifetime token.
+    # A background thread then re-checks every 5 minutes during compute() in
+    # case a single tile's compute outlasts the credential window.
+    _ensure_s3_credentials(force=True)
     print("    Computing temporal median (HLS)…")
 
     stop_refresh = threading.Event()
 
     def _refresh_loop() -> None:
-        while not stop_refresh.wait(timeout=120):  # wake every 2 minutes
-            _ensure_s3_credentials()
+        while not stop_refresh.wait(timeout=300):  # wake every 5 minutes
+            try:
+                _ensure_s3_credentials()
+            except Exception as e:
+                print(f"  WARNING: background credential refresh failed: {e}")
 
     refresh_thread = threading.Thread(target=_refresh_loop, daemon=True)
     refresh_thread.start()
