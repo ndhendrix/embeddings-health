@@ -85,6 +85,10 @@ def _ensure_s3_credentials() -> None:
         "AWS_SECRET_ACCESS_KEY": creds["secretAccessKey"],
         "AWS_SESSION_TOKEN":     creds["sessionToken"],
         "AWS_DEFAULT_REGION":    "us-west-2",
+        # NASA's lp-prod-protected bucket policy allows s3:GetObject but
+        # explicitly denies s3:ListBucket.  This tells GDAL's /vsis3/ driver
+        # not to probe the bucket directory before opening each file.
+        "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
     })
     _s3_creds_expiry = time.time() + 3600
     print("  HLS: S3 credentials refreshed (valid ~1 h).")
