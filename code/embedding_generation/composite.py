@@ -12,7 +12,6 @@ Output files land in --output-dir.
 import argparse
 import math
 import os
-import time
 import traceback
 import warnings
 from pathlib import Path
@@ -50,48 +49,48 @@ HLS_S30_COLLECTION = "HLSS30_2.0"
 HLS_PRITHVI_BANDS = ["B02", "B03", "B04", "B8A", "B11", "B12"]
 HLS_FMASK_BAND    = "Fmask"
 
-# NASA Earthdata HTTPS base — stripped when rewriting to S3 paths.
-_HLS_HTTPS_PREFIX = "https://data.lpdaac.earthdatacloud.nasa.gov/"
-# S3 temporary credential expiry timestamp (refreshed automatically).
-_s3_creds_expiry: float = 0.0
+def _configure_earthdata_gdal_auth() -> None:
+    """Configure GDAL to authenticate with NASA Earthdata over HTTPS.
 
+    earthaccess.login(strategy='environment') authenticates the Python-layer
+    requests session but does NOT always write ~/.netrc.  GDAL's /vsicurl/
+    driver needs a netrc entry to follow NASA's OAuth2 redirect
+    (data.lpdaac.earthdatacloud.nasa.gov → urs.earthdata.nasa.gov) and cache
+    the resulting session cookie.  We write the netrc entry explicitly from the
+    EARTHDATA_* env vars so the file is always present.
 
-def _https_to_s3(href: str) -> str:
-    """Rewrite a NASA LP DAAC HTTPS URL to a direct S3 path.
-
-    e.g. https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/HLSS30.020/...
-      →  s3://lp-prod-protected/HLSS30.020/...
+    This approach works from any AWS region (unlike direct S3 access, which is
+    restricted to us-west-2 by NASA's IAM policy).  Safe to call repeatedly;
+    the netrc entry is written only once per process.
     """
-    if href.startswith(_HLS_HTTPS_PREFIX):
-        return "s3://" + href[len(_HLS_HTTPS_PREFIX):]
-    return href
+    username = os.environ.get("EARTHDATA_USERNAME", "")
+    password = os.environ.get("EARTHDATA_PASSWORD", "")
 
+    if username and password:
+        netrc_path = Path.home() / ".netrc"
+        existing = netrc_path.read_text() if netrc_path.exists() else ""
+        if "urs.earthdata.nasa.gov" not in existing:
+            with open(netrc_path, "a") as f:
+                f.write(
+                    f"\nmachine urs.earthdata.nasa.gov"
+                    f" login {username} password {password}\n"
+                )
+            os.chmod(str(netrc_path), 0o600)
+            print("  HLS: wrote Earthdata credentials to ~/.netrc for GDAL.")
 
-def _ensure_s3_credentials() -> None:
-    """Mint or refresh NASA LP DAAC temporary S3 credentials.
-
-    Credentials are valid for ~1 hour; this function re-mints them with a
-    60-second buffer so they never expire mid-tile. The resulting AWS env vars
-    (ACCESS_KEY_ID / SECRET_ACCESS_KEY / SESSION_TOKEN) are read by GDAL and
-    boto3 in every dask worker thread automatically.
-    """
-    global _s3_creds_expiry
-    if time.time() < _s3_creds_expiry - 60:
-        return  # still valid
-    import earthaccess
-    creds = earthaccess.get_s3_credentials(provider="LPCLOUD")
     os.environ.update({
-        "AWS_ACCESS_KEY_ID":     creds["accessKeyId"],
-        "AWS_SECRET_ACCESS_KEY": creds["secretAccessKey"],
-        "AWS_SESSION_TOKEN":     creds["sessionToken"],
-        "AWS_DEFAULT_REGION":    "us-west-2",
-        # NASA's lp-prod-protected bucket policy allows s3:GetObject but
-        # explicitly denies s3:ListBucket.  This tells GDAL's /vsis3/ driver
-        # not to probe the bucket directory before opening each file.
+        # Tell GDAL to use netrc when following the NASA OAuth redirect
+        "GDAL_HTTP_NETRC":              "YES",
+        # Cache the resulting session cookie so subsequent files skip the
+        # redirect roundtrip
+        "GDAL_HTTP_COOKIEFILE":         "/tmp/.urs_cookies",
+        "GDAL_HTTP_COOKIEJAR":          "/tmp/.urs_cookies",
+        # Retry transient failures (common with NASA's load-balanced endpoints)
+        "GDAL_HTTP_MAX_RETRY":          "3",
+        "GDAL_HTTP_RETRY_DELAY":        "2",
+        # Don't attempt directory listing — NASA endpoints don't support it
         "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
     })
-    _s3_creds_expiry = time.time() + 3600
-    print("  HLS: S3 credentials refreshed (valid ~1 h).")
 
 
 # AWS Element84 STAC uses common names as asset keys (not B01/B02/... codes).
@@ -332,20 +331,12 @@ def load_and_composite_hls(
         print(f"    → {len(items)} scenes after sampling "
               f"({max_scenes_per_month}/month max)")
 
-    # Refresh S3 credentials (minted by earthaccess, valid ~1 h) and rewrite
-    # HTTPS asset URLs to direct S3 paths.  GDAL reads AWS_* env vars from the
-    # process environment, so no extra auth configuration is needed in odc.stac.
-    _ensure_s3_credentials()
-    items_s3 = []
-    for item in items:
-        item_s3 = item.clone()
-        for asset in item_s3.assets.values():
-            asset.href = _https_to_s3(asset.href)
-        items_s3.append(item_s3)
+    # Ensure GDAL HTTPS auth is configured (idempotent, safe to call per tile)
+    _configure_earthdata_gdal_auth()
 
     all_bands = HLS_PRITHVI_BANDS + [HLS_FMASK_BAND]
     ds = odc.stac.load(
-        items_s3,
+        items,
         bands=all_bands,
         crs=crs,
         resolution=resolution,
@@ -671,9 +662,9 @@ def main() -> None:
                     "in your .env file (or exported in the shell)."
                 )
             print("Earthdata authentication successful.")
-            # Mint the first set of S3 credentials eagerly so any auth error
-            # surfaces here rather than deep inside the first tile.
-            _ensure_s3_credentials()
+            # Configure GDAL HTTPS auth eagerly so any netrc/credential
+            # problem surfaces here rather than deep inside the first tile.
+            _configure_earthdata_gdal_auth()
             hls_client = pystac_client.Client.open(HLS_STAC_ENDPOINT)
 
     # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (native HLS)
