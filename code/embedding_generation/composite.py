@@ -14,6 +14,7 @@ import math
 import os
 import time
 import traceback
+from datetime import datetime, timezone
 import warnings
 from pathlib import Path
 
@@ -94,8 +95,19 @@ def _ensure_s3_credentials() -> None:
         # Suppress /vsis3/ directory probes — only s3:GetObject is allowed
         "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
     })
-    _s3_creds_expiry = time.time() + 3600
-    print("  HLS: S3 credentials refreshed (valid ~1 h).")
+    # Use the actual expiry time returned by NASA rather than assuming 1 h —
+    # some tokens are issued with shorter lifetimes.
+    expiry_str = creds.get("expiration", "")
+    if expiry_str:
+        try:
+            expiry_dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+            _s3_creds_expiry = expiry_dt.timestamp()
+        except ValueError:
+            _s3_creds_expiry = time.time() + 3600
+    else:
+        _s3_creds_expiry = time.time() + 3600
+    remaining = int(_s3_creds_expiry - time.time())
+    print(f"  HLS: S3 credentials refreshed (expire in {remaining // 60} min).")
 
 
 # AWS Element84 STAC uses common names as asset keys (not B01/B02/... codes).
@@ -360,6 +372,9 @@ def load_and_composite_hls(
     clear = (fmask & 0b00001110) == 0
     masked = ds[HLS_PRITHVI_BANDS].where(clear)
 
+    # Refresh credentials immediately before compute() — the dask graph is built
+    # lazily, so S3 reads happen here, not during odc.stac.load() above.
+    _ensure_s3_credentials()
     print("    Computing temporal median (HLS)…")
     try:
         with ProgressBar():
