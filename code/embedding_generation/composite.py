@@ -11,6 +11,7 @@ Output files land in --output-dir.
 """
 import argparse
 import math
+import os
 import traceback
 import warnings
 from pathlib import Path
@@ -614,6 +615,20 @@ def main() -> None:
                     "in your .env file (or exported in the shell)."
                 )
             print("Earthdata authentication successful.")
+
+            # GDAL (used by rasterio/odc.stac) does not inherit the earthaccess
+            # session automatically. These four env vars tell it to follow NASA's
+            # EDL redirect, authenticate via ~/.netrc, and cache the resulting
+            # session cookie. Must be in os.environ — not a rasterio.Env context —
+            # so that dask worker threads pick them up during compute().
+            os.environ.update({
+                "GDAL_HTTP_NETRC":       "YES",
+                "GDAL_HTTP_COOKIEFILE":  "/tmp/.urs_cookies",
+                "GDAL_HTTP_COOKIEJAR":   "/tmp/.urs_cookies",
+                "GDAL_HTTP_MAX_RETRY":   "3",
+                "GDAL_HTTP_RETRY_DELAY": "2",
+            })
+
             hls_client = pystac_client.Client.open(HLS_STAC_ENDPOINT)
 
     # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (native HLS)
