@@ -322,18 +322,26 @@ def _run_composite(
     max_cloud_cover: int,
     max_scenes_per_month: int | None = 3,
     label: str = "",
+    force: bool = False,
 ) -> None:
     """Composite one time window over a list of tiles, merging if necessary.
 
     Tile TIFs are named <out_path.stem>_tile###.tif and deleted after merging.
     Individual tiles that already exist are skipped, enabling resume after
-    interruption mid-merge.
+    interruption mid-merge. Pass force=True to delete existing outputs and
+    reprocess from scratch.
     """
     prefix = f"  [{label}]" if label else " "
 
     if out_path.exists():
-        print(f"{prefix} Already exists, skipping: {out_path.name}")
-        return
+        if not force:
+            print(f"{prefix} Already exists, skipping: {out_path.name}")
+            return
+        print(f"{prefix} --force: removing existing {out_path.name}")
+        out_path.unlink()
+        # Also remove any leftover tile files from a previous run
+        for stale in out_path.parent.glob(f"{out_path.stem}_tile*.tif"):
+            stale.unlink()
 
     n = len(tiles)
 
@@ -384,6 +392,7 @@ def process_state(
     max_cloud_cover: int = 30,
     max_tile_km: float = 200.0,
     max_scenes_per_month: int | None = 3,
+    force: bool = False,
 ) -> None:
     """Run composite generation for a single state, tiling automatically if needed."""
     crs = bbox_to_utm_epsg(bbox)
@@ -400,6 +409,7 @@ def process_state(
             f"{year}-01-01/{year}-12-31",
             output_dir / f"s2_annual_{state}_{year}_olmoearth.tif",
             resolution, max_cloud_cover, max_scenes_per_month,
+            force=force,
         )
 
     elif model == "prithvi":
@@ -409,7 +419,7 @@ def process_state(
                 f"{year}-{start}/{year}-{end}",
                 output_dir / f"s2_{season}_{state}_{year}_prithvi.tif",
                 resolution, max_cloud_cover, max_scenes_per_month,
-                label=season,
+                label=season, force=force,
             )
 
 
@@ -441,6 +451,9 @@ def main() -> None:
                         help="Keep at most N scenes per calendar month, choosing the "
                              "clearest (lowest cloud cover) first (default 3). "
                              "Use 0 to disable sampling and use all available scenes.")
+    parser.add_argument("--force", action="store_true",
+                        help="Overwrite existing output files instead of skipping them. "
+                             "Also removes any leftover tile files from previous runs.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
@@ -460,7 +473,7 @@ def main() -> None:
         for state, bbox in states:
             process_state(client, state, bbox, args.model, args.year,
                           resolution, args.output_dir,
-                          args.max_cloud_cover, args.max_tile_km, max_scenes)
+                          args.max_cloud_cover, args.max_tile_km, max_scenes, args.force)
         print("\nAll states complete.")
     else:
         state = args.state or "RI"
