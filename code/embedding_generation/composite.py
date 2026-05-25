@@ -12,6 +12,7 @@ Output files land in --output-dir.
 import argparse
 import math
 import os
+import threading
 import time
 import traceback
 from datetime import datetime, timezone
@@ -372,16 +373,33 @@ def load_and_composite_hls(
     clear = (fmask & 0b00001110) == 0
     masked = ds[HLS_PRITHVI_BANDS].where(clear)
 
-    # Refresh credentials immediately before compute() — the dask graph is built
-    # lazily, so S3 reads happen here, not during odc.stac.load() above.
+    # Refresh credentials immediately before compute(), then keep refreshing
+    # every 2 minutes in a background thread.  A single tile's compute() can
+    # outlast the credential lifetime (typically ~1 h) on large states, so a
+    # one-shot refresh before compute() is not sufficient.
     _ensure_s3_credentials()
     print("    Computing temporal median (HLS)…")
+
+    stop_refresh = threading.Event()
+
+    def _refresh_loop() -> None:
+        while not stop_refresh.wait(timeout=120):  # wake every 2 minutes
+            _ensure_s3_credentials()
+
+    refresh_thread = threading.Thread(target=_refresh_loop, daemon=True)
+    refresh_thread.start()
+    median = None
     try:
         with ProgressBar():
             median = masked.median(dim="time").compute()
     except Exception:
         print("    ERROR during dask compute:")
         traceback.print_exc()
+    finally:
+        stop_refresh.set()
+        refresh_thread.join(timeout=5)
+
+    if median is None:
         return None, None, None
 
     print(f"    Median dataset dims: {dict(median.dims)}")
