@@ -12,6 +12,7 @@ Output files land in --output-dir.
 import argparse
 import math
 import os
+import time
 import traceback
 import warnings
 from pathlib import Path
@@ -48,6 +49,46 @@ HLS_S30_COLLECTION = "HLSS30_2.0"
 # embed.py works identically regardless of source.
 HLS_PRITHVI_BANDS = ["B02", "B03", "B04", "B8A", "B11", "B12"]
 HLS_FMASK_BAND    = "Fmask"
+
+# NASA Earthdata HTTPS base — stripped when rewriting to S3 paths.
+_HLS_HTTPS_PREFIX = "https://data.lpdaac.earthdatacloud.nasa.gov/"
+# S3 temporary credential expiry timestamp (refreshed automatically).
+_s3_creds_expiry: float = 0.0
+
+
+def _https_to_s3(href: str) -> str:
+    """Rewrite a NASA LP DAAC HTTPS URL to a direct S3 path.
+
+    e.g. https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/HLSS30.020/...
+      →  s3://lp-prod-protected/HLSS30.020/...
+    """
+    if href.startswith(_HLS_HTTPS_PREFIX):
+        return "s3://" + href[len(_HLS_HTTPS_PREFIX):]
+    return href
+
+
+def _ensure_s3_credentials() -> None:
+    """Mint or refresh NASA LP DAAC temporary S3 credentials.
+
+    Credentials are valid for ~1 hour; this function re-mints them with a
+    60-second buffer so they never expire mid-tile. The resulting AWS env vars
+    (ACCESS_KEY_ID / SECRET_ACCESS_KEY / SESSION_TOKEN) are read by GDAL and
+    boto3 in every dask worker thread automatically.
+    """
+    global _s3_creds_expiry
+    if time.time() < _s3_creds_expiry - 60:
+        return  # still valid
+    import earthaccess
+    creds = earthaccess.get_s3_credentials(provider="LPCLOUD")
+    os.environ.update({
+        "AWS_ACCESS_KEY_ID":     creds["accessKeyId"],
+        "AWS_SECRET_ACCESS_KEY": creds["secretAccessKey"],
+        "AWS_SESSION_TOKEN":     creds["sessionToken"],
+        "AWS_DEFAULT_REGION":    "us-west-2",
+    })
+    _s3_creds_expiry = time.time() + 3600
+    print("  HLS: S3 credentials refreshed (valid ~1 h).")
+
 
 # AWS Element84 STAC uses common names as asset keys (not B01/B02/... codes).
 # Band ordering follows olmoearth_pretrain.data.constants.Modality.SENTINEL2_L2A band sets:
@@ -287,9 +328,20 @@ def load_and_composite_hls(
         print(f"    → {len(items)} scenes after sampling "
               f"({max_scenes_per_month}/month max)")
 
+    # Refresh S3 credentials (minted by earthaccess, valid ~1 h) and rewrite
+    # HTTPS asset URLs to direct S3 paths.  GDAL reads AWS_* env vars from the
+    # process environment, so no extra auth configuration is needed in odc.stac.
+    _ensure_s3_credentials()
+    items_s3 = []
+    for item in items:
+        item_s3 = item.clone()
+        for asset in item_s3.assets.values():
+            asset.href = _https_to_s3(asset.href)
+        items_s3.append(item_s3)
+
     all_bands = HLS_PRITHVI_BANDS + [HLS_FMASK_BAND]
     ds = odc.stac.load(
-        items,
+        items_s3,
         bands=all_bands,
         crs=crs,
         resolution=resolution,
@@ -615,20 +667,9 @@ def main() -> None:
                     "in your .env file (or exported in the shell)."
                 )
             print("Earthdata authentication successful.")
-
-            # GDAL (used by rasterio/odc.stac) does not inherit the earthaccess
-            # session automatically. These four env vars tell it to follow NASA's
-            # EDL redirect, authenticate via ~/.netrc, and cache the resulting
-            # session cookie. Must be in os.environ — not a rasterio.Env context —
-            # so that dask worker threads pick them up during compute().
-            os.environ.update({
-                "GDAL_HTTP_NETRC":       "YES",
-                "GDAL_HTTP_COOKIEFILE":  "/tmp/.urs_cookies",
-                "GDAL_HTTP_COOKIEJAR":   "/tmp/.urs_cookies",
-                "GDAL_HTTP_MAX_RETRY":   "3",
-                "GDAL_HTTP_RETRY_DELAY": "2",
-            })
-
+            # Mint the first set of S3 credentials eagerly so any auth error
+            # surfaces here rather than deep inside the first tile.
+            _ensure_s3_credentials()
             hls_client = pystac_client.Client.open(HLS_STAC_ENDPOINT)
 
     # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (native HLS)
