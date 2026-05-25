@@ -15,6 +15,8 @@ import traceback
 import warnings
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 import numpy as np
 import rasterio
 import rasterio.errors
@@ -31,6 +33,20 @@ warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarni
 
 STAC_ENDPOINT = "https://earth-search.aws.element84.com/v1"
 S2_COLLECTION = "sentinel-2-l2a"
+
+# NASA LP DAAC — Harmonized Landsat Sentinel-2 (HLS) S30 v2.0
+# Used as the Prithvi data source when --source hls is set.
+# Access requires Earthdata credentials: set EARTHDATA_USERNAME + EARTHDATA_PASSWORD
+# in a .env file (or export them). Direct S3 access only works from AWS us-west-2;
+# HTTPS access works anywhere with valid credentials.
+HLS_STAC_ENDPOINT  = "https://cmr.earthdata.nasa.gov/stac/LPCLOUD"
+HLS_S30_COLLECTION = "HLSS30_2.0"
+
+# HLS band codes that correspond 1-to-1 with PRITHVI_BANDS.
+# Data is saved with PRITHVI_BANDS (common names) in the output TIF tags so
+# embed.py works identically regardless of source.
+HLS_PRITHVI_BANDS = ["B02", "B03", "B04", "B8A", "B11", "B12"]
+HLS_FMASK_BAND    = "Fmask"
 
 # AWS Element84 STAC uses common names as asset keys (not B01/B02/... codes).
 # Band ordering follows olmoearth_pretrain.data.constants.Modality.SENTINEL2_L2A band sets:
@@ -233,6 +249,98 @@ def load_and_composite(
     return arr, transform, out_crs
 
 
+def load_and_composite_hls(
+    client: pystac_client.Client,
+    bbox: tuple[float, float, float, float],
+    datetime_str: str,
+    crs: str,
+    resolution: int,
+    max_cloud_cover: int = 30,
+    max_scenes_per_month: int | None = 3,
+) -> tuple:
+    """Query HLS S30 v2.0 via CMR-STAC, apply Fmask, and return (arr, transform, crs).
+
+    Uses Fmask bit masking instead of SCL: bits 1 (cloud), 2 (adjacent to cloud
+    or shadow), and 3 (cloud shadow) must all be zero for a pixel to be retained.
+    The output array has channels ordered to match PRITHVI_BANDS (blue, green,
+    red, nir08, swir16, swir22) so save_tif can tag them with common names.
+
+    Returns (None, None, None) if no usable scenes are found.
+    """
+    search = client.search(
+        collections=[HLS_S30_COLLECTION],
+        bbox=bbox,
+        datetime=datetime_str,
+    )
+    items = list(search.item_collection())
+    # Filter by cloud cover client-side (CMR-STAC query syntax differs from Element84)
+    items = [i for i in items
+             if i.properties.get("eo:cloud_cover", 100) < max_cloud_cover]
+    print(f"    {len(items)} HLS scenes found for {datetime_str} "
+          f"(<{max_cloud_cover}% cloud)")
+    if not items:
+        return None, None, None
+
+    if max_scenes_per_month is not None:
+        items = sample_scenes_per_month(items, max_scenes_per_month)
+        print(f"    → {len(items)} scenes after sampling "
+              f"({max_scenes_per_month}/month max)")
+
+    all_bands = HLS_PRITHVI_BANDS + [HLS_FMASK_BAND]
+    ds = odc.stac.load(
+        items,
+        bands=all_bands,
+        crs=crs,
+        resolution=resolution,
+        bbox=bbox,
+        groupby="solar_day",
+        chunks={"time": 1, "x": 512, "y": 512},
+    )
+
+    # Fmask cloud masking: clear = bits 1 (cloud) + 2 (adjacent) + 3 (shadow) all zero
+    fmask = ds[HLS_FMASK_BAND].astype("uint8")
+    clear = (fmask & 0b00001110) == 0
+    masked = ds[HLS_PRITHVI_BANDS].where(clear)
+
+    print("    Computing temporal median (HLS)…")
+    try:
+        with ProgressBar():
+            median = masked.median(dim="time").compute()
+    except Exception:
+        print("    ERROR during dask compute:")
+        traceback.print_exc()
+        return None, None, None
+
+    print(f"    Median dataset dims: {dict(median.dims)}")
+
+    try:
+        arr = np.stack(
+            [median[b].values for b in HLS_PRITHVI_BANDS], axis=0
+        ).astype("float32")
+    except Exception:
+        print("    ERROR stacking bands:")
+        traceback.print_exc()
+        return None, None, None
+
+    print(f"    Array shape: {arr.shape}  dtype={arr.dtype}  "
+          f"nan_frac={np.isnan(arr).mean():.1%}")
+
+    if arr.shape[1] == 0 or arr.shape[2] == 0:
+        print("    WARNING: empty spatial extent — skipping.")
+        return None, None, None
+
+    try:
+        geobox = ds.odc.geobox
+        transform = geobox.transform
+        out_crs = geobox.crs.to_wkt()
+    except Exception:
+        print("    ERROR extracting geobox:")
+        traceback.print_exc()
+        return None, None, None
+
+    return arr, transform, out_crs
+
+
 def save_tif(arr: np.ndarray, transform, crs: str, bands: list[str], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Write to a .tmp file first, then rename — ensures the output is either
@@ -323,6 +431,7 @@ def _run_composite(
     max_scenes_per_month: int | None = 3,
     label: str = "",
     force: bool = False,
+    hls_client: "pystac_client.Client | None" = None,
 ) -> None:
     """Composite one time window over a list of tiles, merging if necessary.
 
@@ -330,6 +439,10 @@ def _run_composite(
     Individual tiles that already exist are skipped, enabling resume after
     interruption mid-merge. Pass force=True to delete existing outputs and
     reprocess from scratch.
+
+    When hls_client is provided, HLS S30 v2.0 data is used instead of the
+    Element84 Sentinel-2 STAC (Prithvi only). Output band tags are always
+    written as PRITHVI_BANDS (common names) regardless of source.
     """
     prefix = f"  [{label}]" if label else " "
 
@@ -343,16 +456,30 @@ def _run_composite(
         for stale in out_path.parent.glob(f"{out_path.stem}_tile*.tif"):
             stale.unlink()
 
+    # Choose loader based on data source. HLS output uses PRITHVI_BANDS as
+    # tag names so embed.py is source-agnostic.
+    if hls_client is not None:
+        def _load(tile_bbox: tuple) -> tuple:
+            return load_and_composite_hls(
+                hls_client, tile_bbox, datetime_str, crs, resolution,
+                max_cloud_cover, max_scenes_per_month,
+            )
+        out_bands = PRITHVI_BANDS
+    else:
+        def _load(tile_bbox: tuple) -> tuple:
+            return load_and_composite(
+                client, tile_bbox, datetime_str, bands, crs, resolution,
+                max_cloud_cover, max_scenes_per_month,
+            )
+        out_bands = bands
+
     n = len(tiles)
 
     if n == 1:
-        print(f"{prefix} Compositing ({len(bands)} bands)…")
-        arr, transform, out_crs = load_and_composite(
-            client, tiles[0], datetime_str, bands, crs, resolution,
-            max_cloud_cover, max_scenes_per_month,
-        )
+        print(f"{prefix} Compositing ({len(out_bands)} bands)…")
+        arr, transform, out_crs = _load(tiles[0])
         if arr is not None:
-            save_tif(arr, transform, out_crs, bands, out_path)
+            save_tif(arr, transform, out_crs, out_bands, out_path)
         return
 
     # --- tiled path ---
@@ -362,15 +489,12 @@ def _run_composite(
         if tile_path.exists():
             print(f"{prefix} Tile {idx + 1}/{n} already exists, skipping")
         else:
-            print(f"{prefix} Tile {idx + 1}/{n} ({len(bands)} bands)…")
-            arr, transform, out_crs = load_and_composite(
-                client, tile_bbox, datetime_str, bands, crs, resolution,
-                max_cloud_cover, max_scenes_per_month,
-            )
+            print(f"{prefix} Tile {idx + 1}/{n} ({len(out_bands)} bands)…")
+            arr, transform, out_crs = _load(tile_bbox)
             if arr is None:
                 print(f"{prefix} WARNING: tile {idx + 1}/{n} returned no data, skipping")
                 continue
-            save_tif(arr, transform, out_crs, bands, tile_path)
+            save_tif(arr, transform, out_crs, out_bands, tile_path)
         tile_paths.append(tile_path)
 
     if not tile_paths:
@@ -378,7 +502,7 @@ def _run_composite(
         return
 
     print(f"{prefix} Merging {len(tile_paths)}/{n} tiles → {out_path.name}…")
-    _merge_tiles(tile_paths, bands, out_path)
+    _merge_tiles(tile_paths, out_bands, out_path)
 
 
 def process_state(
@@ -393,15 +517,18 @@ def process_state(
     max_tile_km: float = 200.0,
     max_scenes_per_month: int | None = 3,
     force: bool = False,
+    hls_client: "pystac_client.Client | None" = None,
 ) -> None:
     """Run composite generation for a single state, tiling automatically if needed."""
     crs = bbox_to_utm_epsg(bbox)
     tiles = split_bbox_into_tiles(bbox, crs, max_tile_km)
     n_tiles = len(tiles)
 
+    source_label = "HLS" if hls_client is not None else "Element84"
     print(f"\n{'='*60}")
     tile_info = f"  {n_tiles} tiles" if n_tiles > 1 else ""
-    print(f"State: {state}  Year: {year}  Model: {model}  CRS: {crs}{tile_info}")
+    print(f"State: {state}  Year: {year}  Model: {model}  "
+          f"Source: {source_label}  CRS: {crs}{tile_info}")
 
     if model == "olmoearth":
         _run_composite(
@@ -420,10 +547,14 @@ def process_state(
                 output_dir / f"s2_{season}_{state}_{year}_prithvi.tif",
                 resolution, max_cloud_cover, max_scenes_per_month,
                 label=season, force=force,
+                hls_client=hls_client,
             )
 
 
 def main() -> None:
+    # Load .env before parsing so EARTHDATA_* vars are available to earthaccess
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--state", default=None,
                         help="Two-letter state abbreviation (must be in STATE_BBOXES). "
@@ -435,6 +566,12 @@ def main() -> None:
                         help="Override state bbox: W S E N in WGS84. Single state only.")
     parser.add_argument("--year", type=int, default=2022)
     parser.add_argument("--model", choices=["olmoearth", "prithvi"], default="olmoearth")
+    parser.add_argument("--source", choices=["element84", "hls"], default="element84",
+                        help="Data source for Prithvi composites. 'element84' (default) "
+                             "uses the public AWS Sentinel-2 STAC. 'hls' uses NASA LP DAAC "
+                             "HLS S30 v2.0 — Prithvi's actual training distribution — and "
+                             "requires EARTHDATA_USERNAME / EARTHDATA_PASSWORD in your "
+                             ".env file or environment. Ignored for OlmoEarth.")
     parser.add_argument("--resolution", type=int, default=None,
                         help="Output pixel resolution in metres. Defaults to 10 m for "
                              "OlmoEarth (trained on 10 m S2) and 30 m for Prithvi "
@@ -457,7 +594,27 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
+    # Element84 STAC client (always needed for OlmoEarth; fallback for Prithvi)
     client = pystac_client.Client.open(STAC_ENDPOINT)
+
+    # HLS client — only initialised when --source hls --model prithvi
+    hls_client = None
+    if args.source == "hls":
+        if args.model != "prithvi":
+            print("WARNING: --source hls is only supported for --model prithvi. "
+                  "Falling back to Element84.")
+            args.source = "element84"
+        else:
+            import earthaccess
+            auth = earthaccess.login(strategy="environment")
+            if not auth.authenticated:
+                raise SystemExit(
+                    "Earthdata authentication failed.\n"
+                    "Check that EARTHDATA_USERNAME and EARTHDATA_PASSWORD are set "
+                    "in your .env file (or exported in the shell)."
+                )
+            print("Earthdata authentication successful.")
+            hls_client = pystac_client.Client.open(HLS_STAC_ENDPOINT)
 
     # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (native HLS)
     resolution = args.resolution or (10 if args.model == "olmoearth" else 30)
@@ -466,14 +623,15 @@ def main() -> None:
     if args.all_states:
         states = list(STATE_BBOXES.items())
         print(f"Running all {len(states)} CONUS states  year={args.year}  "
-              f"model={args.model}  resolution={resolution}m  "
+              f"model={args.model}  source={args.source}  resolution={resolution}m  "
               f"max_cloud={args.max_cloud_cover}%  "
               f"max_tile={args.max_tile_km:.0f}km  "
               f"max_scenes/month={max_scenes or 'unlimited'}")
         for state, bbox in states:
             process_state(client, state, bbox, args.model, args.year,
                           resolution, args.output_dir,
-                          args.max_cloud_cover, args.max_tile_km, max_scenes, args.force)
+                          args.max_cloud_cover, args.max_tile_km, max_scenes, args.force,
+                          hls_client=hls_client)
         print("\nAll states complete.")
     else:
         state = args.state or "RI"
@@ -485,7 +643,8 @@ def main() -> None:
             raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
         process_state(client, state, bbox, args.model, args.year,
                       resolution, args.output_dir,
-                      args.max_cloud_cover, args.max_tile_km, max_scenes)
+                      args.max_cloud_cover, args.max_tile_km, max_scenes,
+                      hls_client=hls_client)
 
 
 if __name__ == "__main__":
