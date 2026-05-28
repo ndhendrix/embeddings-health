@@ -5,6 +5,97 @@ The goal of this project is to determine whether spatial embeddings (DeepMind Al
 
 As an exploratory aim, we look to mechanistic interpretability research to guide us in the search for vectors within the embeddings that may be associated with more specific health outcomes. Just as vectors in general purpose LLMs encode information about factors like political ideology, we hypothesize that vectors in spatial embeddings may encode information about elements of the built and natural environments that are known to influence specific health outcomes.
 
+---
+
+## Embedding generation pipeline
+
+The pipeline lives in `code/embedding_generation/` and requires Python 3.11–3.12. All commands below are run from that directory with `uv run python`.
+
+### Step 1 — Sentinel-2 composites (`composite.py`)
+
+Produces annual (OlmoEarth) or seasonal (Prithvi) cloud-free median GeoTIFFs from Sentinel-2 L2A imagery via the public AWS Element84 STAC catalog. No credentials required.
+
+```bash
+# Single state, Prithvi model (spring/summer/fall composites at 30 m)
+uv run python composite.py --model prithvi --state RI --year 2022 \
+    --max-scenes-per-month 8 --output-dir outputs/composites
+
+# All CONUS states
+uv run python composite.py --model prithvi --all-states --year 2022 \
+    --max-scenes-per-month 8 --output-dir outputs/composites
+```
+
+Key flags:
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model` | `olmoearth` | `olmoearth` (annual, 12 bands, 10 m) or `prithvi` (seasonal, 6 bands, 30 m) |
+| `--state` | `RI` | Two-letter state abbreviation |
+| `--all-states` | off | Process all 48 contiguous US states |
+| `--year` | `2022` | Composite year |
+| `--max-cloud-cover` | `30` | Maximum scene-level cloud cover % |
+| `--max-scenes-per-month` | `3` | Max scenes kept per calendar month (clearest first). Use 8+ for good spatial coverage |
+| `--max-tile-km` | `200` | Tiles states wider than this (km) to avoid memory limits |
+| `--force` | off | Reprocess existing outputs instead of skipping |
+| `--output-dir` | `outputs/composites` | Directory for output GeoTIFFs |
+
+### Step 2 — Embedding inference (`embed.py`)
+
+Runs chip-based GPU inference over a composite GeoTIFF and writes a Cloud-Optimized GeoTIFF of patch embeddings. Supports OlmoEarth 1.1 (AllenAI) and Prithvi-EO-2.0 (IBM/NASA). Automatically uses CUDA, Apple Silicon MPS, or CPU.
+
+```bash
+# Prithvi tiny (default variant) — 192-dim embeddings at 480 m resolution
+uv run python embed.py --model prithvi \
+    --input outputs/composites/s2_spring_RI_2022_prithvi.tif \
+            outputs/composites/s2_summer_RI_2022_prithvi.tif \
+            outputs/composites/s2_fall_RI_2022_prithvi.tif \
+    --output outputs/embeddings/prithvi_tiny_RI_2022.tif \
+    --raw-output outputs/embeddings/prithvi_tiny_RI_2022_raw.tif
+
+# OlmoEarth Base — 768-dim embeddings at 80 m resolution
+uv run python embed.py --model olmoearth \
+    --input outputs/composites/s2_annual_RI_2022_olmoearth.tif \
+    --output outputs/embeddings/olmoearth_RI_2022.tif
+```
+
+Key flags:
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model` | required | `olmoearth` or `prithvi` |
+| `--variant` | `tiny` (Prithvi) / `Base` (OlmoEarth) | Prithvi: `tiny`, `300M`, `600M`. OlmoEarth: `Base`, `Large` |
+| `--input` | required | One TIF for OlmoEarth; one-to-four for Prithvi (spring, summer, fall, winter). If fewer TIFs than the model's expected frame count are supplied, the last TIF is repeated with a warning |
+| `--output` | required | Output COG path (PCA-compressed by default) |
+| `--raw-output` | off | Also save the pre-PCA raw embeddings to this path. Useful for re-running PCA/UMAP without redoing GPU inference |
+| `--no-pca` | off | Skip PCA; write raw embeddings directly to `--output` |
+| `--pca-dims` | `64` | PCA output dimensionality |
+| `--pca-model` | auto | Path to a pre-fitted `.pkl` PCA model. If absent, a new one is fitted and saved alongside the output |
+| `--force` | off | Delete existing output and checkpoint files before starting |
+| `--checkpoint-every` | `500` | Save a recovery checkpoint every N chips. Jobs interrupted mid-run resume automatically from the last checkpoint when restarted with the same `--output` path |
+| `--batch-size` | `8` | Chips per GPU batch |
+| `--year` | `2022` | Used for OlmoEarth temporal encoding |
+| `--test-chips` | off | Process only the first N chips (debug/smoke-test) |
+
+**Output resolution:**
+- OlmoEarth: 80 m/pixel (8-pixel patch × 10 m input)
+- Prithvi: 480 m/pixel (16-pixel patch × 30 m input)
+
+### Step 3 — Census-tract aggregation (`aggregate.py`)
+
+Aggregates the embedding COG to census-tract level statistics (mean, median, max, min, std across all pixels within each tract boundary).
+
+```bash
+uv run python aggregate.py \
+    --embedding outputs/embeddings/prithvi_tiny_RI_2022.tif \
+    --tracts data/census_tracts_2020.gpkg \
+    --output data/prithvi_tiny_embeddings.csv \
+    --model prithvi --year 2022
+```
+
+Output CSV columns follow the schema `{BAND}_{STAT}` (e.g. `PR0000_MEAN`, `PR0001_MEDIAN`), matching the AlphaEarth embeddings format already in this repo.
+
+---
+
 ## To do
 
 - [ ] Add TESSERA embeddings

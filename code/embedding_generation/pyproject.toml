@@ -18,6 +18,8 @@ dependencies = [
     "torch>=2.1",
     "torchvision>=0.16",
     "transformers>=4.40",
+    "timm>=0.9",
+    "einops>=0.7",
     "olmoearth-pretrain>=0.1.0",
     # terratorch is optional; we load Prithvi via transformers trust_remote_code
     # "terratorch>=1.2rc4",
@@ -35,9 +37,6 @@ dependencies = [
     "class-registry>=2.1.2",
     "setuptools>=82.0.1",
     "matplotlib>=3.10.9",
-    # NASA Earthdata access (HLS S30 for Prithvi composites)
-    "earthaccess>=0.9",
-    "python-dotenv>=1.0",
 ]
 
 [project.scripts]

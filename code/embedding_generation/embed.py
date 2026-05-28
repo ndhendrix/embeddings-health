@@ -1,38 +1,51 @@
 """
 Run OlmoEarth or Prithvi-EO-2.0 inference on a composite GeoTIFF.
 
-Processes the raster in non-overlapping 128×128 pixel chips, extracts spatial
+Processes the raster in non-overlapping chip-sized windows, extracts spatial
 patch embeddings from the encoder, assembles them into a multi-band COG, then
 optionally PCA-compresses to 64 dimensions.
 
-OlmoEarth output resolution:   80 m/pixel  (patch_size=8 × 10 m input = 8 px/token × 10 m)
-Prithvi output resolution:    480 m/pixel  (patch_size=16 × 30 m input = 16 px/token × 30 m)
+OlmoEarth output resolution:   80 m/pixel  (patch_size=8 × 10 m input)
+Prithvi output resolution:    480 m/pixel  (patch_size=16 × 30 m input)
 
 Usage (OlmoEarth):
   python embed.py --model olmoearth \\
     --input outputs/composites/s2_annual_RI_2022_olmoearth.tif \\
     --output outputs/embeddings/olmoearth_RI_2022.tif
 
-Usage (Prithvi — three seasonal composites):
-  python embed.py --model prithvi \\
+Usage (Prithvi tiny — 3 seasonal composites; 4th frame auto-padded):
+  python embed.py --model prithvi --variant tiny \\
     --input outputs/composites/s2_spring_RI_2022_prithvi.tif \\
             outputs/composites/s2_summer_RI_2022_prithvi.tif \\
             outputs/composites/s2_fall_RI_2022_prithvi.tif \\
-    --output outputs/embeddings/prithvi_RI_2022.tif
+    --output outputs/embeddings/prithvi_tiny_RI_2022.tif \\
+    --raw-output outputs/embeddings/prithvi_tiny_RI_2022_raw.tif
 
 Flags:
-  --no-pca              Store raw embeddings (768 for OlmoEarth; 1024 for Prithvi).
+  --variant STR         Model variant. OlmoEarth: Base (default) / Large.
+                        Prithvi: tiny (default) / 300M / 600M.
+  --no-pca              Store raw embeddings instead of PCA-compressing.
+  --raw-output PATH     Also write the pre-PCA raw embedding COG to this path.
+                        Lets you re-run PCA/UMAP later without re-doing GPU inference.
+                        No-op when --no-pca is set (--output already has raw embeddings).
   --pca-dims N          PCA target dimensionality (default 64).
   --pca-model PATH      Path to pre-fitted .pkl PCA; if absent a new PCA is fitted
                         and saved next to the output TIF.
+  --force               Delete any existing output and checkpoint files before
+                        starting. Without this flag, checkpoints are resumed
+                        automatically.
   --test-chips N        Process only the first N chips (local debug mode).
   --batch-size N        Chips per GPU batch (default 8).
-  --variant STR         Base/Large for OlmoEarth; 300M/600M for Prithvi.
   --checkpoint-every N  Save a recovery checkpoint every N chips (default 500).
                         A .ckpt.npy and .ckpt.n sidecar are written next to the
                         output file and deleted on clean completion. If the job
                         is interrupted and restarted with the same --output path,
                         inference resumes from the last checkpoint automatically.
+
+Frame-count mismatch (Prithvi only):
+  If the model's config.num_frames exceeds the number of --input TIFs, the last
+  TIF is repeated to fill the gap (with a printed warning). This lets you run the
+  tiny-TL variant (num_frames=4) with only 3 seasonal composites.
 """
 import argparse
 import pickle
@@ -57,6 +70,7 @@ OLMOEARTH_REPO = {
     "Large": "OlmoEarth-v1-Large",
 }
 PRITHVI_REPO = {
+    "tiny": "ibm-nasa-geospatial/Prithvi-EO-2.0-tiny-TL",
     "300M": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M",
     "600M": "ibm-nasa-geospatial/Prithvi-EO-2.0-600M",
 }
@@ -81,10 +95,10 @@ OLMOEARTH_STRIDE_PX = 8           # output stride in input pixels
 #       ibm-nasa-geospatial/Prithvi-EO-2.0-300M config.json on HuggingFace.
 # ---------------------------------------------------------------------------
 PRITHVI_CHIP_PX = 224
-PRITHVI_TIMESTEPS = 3             # spring, summer, fall
+PRITHVI_TIMESTEPS = 3             # default seasons produced by composite.py (spring/summer/fall)
 PRITHVI_PATCH_SIZE = 16           # spatial patch size in pixels
-PRITHVI_EMBED_DIM_BY_VARIANT = {"300M": 768, "600M": 1024}
-
+# NOTE: the number of temporal frames fed to the model is read from model.config.num_frames
+# at load time (via load_prithvi()), NOT from PRITHVI_TIMESTEPS. The tiny-TL variant needs 4.
 # Normalization (S2 DN units, i.e. reflectance × 10000).
 # Bands in order: B02, B03, B04, B8A, B11, B12
 # TODO: confirm these against the model card mean/std values.
@@ -111,15 +125,80 @@ def load_olmoearth(variant: str = "Base"):
     return model
 
 
-def load_prithvi(variant: str = "300M"):
-    """Return (model,) using transformers AutoModel with trust_remote_code."""
-    from transformers import AutoModel  # type: ignore
+def load_prithvi(variant: str = "tiny") -> tuple:
+    """Return (model, embed_dim, num_frames, model_family).
+
+    model_family is one of:
+      'prithvi_mae'    — raw PyTorch weights + prithvi_mae.py (tiny-TL and similar)
+      'hf_transformers'— HuggingFace AutoModel with trust_remote_code (300M, 600M)
+
+    Dispatches based on the structure of config.json in the HuggingFace repo:
+      architecture key present → prithvi_mae
+      otherwise                → hf_transformers
+    """
+    import json
+    from huggingface_hub import hf_hub_download
 
     repo = PRITHVI_REPO[variant]
     print(f"Loading Prithvi-EO-2.0-{variant} from {repo}…")
+    cfg_path = hf_hub_download(repo_id=repo, filename="config.json")
+    with open(cfg_path) as f:
+        cfg_dict = json.load(f)
+
+    if "architecture" in cfg_dict:
+        return _load_prithvi_mae(repo, cfg_dict)
+    else:
+        return _load_prithvi_hf(repo, cfg_dict)
+
+
+def _load_prithvi_mae(repo: str, cfg_dict: dict) -> tuple:
+    """Load a raw-weights Prithvi model (tiny-TL style).
+
+    Downloads the full repo snapshot, imports PrithviMAE from prithvi_mae.py,
+    instantiates with pretrained_cfg, and loads the .pt checkpoint.
+    """
+    import sys, json, torch
+    from pathlib import Path
+    from huggingface_hub import snapshot_download
+
+    repo_dir = snapshot_download(repo)
+    if repo_dir not in sys.path:
+        sys.path.insert(0, repo_dir)
+    from prithvi_mae import PrithviMAE  # type: ignore  # noqa: PLC0415
+
+    pcfg = cfg_dict["pretrained_cfg"]
+    embed_dim  = int(cfg_dict.get("num_features", pcfg.get("embed_dim", 192)))
+    num_frames = int(pcfg.get("num_frames", 4))
+    print(f"  Config: embed_dim={embed_dim}  num_frames={num_frames}")
+
+    # PrithviMAE.__init__ has **kwargs so extra keys (bands/mean/std/origin_url) are ignored.
+    model = PrithviMAE(**pcfg)
+
+    # Load weights; replace fixed pos_embed so the model handles variable num_frames.
+    weights_path = next(Path(repo_dir).glob("*.pt"))
+    state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
+    for k in list(state_dict.keys()):
+        if k == "encoder.pos_embed":
+            state_dict[k] = model.encoder.pos_embed
+        elif k == "decoder.decoder_pos_embed":
+            state_dict[k] = model.decoder.decoder_pos_embed
+    model.load_state_dict(state_dict, strict=True)
+    model.eval()
+    print(f"  Loaded weights from {weights_path.name}")
+    return model, embed_dim, num_frames, "prithvi_mae"
+
+
+def _load_prithvi_hf(repo: str, cfg_dict: dict) -> tuple:
+    """Load a Prithvi model via HuggingFace AutoModel (300M / 600M)."""
+    from transformers import AutoModel, AutoConfig  # type: ignore
+
+    cfg = AutoConfig.from_pretrained(repo, trust_remote_code=True)
+    embed_dim  = int(getattr(cfg, "embed_dim", None) or getattr(cfg, "hidden_size", 768))
+    num_frames = int(getattr(cfg, "num_frames", 3))
+    print(f"  Config: embed_dim={embed_dim}  num_frames={num_frames}")
     model = AutoModel.from_pretrained(repo, trust_remote_code=True)
     model.eval()
-    return (model,)
+    return model, embed_dim, num_frames, "hf_transformers"
 
 
 # ---------------------------------------------------------------------------
@@ -203,26 +282,41 @@ def run_prithvi_batch(
     model,
     chips: np.ndarray,   # (B, T, 6, chip_px, chip_px) float32, already normalised
     device: torch.device,
+    model_family: str = "prithvi_mae",
 ) -> np.ndarray:
     """Return (B, grid, grid, embed_dim) float32 spatial patch embeddings.
 
-    grid = chip_px // PRITHVI_PATCH_SIZE.
-    TODO: verify output structure from ibm-nasa-geospatial/Prithvi-EO-2.0-300M
-          — the actual attribute name and shape of the encoder's hidden state.
+    grid = chip_px // PRITHVI_PATCH_SIZE = 224 // 16 = 14.
+    Handles two model families:
+      prithvi_mae     — raw PrithviMAE weights (tiny-TL); input (B,C,T,H,W);
+                        calls model.forward_features() → list of hidden states.
+      hf_transformers — HuggingFace AutoModel (300M/600M); input pixel_values (B,T,C,H,W);
+                        reads output.last_hidden_state.
     """
-    chips = _impute_nan(chips)             # fill NaN before model sees them
-    tensor = torch.from_numpy(chips).to(device)   # (B, T, C, H, W)
-    with torch.no_grad():
-        output = model(pixel_values=tensor)
+    chips = _impute_nan(chips)          # fill NaN before model sees them
+    B, T, C, H, W = chips.shape
 
-    # AutoModel from Prithvi returns last_hidden_state: (B, T * H_p * W_p, D)
-    # TODO: confirm the output attribute name and shape from the model card.
-    hidden = output.last_hidden_state   # (B, num_tokens, D)
-    B, N, D = hidden.shape
-    T = chips.shape[1]
-    grid = int(round((N / T) ** 0.5))
-    # Reshape to (B, T, grid, grid, D) then average over T
-    spatial = hidden.reshape(B, T, grid, grid, D).mean(dim=1)  # (B, grid, grid, D)
+    if model_family == "prithvi_mae":
+        # PrithviMAE expects (B, C, T, H, W) — channels before time.
+        tensor = torch.from_numpy(chips).permute(0, 2, 1, 3, 4).to(device)
+        with torch.no_grad():
+            features = model.forward_features(tensor)
+        # forward_features returns a list; last element is final-layer hidden states.
+        # Shape: (B, 1 + T*grid*grid, D) — first token is CLS.
+        hidden = features[-1][:, 1:, :]    # drop CLS → (B, T*grid*grid, D)
+        D = hidden.shape[-1]
+        grid = int(round((hidden.shape[1] / T) ** 0.5))
+    else:
+        # HuggingFace: expects pixel_values (B, T, C, H, W)
+        tensor = torch.from_numpy(chips).to(device)
+        with torch.no_grad():
+            output = model(pixel_values=tensor)
+        hidden = output.last_hidden_state   # (B, N, D)
+        D = hidden.shape[-1]
+        grid = int(round((hidden.shape[1] / T) ** 0.5))
+
+    # Average temporal tokens → spatial embedding map (B, grid, grid, D)
+    spatial = hidden.reshape(B, T, grid, grid, D).mean(dim=1)
     return spatial.float().cpu().numpy()
 
 
@@ -371,7 +465,7 @@ def embed_olmoearth(
 
     n_processed = 0
     for batch in tqdm(chips_to_batches(iter_chips(src, OLMOEARTH_CHIP_PX), batch_size),
-                      desc="OlmoEarth chips", initial=n_skip):
+                      desc="OlmoEarth chips", initial=n_skip // batch_size):
         # Skip chips already completed in a previous run
         if n_processed < n_skip:
             n_processed += len(batch)
@@ -418,8 +512,9 @@ def embed_prithvi(
     test_chips: int | None,
     ckpt_path: Path | None = None,
     checkpoint_every: int = 500,
+    model_family: str = "prithvi_mae",
 ) -> np.ndarray:
-    """Return (embed_dim, H_out, W_out) embedding map averaged over 3 seasons."""
+    """Return (embed_dim, H_out, W_out) embedding map averaged over temporal frames."""
     h, w = srcs[0].height, srcs[0].width
     stride = PRITHVI_PATCH_SIZE
     out_h = (h + stride - 1) // stride
@@ -438,8 +533,9 @@ def embed_prithvi(
         for items in zip(*chip_iters):
             yield items
 
+    n_timesteps = len(srcs)
     for batch in tqdm(chips_to_batches(multi_iter(), batch_size),
-                      desc="Prithvi chips", initial=n_skip):
+                      desc="Prithvi chips", initial=n_skip // batch_size):
         if n_processed < n_skip:
             n_processed += len(batch)
             continue
@@ -451,13 +547,13 @@ def embed_prithvi(
         wins  = [b[0][2] for b in batch]
 
         season_chips = []
-        for t in range(PRITHVI_TIMESTEPS):
+        for t in range(n_timesteps):
             raw = np.stack([b[t][3] for b in batch], axis=0)
             norm = (raw - PRITHVI_MEANS[:, None, None]) / PRITHVI_STDS[:, None, None]
             season_chips.append(norm)
         chips = np.stack(season_chips, axis=1)
 
-        spatial = run_prithvi_batch(model, chips, device)
+        spatial = run_prithvi_batch(model, chips, device, model_family=model_family)
 
         for i, (row_off, col_off, win) in enumerate(zip(rows, cols, wins)):
             out_r = row_off // stride
@@ -485,16 +581,25 @@ def main() -> None:
     )
     parser.add_argument("--model", choices=["olmoearth", "prithvi"], required=True)
     parser.add_argument("--input", nargs="+", required=True,
-                        help="Composite TIF(s): one for OlmoEarth; three for Prithvi.")
+                        help="Composite TIF(s): one for OlmoEarth; one-to-four for Prithvi.")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--raw-output", type=Path, default=None,
+                        help="Also write the pre-PCA raw embeddings to this COG path. "
+                             "Useful for re-running PCA/UMAP without redoing GPU inference. "
+                             "Ignored when --no-pca is set (--output already has raw embeddings).")
     parser.add_argument("--no-pca", action="store_true",
-                        help="Skip PCA; store raw embeddings.")
+                        help="Skip PCA; store raw embeddings to --output.")
     parser.add_argument("--pca-dims", type=int, default=64)
     parser.add_argument("--pca-model", type=Path, default=None)
+    parser.add_argument("--force", action="store_true",
+                        help="Delete existing output and checkpoint files before starting. "
+                             "Without this flag, an existing checkpoint is resumed automatically.")
     parser.add_argument("--test-chips", type=int, default=None,
                         help="Limit to first N chips (debug).")
     parser.add_argument("--batch-size", type=int, default=8)
-    parser.add_argument("--variant", default=None)
+    parser.add_argument("--variant", default=None,
+                        help="Model variant. OlmoEarth: Base (default) / Large. "
+                             "Prithvi: tiny (default) / 300M / 600M.")
     parser.add_argument("--year", type=int, default=2022)
     parser.add_argument("--checkpoint-every", type=int, default=500,
                         help="Save recovery checkpoint every N chips (default 500).")
@@ -508,6 +613,17 @@ def main() -> None:
     if args.test_chips:
         print(f"DEBUG: processing only first {args.test_chips} chips.")
 
+    # Resolve checkpoint path early so --force can clean it up before model loading.
+    ckpt_path = args.output.with_suffix(".ckpt.npy")
+
+    if args.force:
+        for p in [args.output, ckpt_path, ckpt_path.with_suffix(".n")]:
+            if p and p.exists():
+                p.unlink()
+        if args.raw_output and args.raw_output.exists():
+            args.raw_output.unlink()
+        print("--force: cleared existing outputs and checkpoints.")
+
     if args.model == "olmoearth":
         variant = args.variant or "Base"
         model = load_olmoearth(variant)
@@ -516,7 +632,6 @@ def main() -> None:
         if len(args.input) != 1:
             raise SystemExit("OlmoEarth requires exactly one --input TIF.")
 
-        ckpt_path = args.output.with_suffix(".ckpt.npy")
         with rasterio.open(args.input[0]) as src:
             print(f"Input: {args.input[0]}  shape={src.count}×{src.height}×{src.width}  CRS={src.crs}")
             raw = embed_olmoearth(src, model, device, args.batch_size,
@@ -531,21 +646,30 @@ def main() -> None:
         col_prefix = "OE"
 
     elif args.model == "prithvi":
-        variant = args.variant or "300M"
-        (model,) = load_prithvi(variant)
+        variant = args.variant or "tiny"
+        model, embed_dim, num_frames, model_family = load_prithvi(variant)
         model = model.to(device)
 
-        if len(args.input) != 3:
-            raise SystemExit("Prithvi requires exactly three --input TIFs (spring, summer, fall).")
+        # Adjust input list to match num_frames expected by the model.
+        inputs = list(args.input)
+        if len(inputs) < num_frames:
+            n_pad = num_frames - len(inputs)
+            print(f"WARNING: {variant} model expects {num_frames} temporal frames but only "
+                  f"{len(inputs)} --input TIF(s) provided. Repeating the last TIF {n_pad} "
+                  f"time(s) to pad. Consider generating a winter composite for a proper 4th frame.")
+            inputs = inputs + [inputs[-1]] * n_pad
+        elif len(inputs) > num_frames:
+            print(f"WARNING: {variant} model expects {num_frames} frames but {len(inputs)} "
+                  f"--input TIFs were provided; using only the first {num_frames}.")
+            inputs = inputs[:num_frames]
 
-        ckpt_path = args.output.with_suffix(".ckpt.npy")
-        srcs = [rasterio.open(p) for p in args.input]
-        print(f"Inputs: {args.input}")
-        embed_dim = PRITHVI_EMBED_DIM_BY_VARIANT[variant]
+        srcs = [rasterio.open(p) for p in inputs]
+        print(f"Inputs ({len(srcs)} frames): {inputs}")
         raw = embed_prithvi(srcs, model, embed_dim, device, args.batch_size,
                             args.test_chips,
                             ckpt_path=ckpt_path,
-                            checkpoint_every=args.checkpoint_every)
+                            checkpoint_every=args.checkpoint_every,
+                            model_family=model_family)
         transform_in = srcs[0].transform
         crs_in = srcs[0].crs
         for s in srcs:
@@ -556,10 +680,23 @@ def main() -> None:
 
     print(f"Raw embedding map: {raw.shape}  (D × H_out × W_out)")
 
-    # PCA compression
+    # Scale geotransform to output (patch-level) resolution — needed for both raw and PCA writes.
+    out_transform = Affine(
+        transform_in.a * stride, transform_in.b, transform_in.c,
+        transform_in.d, transform_in.e * stride, transform_in.f,
+    )
+
+    raw_band_names = [f"{col_prefix}{i:04d}" for i in range(embed_dim)]
+
+    # Optionally save the pre-PCA raw embeddings.
+    if args.raw_output and not args.no_pca:
+        print(f"Writing raw embedding COG: {args.raw_output}  {raw.shape}")
+        write_cog(raw, out_transform, crs_in, args.raw_output, band_names=raw_band_names)
+
+    # PCA compression (or pass-through).
     if args.no_pca:
         final = raw
-        band_names = [f"{col_prefix}{i:04d}" for i in range(embed_dim)]
+        band_names = raw_band_names
     else:
         if args.pca_model and args.pca_model.exists():
             with open(args.pca_model, "rb") as f:
@@ -576,12 +713,6 @@ def main() -> None:
 
         final = apply_pca(raw, pca)
         band_names = [f"{col_prefix}{i:02d}" for i in range(args.pca_dims)]
-
-    # Scale geotransform to output (patch-level) resolution
-    out_transform = Affine(
-        transform_in.a * stride, transform_in.b, transform_in.c,
-        transform_in.d, transform_in.e * stride, transform_in.f,
-    )
 
     print(f"Writing COG: {args.output}  {final.shape}")
     write_cog(final, out_transform, crs_in, args.output, band_names=band_names)
