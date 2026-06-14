@@ -43,11 +43,14 @@ print(f"Manifest has {len(rows)} entries. Looking for missing piece jobs...\n")
 recovered: dict[str, dict] = {}
 
 
-# ── Strategy 1: search completed results ────────────────────────────────────
-print("Querying completed results (search API)...")
+# ── Strategy 1: search completed results (tile-level, skip if no pieces found) ─
+# The search endpoint returns individual tile records, not job records, so piece
+# jobs appear here only after they complete.  We scan at most 5 pages; if no
+# pieces turn up we move straight to Strategy 2 which queries job-level data.
+print("Querying completed results (search API, max 5 pages)...")
 page = 1
 total_results = 0
-while True:
+while page <= 5:
     t0 = time.time()
     resp = requests.post(
         f"{BASE_URL}/api/v1/prediction-results/search",
@@ -72,8 +75,7 @@ while True:
           f" (total: {total_results} scanned, {len(recovered)} pieces found)"
           f" [page {page}/{total_pages}]")
     if page == 1 and records:
-        sample = records[0]
-        print(f"  Sample result fields: {list(sample.keys())}")
+        print(f"  Sample result fields: {list(records[0].keys())}")
     if len(records) < 100:
         break
     page += 1
