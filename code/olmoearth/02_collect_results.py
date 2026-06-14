@@ -99,22 +99,31 @@ for i, row in enumerate(pending, 1):
 
         url = (f"{BASE_URL}/api/v1/prediction-results/files"
                f"?download_token={token}")
-        subprocess.run(
-            [
-                "curl",
-                "--http1.1",         # avoid HTTP/2 stream errors (CURLE_HTTP2_STREAM)
-                "-C", "-",           # resume from partial file if present
-                "--retry", "20",     # retry up to 20 times on transient errors
-                "--retry-delay", "10",
-                "--retry-max-time", "0",  # no overall time cap on retries
-                "-L",                # follow redirects
-                "--fail",            # non-zero exit on HTTP errors
-                "--config", str(cfg_path),
-                "-o", str(zip_path),
-                url,
-            ],
-            check=True,
-        )
+
+        # curl's built-in --retry only covers a small set of error codes.
+        # Exit 18 (CURLE_PARTIAL_FILE, server closed connection early) and
+        # exit 92 (CURLE_HTTP2_STREAM) are not retried by curl itself, so
+        # we wrap the call in a Python loop that handles those explicitly.
+        RETRIABLE = {18, 56, 92}
+        for attempt in range(20):
+            result = subprocess.run(
+                [
+                    "curl",
+                    "--http1.1",     # avoid HTTP/2 stream errors
+                    "-L",            # follow redirects
+                    "--fail",        # non-zero exit on HTTP errors
+                    "--config", str(cfg_path),
+                    "-o", str(zip_path),
+                    url,
+                ],
+                check=False,
+            )
+            if result.returncode == 0:
+                break
+            if result.returncode not in RETRIABLE or attempt == 19:
+                raise subprocess.CalledProcessError(result.returncode, "curl")
+            print(f"  curl exit {result.returncode} — retry {attempt + 1}/20 in 10s...")
+            time.sleep(10)
 
         with zipfile.ZipFile(zip_path) as zf:
             tif_names = sorted(n for n in zf.namelist() if n.endswith(".tif"))
