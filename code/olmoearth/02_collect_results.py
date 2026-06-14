@@ -84,19 +84,29 @@ for row in pending:
         continue
 
     token = pred["result"]["download_token"]
-    resp = session.get(
-        f"{BASE_URL}/api/v1/prediction-results/files",
-        headers=HEADERS,
-        params={"download_token": token},
-        stream=True,
-    )
-    resp.raise_for_status()
 
     with tempfile.TemporaryDirectory() as tmp:
         zip_path = Path(tmp) / "result.zip"
-        with open(zip_path, "wb") as fh:
-            for chunk in resp.iter_content(chunk_size=65536):
-                fh.write(chunk)
+        for attempt in range(5):
+            try:
+                resp = session.get(
+                    f"{BASE_URL}/api/v1/prediction-results/files",
+                    headers=HEADERS,
+                    params={"download_token": token},
+                    stream=True,
+                )
+                resp.raise_for_status()
+                with open(zip_path, "wb") as fh:
+                    for chunk in resp.iter_content(chunk_size=65536):
+                        fh.write(chunk)
+                break
+            except (requests.exceptions.ChunkedEncodingError,
+                    requests.exceptions.ConnectionError) as e:
+                if attempt == 4:
+                    raise
+                wait = 2 ** attempt
+                print(f"  [{name}] download interrupted, retrying in {wait}s ({attempt + 1}/5)...")
+                time.sleep(wait)
 
         with zipfile.ZipFile(zip_path) as zf:
             tif_names = sorted(n for n in zf.namelist() if n.endswith(".tif"))
