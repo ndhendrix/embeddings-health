@@ -22,6 +22,7 @@ import rasterio
 import requests
 from rasterio.merge import merge as rasterio_merge
 from requests.adapters import HTTPAdapter
+from tqdm import tqdm
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
@@ -61,9 +62,16 @@ def save_manifest():
         writer.writerows(rows)
 
 
+# Episode-based retry: up to MAX_EPISODE_ATTEMPTS per uninterrupted failure burst.
+# If more than EPISODE_WINDOW seconds pass between failures the counter resets,
+# so a large-state download that drops multiple times hours apart is not penalised.
+MAX_EPISODE_ATTEMPTS = 5
+EPISODE_WINDOW = 60  # seconds of quiet before treating the next failure as a new episode
+
 newly_done = 0
-for row in pending:
+for i, row in enumerate(pending, 1):
     name, prediction_id = row["name"], row["prediction_id"]
+    print(f"\n[{i}/{len(pending)} pending | {done_count + newly_done} done] {name}")
 
     resp = session.get(
         f"{BASE_URL}/api/v1/predictions/{prediction_id}",
@@ -75,19 +83,24 @@ for row in pending:
     time.sleep(POLL_DELAY)
 
     if pred["status"] in ("failed", "cancelled", "error"):
-        print(f"  [{name}] {pred['status']}")
+        print(f"  status: {pred['status']}")
         row["status"] = pred["status"]
         save_manifest()
         continue
 
     if pred["status"] != "completed":
+        print(f"  status: {pred['status']} — skipping until next pass")
         continue
 
     token = pred["result"]["download_token"]
 
     with tempfile.TemporaryDirectory() as tmp:
         zip_path = Path(tmp) / "result.zip"
-        for attempt in range(5):
+        episode_attempts = 0
+        last_failure_time = 0.0
+        while True:
+            if episode_attempts > 0 and (time.time() - last_failure_time) > EPISODE_WINDOW:
+                episode_attempts = 0
             try:
                 resp = session.get(
                     f"{BASE_URL}/api/v1/prediction-results/files",
@@ -96,16 +109,23 @@ for row in pending:
                     stream=True,
                 )
                 resp.raise_for_status()
-                with open(zip_path, "wb") as fh:
-                    for chunk in resp.iter_content(chunk_size=65536):
-                        fh.write(chunk)
+                total_bytes = int(resp.headers.get("content-length", 0)) or None
+                with tqdm(total=total_bytes, unit="B", unit_scale=True,
+                          desc="  downloading", leave=False) as pbar:
+                    with open(zip_path, "wb") as fh:
+                        for chunk in resp.iter_content(chunk_size=65536):
+                            fh.write(chunk)
+                            pbar.update(len(chunk))
                 break
             except (requests.exceptions.ChunkedEncodingError,
                     requests.exceptions.ConnectionError) as e:
-                if attempt == 4:
+                episode_attempts += 1
+                last_failure_time = time.time()
+                if episode_attempts >= MAX_EPISODE_ATTEMPTS:
                     raise
-                wait = 2 ** attempt
-                print(f"  [{name}] download interrupted, retrying in {wait}s ({attempt + 1}/5)...")
+                wait = 2 ** (episode_attempts - 1)
+                print(f"  download interrupted — retrying in {wait}s "
+                      f"(episode attempt {episode_attempts}/{MAX_EPISODE_ATTEMPTS})")
                 time.sleep(wait)
 
         with zipfile.ZipFile(zip_path) as zf:
