@@ -48,56 +48,61 @@ print("Querying completed results (search API)...")
 page = 1
 total_results = 0
 while True:
+    t0 = time.time()
     resp = requests.post(
         f"{BASE_URL}/api/v1/prediction-results/search",
         json={"project_id": CONFIG["project_id"], "page": page, "limit": 100},
         headers=HEADERS,
     )
+    elapsed = time.time() - t0
+    print(f"  page {page}: HTTP {resp.status_code} in {elapsed:.1f}s", end="")
     resp.raise_for_status()
     data = resp.json()
     records = data.get("records", [])
     total_results += len(records)
+    total_pages = data.get("total_pages") or data.get("pages") or "?"
+    new_this_page = 0
     for r in records:
         name = r.get("prediction_name", "")
         if PIECE_RE.match(name) and name not in existing_names:
             pid = r.get("prediction_id") or r.get("id", "")
             recovered[name] = {"name": name, "prediction_id": pid, "status": "submitted"}
+            new_this_page += 1
+    print(f" — {len(records)} records, {new_this_page} new pieces"
+          f" (total: {total_results} scanned, {len(recovered)} pieces found)"
+          f" [page {page}/{total_pages}]")
+    if page == 1 and records:
+        sample = records[0]
+        print(f"  Sample result fields: {list(sample.keys())}")
     if len(records) < 100:
         break
     page += 1
     time.sleep(0.3)
 
-print(f"  Scanned {total_results} completed results, found {len(recovered)} missing piece jobs.")
-
-# Print a sample result to show available fields (helpful for debugging)
-if total_results > 0:
-    resp2 = requests.post(
-        f"{BASE_URL}/api/v1/prediction-results/search",
-        json={"project_id": CONFIG["project_id"], "page": 1, "limit": 1},
-        headers=HEADERS,
-    )
-    sample = resp2.json().get("records", [{}])[0]
-    print(f"  Sample result fields: {list(sample.keys())}")
+print(f"\nSearch API done: {total_results} results scanned, {len(recovered)} piece jobs found.\n")
 
 
 # ── Strategy 2: list all predictions to catch in-progress piece jobs ─────────
-print("\nQuerying all predictions (listing API)...")
+print("Querying all predictions (listing API)...")
 page = 1
 in_progress_found = 0
 while True:
+    t0 = time.time()
     resp = requests.get(
         f"{BASE_URL}/api/v1/predictions",
         headers=HEADERS,
         params={"project_id": CONFIG["project_id"], "page": page, "limit": 100},
     )
+    elapsed = time.time() - t0
+    print(f"  page {page}: HTTP {resp.status_code} in {elapsed:.1f}s", end="")
     if resp.status_code in (404, 405, 422):
-        print(f"  Listing endpoint returned {resp.status_code} — not available, skipping.")
+        print(f" — endpoint not available, skipping.")
         break
     resp.raise_for_status()
     data = resp.json()
     records = data.get("records", [])
-    if not records:
-        break
+    total_pages = data.get("total_pages") or data.get("pages") or "?"
+    new_this_page = 0
     for r in records:
         name = r.get("name", "")
         if PIECE_RE.match(name) and name not in existing_names and name not in recovered:
@@ -107,13 +112,20 @@ while True:
                 "status": "submitted",
             }
             in_progress_found += 1
+            new_this_page += 1
+    print(f" — {len(records)} records, {new_this_page} new pieces [page {page}/{total_pages}]")
+    if page == 1 and records:
+        sample = records[0]
+        print(f"  Sample result fields: {list(sample.keys())}")
     if len(records) < 100:
         break
     page += 1
     time.sleep(0.3)
 
 if in_progress_found:
-    print(f"  Found {in_progress_found} additional in-progress piece jobs.")
+    print(f"\nListing API: found {in_progress_found} additional in-progress piece jobs.")
+else:
+    print(f"\nListing API done.")
 
 # ── Write recovered entries to manifest ──────────────────────────────────────
 if recovered:
