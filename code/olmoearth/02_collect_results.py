@@ -102,17 +102,32 @@ for i, row in enumerate(pending, 1):
             if episode_attempts > 0 and (time.time() - last_failure_time) > EPISODE_WINDOW:
                 episode_attempts = 0
             try:
+                # Resume from however many bytes are already on disk.
+                bytes_written = zip_path.stat().st_size if zip_path.exists() else 0
+                req_headers = dict(HEADERS)
+                if bytes_written > 0:
+                    req_headers["Range"] = f"bytes={bytes_written}-"
+
                 resp = session.get(
                     f"{BASE_URL}/api/v1/prediction-results/files",
-                    headers=HEADERS,
+                    headers=req_headers,
                     params={"download_token": token},
                     stream=True,
                 )
                 resp.raise_for_status()
-                total_bytes = int(resp.headers.get("content-length", 0)) or None
-                with tqdm(total=total_bytes, unit="B", unit_scale=True,
-                          desc="  downloading", leave=False) as pbar:
-                    with open(zip_path, "wb") as fh:
+
+                # 206 Partial Content = server supports range; 200 = it ignored us, restart.
+                if resp.status_code == 200 and bytes_written > 0:
+                    bytes_written = 0
+
+                # Reconstruct total size for the progress bar.
+                content_length = int(resp.headers.get("content-length", 0)) or None
+                total_bytes = (bytes_written + content_length) if content_length else None
+
+                open_mode = "ab" if bytes_written > 0 else "wb"
+                with tqdm(total=total_bytes, initial=bytes_written, unit="B",
+                          unit_scale=True, desc="  downloading", leave=False) as pbar:
+                    with open(zip_path, open_mode) as fh:
                         for chunk in resp.iter_content(chunk_size=65536):
                             fh.write(chunk)
                             pbar.update(len(chunk))
@@ -123,8 +138,10 @@ for i, row in enumerate(pending, 1):
                 last_failure_time = time.time()
                 if episode_attempts >= MAX_EPISODE_ATTEMPTS:
                     raise
+                bytes_on_disk = zip_path.stat().st_size if zip_path.exists() else 0
                 wait = 2 ** (episode_attempts - 1)
-                print(f"  download interrupted — retrying in {wait}s "
+                print(f"  download interrupted at {bytes_on_disk / 1e6:.0f} MB — "
+                      f"resuming in {wait}s "
                       f"(episode attempt {episode_attempts}/{MAX_EPISODE_ATTEMPTS})")
                 time.sleep(wait)
 
