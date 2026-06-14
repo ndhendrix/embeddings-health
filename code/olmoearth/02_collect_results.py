@@ -102,6 +102,7 @@ for i, row in enumerate(pending, 1):
         subprocess.run(
             [
                 "curl",
+                "--http1.1",         # avoid HTTP/2 stream errors (CURLE_HTTP2_STREAM)
                 "-C", "-",           # resume from partial file if present
                 "--retry", "20",     # retry up to 20 times on transient errors
                 "--retry-delay", "10",
