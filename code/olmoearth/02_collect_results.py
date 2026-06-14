@@ -88,7 +88,7 @@ for i, row in enumerate(pending, 1):
 
     token = pred["result"]["download_token"]
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=OUT_DIR) as tmp:
         zip_path = Path(tmp) / "result.zip"
 
         # Write auth to a temp file so the API key never appears in ps output.
