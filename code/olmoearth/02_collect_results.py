@@ -12,6 +12,7 @@ Usage:
 """
 import csv
 import os
+import subprocess
 import tempfile
 import time
 import zipfile
@@ -22,7 +23,6 @@ import rasterio
 import requests
 from rasterio.merge import merge as rasterio_merge
 from requests.adapters import HTTPAdapter
-from tqdm import tqdm
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
@@ -62,12 +62,6 @@ def save_manifest():
         writer.writerows(rows)
 
 
-# Episode-based retry: up to MAX_EPISODE_ATTEMPTS per uninterrupted failure burst.
-# If more than EPISODE_WINDOW seconds pass between failures the counter resets,
-# so a large-state download that drops multiple times hours apart is not penalised.
-MAX_EPISODE_ATTEMPTS = 5
-EPISODE_WINDOW = 60  # seconds of quiet before treating the next failure as a new episode
-
 newly_done = 0
 for i, row in enumerate(pending, 1):
     name, prediction_id = row["name"], row["prediction_id"]
@@ -96,54 +90,30 @@ for i, row in enumerate(pending, 1):
 
     with tempfile.TemporaryDirectory() as tmp:
         zip_path = Path(tmp) / "result.zip"
-        episode_attempts = 0
-        last_failure_time = 0.0
-        while True:
-            if episode_attempts > 0 and (time.time() - last_failure_time) > EPISODE_WINDOW:
-                episode_attempts = 0
-            try:
-                # Resume from however many bytes are already on disk.
-                bytes_written = zip_path.stat().st_size if zip_path.exists() else 0
-                req_headers = dict(HEADERS)
-                if bytes_written > 0:
-                    req_headers["Range"] = f"bytes={bytes_written}-"
 
-                resp = session.get(
-                    f"{BASE_URL}/api/v1/prediction-results/files",
-                    headers=req_headers,
-                    params={"download_token": token},
-                    stream=True,
-                )
-                resp.raise_for_status()
+        # Write auth to a temp file so the API key never appears in ps output.
+        cfg_path = Path(tmp) / "curl.cfg"
+        cfg_path.write_text(
+            f'header = "Authorization: Bearer {os.environ["OLMOEARTH_API_KEY"]}"\n'
+        )
 
-                # 206 Partial Content = server supports range; 200 = it ignored us, restart.
-                if resp.status_code == 200 and bytes_written > 0:
-                    bytes_written = 0
-
-                # Reconstruct total size for the progress bar.
-                content_length = int(resp.headers.get("content-length", 0)) or None
-                total_bytes = (bytes_written + content_length) if content_length else None
-
-                open_mode = "ab" if bytes_written > 0 else "wb"
-                with tqdm(total=total_bytes, initial=bytes_written, unit="B",
-                          unit_scale=True, desc="  downloading", leave=False) as pbar:
-                    with open(zip_path, open_mode) as fh:
-                        for chunk in resp.iter_content(chunk_size=65536):
-                            fh.write(chunk)
-                            pbar.update(len(chunk))
-                break
-            except (requests.exceptions.ChunkedEncodingError,
-                    requests.exceptions.ConnectionError) as e:
-                episode_attempts += 1
-                last_failure_time = time.time()
-                if episode_attempts >= MAX_EPISODE_ATTEMPTS:
-                    raise
-                bytes_on_disk = zip_path.stat().st_size if zip_path.exists() else 0
-                wait = 2 ** (episode_attempts - 1)
-                print(f"  download interrupted at {bytes_on_disk / 1e6:.0f} MB — "
-                      f"resuming in {wait}s "
-                      f"(episode attempt {episode_attempts}/{MAX_EPISODE_ATTEMPTS})")
-                time.sleep(wait)
+        url = (f"{BASE_URL}/api/v1/prediction-results/files"
+               f"?download_token={token}")
+        subprocess.run(
+            [
+                "curl",
+                "-C", "-",           # resume from partial file if present
+                "--retry", "20",     # retry up to 20 times on transient errors
+                "--retry-delay", "10",
+                "--retry-max-time", "0",  # no overall time cap on retries
+                "-L",                # follow redirects
+                "--fail",            # non-zero exit on HTTP errors
+                "--config", str(cfg_path),
+                "-o", str(zip_path),
+                url,
+            ],
+            check=True,
+        )
 
         with zipfile.ZipFile(zip_path) as zf:
             tif_names = sorted(n for n in zf.namelist() if n.endswith(".tif"))
