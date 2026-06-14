@@ -13,6 +13,7 @@ Usage:
 import csv
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -39,6 +40,11 @@ HEADERS = {"Authorization": f"Bearer {os.environ['OLMOEARTH_API_KEY']}"}
 POLL_DELAY = 0.5
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Remove leftover temp dirs from any previously OOM-killed runs
+for _stale in OUT_DIR.glob("tmp*"):
+    if _stale.is_dir():
+        shutil.rmtree(_stale, ignore_errors=True)
 
 session = requests.Session()
 retry = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
@@ -130,35 +136,37 @@ for i, row in enumerate(pending, 1):
             tif_names = sorted(n for n in zf.namelist() if n.endswith(".tif"))
             zf.extractall(tmp)
         print(f"  [{name}] {len(tif_names)} tile(s) in ZIP")
+        zip_path.unlink()  # free disk space before loading raster data
 
         tif_paths = [Path(tmp) / n for n in tif_names]
+        out_path = OUT_DIR / f"{name}.tif"
+        cog_profile = dict(
+            driver="GTiff", compress="deflate", predictor=2,
+            tiled=True, blockxsize=256, blockysize=256, bigtiff="IF_SAFER",
+        )
 
         if len(tif_paths) == 1:
+            # Stream block-by-block to avoid loading the full array into RAM
             with rasterio.open(tif_paths[0]) as src:
-                profile = src.profile.copy()
-                data = src.read()
+                profile = {**src.profile, **cog_profile}
+                with rasterio.open(out_path, "w", **profile) as dst:
+                    for _, window in src.block_windows(1):
+                        dst.write(src.read(window=window), window=window)
+            data_shape = (profile["count"], profile["height"], profile["width"])
         else:
             datasets = [rasterio.open(p) for p in tif_paths]
             data, transform = rasterio_merge(datasets)
-            profile = datasets[0].profile.copy()
-            profile.update(height=data.shape[1], width=data.shape[2], transform=transform)
+            profile = {**datasets[0].profile,
+                       "height": data.shape[1], "width": data.shape[2],
+                       "transform": transform, **cog_profile}
             for ds in datasets:
                 ds.close()
+            with rasterio.open(out_path, "w", **profile) as dst:
+                dst.write(data)
+            data_shape = data.shape
+            del data  # release RAM as soon as it's written
 
-    out_path = OUT_DIR / f"{name}.tif"
-    profile.update(
-        driver="GTiff",
-        compress="deflate",
-        predictor=2,
-        tiled=True,
-        blockxsize=256,
-        blockysize=256,
-        bigtiff="IF_SAFER",
-    )
-    with rasterio.open(out_path, "w", **profile) as dst:
-        dst.write(data)
-
-    print(f"  [{name}] → {out_path.name}  shape={data.shape}")
+    print(f"  [{name}] → {out_path.name}  shape={data_shape}")
     row["status"] = "done"
     save_manifest()
     newly_done += 1
