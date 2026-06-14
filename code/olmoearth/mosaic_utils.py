@@ -2,7 +2,9 @@
 from pathlib import Path
 
 import rasterio
+from rasterio.enums import Resampling
 from rasterio.merge import merge as rasterio_merge
+from rasterio.vrt import WarpedVRT
 
 
 COG_PROFILE = {
@@ -61,10 +63,26 @@ def _copy_one_tif(src_path: Path, out_path: Path) -> tuple:
 def _merge_tifs_streaming(tif_paths: list[Path], out_path: Path, mem_limit_mb: int) -> tuple:
     """Merge multiple TIFs using Rasterio's windowed dst_path writer."""
     datasets = [rasterio.open(p) for p in tif_paths]
+    vrts = []
     try:
-        profile = {**datasets[0].profile, **COG_PROFILE}
+        target_crs = datasets[0].crs
+        crs_set = {str(ds.crs) for ds in datasets}
+        if len(crs_set) > 1:
+            print(
+                f"    Reprojecting {len(crs_set)} source CRSs to {target_crs} "
+                "for mosaic"
+            )
+            sources = [
+                WarpedVRT(ds, crs=target_crs, resampling=Resampling.nearest)
+                for ds in datasets
+            ]
+            vrts.extend(sources)
+        else:
+            sources = datasets
+
+        profile = {**datasets[0].profile, "crs": target_crs, **COG_PROFILE}
         rasterio_merge(
-            datasets,
+            sources,
             dst_path=out_path,
             dst_kwds=profile,
             mem_limit=mem_limit_mb,
@@ -72,5 +90,7 @@ def _merge_tifs_streaming(tif_paths: list[Path], out_path: Path, mem_limit_mb: i
         with rasterio.open(out_path) as dst:
             return (dst.count, dst.height, dst.width)
     finally:
+        for vrt in vrts:
+            vrt.close()
         for ds in datasets:
             ds.close()
