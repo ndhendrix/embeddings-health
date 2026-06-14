@@ -12,6 +12,7 @@ Usage:
 """
 import csv
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -164,7 +165,53 @@ for i, row in enumerate(pending, 1):
 
 remaining = sum(1 for r in rows if r["status"] == "submitted")
 print(f"\nThis pass: +{newly_done} collected. Remaining: {remaining}")
-if remaining == 0:
-    print("All done.")
-else:
+if remaining > 0:
     print("Re-run to collect more.")
+
+# ── Mosaic completed piece sets into full-state COGs ─────────────────────────
+PIECE_RE = re.compile(r"^(state_\d{2}_\d{4})_p\d+$")
+
+piece_groups: dict[str, list] = {}
+for r in rows:
+    m = PIECE_RE.match(r["name"])
+    if m:
+        piece_groups.setdefault(m.group(1), []).append(r)
+
+for base_name, piece_rows in sorted(piece_groups.items()):
+    state_cog = OUT_DIR / f"{base_name}.tif"
+    if state_cog.exists():
+        continue
+    done = [r for r in piece_rows if r["status"] == "done"]
+    if len(done) < len(piece_rows):
+        print(f"  {base_name}: {len(done)}/{len(piece_rows)} pieces done — mosaic pending")
+        continue
+
+    print(f"\nMosaicking {len(piece_rows)} piece(s) → {base_name}.tif")
+    piece_tifs = [OUT_DIR / f"{r['name']}.tif" for r in piece_rows]
+    missing_tifs = [p for p in piece_tifs if not p.exists()]
+    if missing_tifs:
+        print(f"  WARNING: piece TIFs missing: {[p.name for p in missing_tifs]}")
+        continue
+
+    datasets = [rasterio.open(p) for p in piece_tifs]
+    data, transform = rasterio_merge(datasets)
+    profile = datasets[0].profile.copy()
+    profile.update(height=data.shape[1], width=data.shape[2], transform=transform)
+    for ds in datasets:
+        ds.close()
+
+    profile.update(
+        driver="GTiff", compress="deflate", predictor=2,
+        tiled=True, blockxsize=256, blockysize=256, bigtiff="IF_SAFER",
+    )
+    with rasterio.open(state_cog, "w", **profile) as dst:
+        dst.write(data)
+    print(f"  → {state_cog.name}  shape={data.shape}")
+
+pieces_pending = any(
+    r["status"] != "done"
+    for r in rows
+    if PIECE_RE.match(r["name"])
+)
+if remaining == 0 and not pieces_pending:
+    print("All done.")
