@@ -25,6 +25,7 @@ HERE = Path(__file__).parent
 PROJECT_ROOT = HERE.parent.parent
 OUT_DIR = PROJECT_ROOT / "data" / "olmoearth"
 MANIFEST = HERE / "manifest.csv"
+MANIFEST_FIELDS = ["name", "prediction_id", "status"]
 
 # Census 2020 land area (km²) for CONUS states + DC
 STATE_AREA_KM2 = {
@@ -63,9 +64,15 @@ rows: list[dict] = []
 manifest_by_name: dict[str, dict] = {}
 pieces_submitted: set[str] = set()
 
+
+def _clean_manifest_rows(raw_rows) -> list[dict]:
+    """Drop stray CSV overflow fields before re-writing manifest rows."""
+    return [{field: row.get(field, "") for field in MANIFEST_FIELDS} for row in raw_rows]
+
+
 if MANIFEST.exists():
     with open(MANIFEST) as fh:
-        rows = list(csv.DictReader(fh))
+        rows = _clean_manifest_rows(csv.DictReader(fh))
     manifest_by_name = {r["name"]: r for r in rows}
     for r in rows:
         m = piece_re.match(r["name"])
@@ -75,9 +82,9 @@ if MANIFEST.exists():
 
 def save_manifest():
     with open(MANIFEST, "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["name", "prediction_id", "status"])
+        writer = csv.DictWriter(fh, fieldnames=MANIFEST_FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(_clean_manifest_rows(rows))
 
 
 submit_script = HERE / "01b_submit_split_state.py"
@@ -95,6 +102,9 @@ for fips in CONUS_FIPS:
 
     if state_name in pieces_submitted:
         print(f"  {state_name}: piece jobs already in manifest — skip")
+        if state_name in manifest_by_name and manifest_by_name[state_name]["status"] == "submitted":
+            manifest_by_name[state_name]["status"] = "split"
+            save_manifest()
         skipped += 1
         continue
 
@@ -118,7 +128,7 @@ for fips in CONUS_FIPS:
         # Reload manifest from disk to pick up piece entries just written by
         # 01b_submit_split_state.py, then mark the original job as "split".
         with open(MANIFEST) as fh:
-            rows = list(csv.DictReader(fh))
+            rows = _clean_manifest_rows(csv.DictReader(fh))
         manifest_by_name = {r["name"]: r for r in rows}
         if state_name in manifest_by_name:
             manifest_by_name[state_name]["status"] = "split"

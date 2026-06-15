@@ -63,7 +63,11 @@ if not pending:
 
 def save_manifest():
     with open(MANIFEST, "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["name", "prediction_id", "status"])
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=["name", "prediction_id", "status"],
+            extrasaction="ignore",
+        )
         writer.writeheader()
         writer.writerows(rows)
 
