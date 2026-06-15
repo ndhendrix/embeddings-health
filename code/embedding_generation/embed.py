@@ -23,7 +23,7 @@ Usage (Prithvi tiny — 3 seasonal composites; 4th frame auto-padded):
 
 Flags:
   --variant STR         Model variant. OlmoEarth: Base (default) / Large.
-                        Prithvi: tiny (default) / 300M / 600M.
+                        Prithvi: tiny (default) / 300M-TL / 300M / 600M.
   --no-pca              Store raw embeddings instead of PCA-compressing.
   --raw-output PATH     Also write the pre-PCA raw embedding COG to this path.
                         Lets you re-run PCA/UMAP later without re-doing GPU inference.
@@ -71,6 +71,7 @@ OLMOEARTH_REPO = {
 }
 PRITHVI_REPO = {
     "tiny": "ibm-nasa-geospatial/Prithvi-EO-2.0-tiny-TL",
+    "300M-TL": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL",
     "300M": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M",
     "600M": "ibm-nasa-geospatial/Prithvi-EO-2.0-600M",
 }
@@ -428,7 +429,10 @@ def fit_pca(embedding_map: np.ndarray, n_components: int, sample_frac: float = 0
 def apply_pca(embedding_map: np.ndarray, pca: PCA) -> np.ndarray:
     D, H, W = embedding_map.shape
     flat = embedding_map.reshape(D, -1).T       # (N, D)
-    out = pca.transform(flat)                   # (N, K)
+    valid = ~np.isnan(flat).any(axis=1)
+    out = np.full((flat.shape[0], pca.n_components_), np.nan, dtype="float32")
+    if valid.any():
+        out[valid] = pca.transform(flat[valid]).astype("float32")
     return out.T.reshape(pca.n_components_, H, W).astype("float32")
 
 
@@ -599,7 +603,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--variant", default=None,
                         help="Model variant. OlmoEarth: Base (default) / Large. "
-                             "Prithvi: tiny (default) / 300M / 600M.")
+                             "Prithvi: tiny (default) / 300M-TL / 300M / 600M.")
     parser.add_argument("--year", type=int, default=2022)
     parser.add_argument("--checkpoint-every", type=int, default=500,
                         help="Save recovery checkpoint every N chips (default 500).")
@@ -647,6 +651,9 @@ def main() -> None:
 
     elif args.model == "prithvi":
         variant = args.variant or "tiny"
+        if variant not in PRITHVI_REPO:
+            valid = ", ".join(PRITHVI_REPO)
+            raise SystemExit(f"Unknown Prithvi variant '{variant}'. Valid variants: {valid}.")
         model, embed_dim, num_frames, model_family = load_prithvi(variant)
         model = model.to(device)
 
@@ -706,6 +713,7 @@ def main() -> None:
             print(f"Fitting PCA ({args.pca_dims} components)…")
             pca = fit_pca(raw, n_components=args.pca_dims)
             pca_path = args.output.with_suffix(".pca.pkl")
+            pca_path.parent.mkdir(parents=True, exist_ok=True)
             with open(pca_path, "wb") as f:
                 pickle.dump(pca, f)
             var_exp = pca.explained_variance_ratio_.sum()
