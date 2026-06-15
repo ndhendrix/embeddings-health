@@ -4,7 +4,7 @@ Submit split jobs for all CONUS states that exceed the server download size limi
 The OlmoEarth download endpoint closes connections after ~5 minutes, limiting
 each download to ~5 GB at the server's ~17 MB/s outbound rate.  States with
 land area > 100 000 km² typically exceed this and must be submitted as multiple
-smaller pieces via 01b_submit_split_state.py.
+smaller county-group pieces via 01b_submit_split_state.py.
 
 Skips any state where:
   - state_{fips}_{year}.tif already exists on disk (downloaded successfully)
@@ -53,6 +53,8 @@ THRESHOLD_KM2 = 100_000
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--year", type=int, default=2022)
+parser.add_argument("--split-mode", choices=["county", "grid"], default="county",
+                    help="Split large states by county groups (default) or regular grid cells")
 args = parser.parse_args()
 
 # Load the full manifest so we can mark superseded whole-state jobs as "split"
@@ -104,7 +106,8 @@ for fips in CONUS_FIPS:
     needs_split += 1
     result = subprocess.run(
         [sys.executable, str(submit_script),
-         "--state", fips, "--year", str(args.year)],
+         "--state", fips, "--year", str(args.year),
+         "--split-mode", args.split_mode],
         capture_output=True, text=True,
     )
     out = (result.stdout.strip() + result.stderr.strip()).replace("\n", " | ")
