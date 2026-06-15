@@ -128,7 +128,7 @@ for fips in CONUS_FIPS:
         # Reload manifest from disk to pick up piece entries just written by
         # 01b_submit_split_state.py, then mark the original job as "split".
         with open(MANIFEST) as fh:
-            rows = _clean_manifest_rows(csv.DictReader(fh))
+            rows = list(csv.DictReader(fh))
         manifest_by_name = {r["name"]: r for r in rows}
         if state_name in manifest_by_name:
             manifest_by_name[state_name]["status"] = "split"

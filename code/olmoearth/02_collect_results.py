@@ -143,7 +143,31 @@ for i, row in enumerate(pending, 1):
 
         tif_paths = [Path(tmp) / n for n in tif_names]
         out_path = OUT_DIR / f"{name}.tif"
-        data_shape = write_cog_from_tifs(tif_paths, out_path)
+        cog_profile = dict(
+            driver="GTiff", compress="deflate", predictor=2,
+            tiled=True, blockxsize=256, blockysize=256, bigtiff="IF_SAFER",
+        )
+
+        if len(tif_paths) == 1:
+            # Stream block-by-block to avoid loading the full array into RAM
+            with rasterio.open(tif_paths[0]) as src:
+                profile = {**src.profile, **cog_profile}
+                with rasterio.open(out_path, "w", **profile) as dst:
+                    for _, window in src.block_windows(1):
+                        dst.write(src.read(window=window), window=window)
+            data_shape = (profile["count"], profile["height"], profile["width"])
+        else:
+            datasets = [rasterio.open(p) for p in tif_paths]
+            data, transform = rasterio_merge(datasets)
+            profile = {**datasets[0].profile,
+                       "height": data.shape[1], "width": data.shape[2],
+                       "transform": transform, **cog_profile}
+            for ds in datasets:
+                ds.close()
+            with rasterio.open(out_path, "w", **profile) as dst:
+                dst.write(data)
+            data_shape = data.shape
+            del data  # release RAM as soon as it's written
 
     print(f"  [{name}] → {out_path.name}  shape={data_shape}")
     row["status"] = "done"
