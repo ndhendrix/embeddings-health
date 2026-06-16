@@ -32,7 +32,6 @@ dependencies = [
     "scikit-learn>=1.3",
     "tqdm>=4.66",
     "pandas>=2.0",
-    "pyarrow>=14.0",
     # CLI
     "typer>=0.9",
     # Dask for lazy compositing
