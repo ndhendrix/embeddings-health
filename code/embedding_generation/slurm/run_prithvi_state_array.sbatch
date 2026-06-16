@@ -154,9 +154,9 @@ else
   RUN_BATCH_SIZE="${BATCH_SIZE_300M_TL:-1}"
 fi
 
-EXTRA_ARGS=()
+TEST_CHIPS_ARGS=""
 if [[ -n "${TEST_CHIPS:-}" ]]; then
-  EXTRA_ARGS+=(--test-chips "$TEST_CHIPS")
+  TEST_CHIPS_ARGS="--test-chips $TEST_CHIPS"
 fi
 
 echo "=== Prithvi embedding task ==="
@@ -184,7 +184,7 @@ uv run --python 3.11 python embed.py \
   --batch-size "$RUN_BATCH_SIZE" \
   --checkpoint-every "${CHECKPOINT_EVERY:-25}" \
   --force \
-  "${EXTRA_ARGS[@]}"
+  $TEST_CHIPS_ARGS
 
 for output in "$RAW_LOCAL" "$REDUCED_LOCAL" "$PCA_LOCAL"; do
   if [[ ! -s "$output" ]]; then
