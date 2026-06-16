@@ -8,7 +8,8 @@ dependencies = [
     "rasterio>=1.3",
     "geopandas>=0.14",
     "shapely>=2.0",
-    "pyproj>=3.6",
+    # Sherlock's manylinux_2_17 baseline cannot install pyproj>=3.7 wheels.
+    "pyproj>=3.6,<3.7",
     "rioxarray>=0.15",
     # Sentinel-2 data access
     "pystac-client>=0.7",
