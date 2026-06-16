@@ -14,6 +14,8 @@ fi
 SCRIPT="$SCRIPT_DIR/run_prithvi_state_array.sbatch"
 LOG_DIR="$SCRIPT_DIR/logs"
 NUM_MODELS=2
+SBATCH_TIME="${SBATCH_TIME:-12:00:00}"
+SBATCH_MEM="${SBATCH_MEM:-128G}"
 
 STATES=()
 while IFS= read -r state; do
@@ -41,14 +43,16 @@ echo "Year: $YEAR"
 echo "States (${NUM_STATES}): ${STATES[*]}"
 echo "Models: tiny 300M-TL"
 echo "Array: 0-$MAX_TASK ($((MAX_TASK + 1)) tasks)"
+echo "Slurm time: $SBATCH_TIME"
+echo "Slurm memory: $SBATCH_MEM"
 
 export REPO_DIR DATA_DIR FINAL_OUT_DIR YEAR
 
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   echo "DRY_RUN=1; not submitting."
-  echo "Command: cd $REPO_DIR && sbatch --export=ALL --array=0-$MAX_TASK $SCRIPT"
+  echo "Command: cd $REPO_DIR && sbatch --export=ALL --time=$SBATCH_TIME --mem=$SBATCH_MEM --array=0-$MAX_TASK $SCRIPT"
   exit 0
 fi
 
 cd "$REPO_DIR"
-sbatch --export=ALL --array="0-$MAX_TASK" "$SCRIPT"
+sbatch --export=ALL --time="$SBATCH_TIME" --mem="$SBATCH_MEM" --array="0-$MAX_TASK" "$SCRIPT"

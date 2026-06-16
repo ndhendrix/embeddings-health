@@ -3,8 +3,8 @@
 #SBATCH -p gpu
 #SBATCH -G 1
 #SBATCH -c 8
-#SBATCH --mem=128G
-#SBATCH --time=12:00:00
+#SBATCH --mem=64G
+#SBATCH --time=01:00:00
 #SBATCH --output=code/embedding_generation/slurm/logs/prithvi_embed_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/prithvi_embed_%A_%a.err
 
@@ -106,7 +106,7 @@ export TORCH_HOME="$CACHE_ROOT/torch"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 if command -v module >/dev/null 2>&1; then
-  module load anaconda
+  module load contribs poldrack anaconda
   module load cuda || true
 fi
 
