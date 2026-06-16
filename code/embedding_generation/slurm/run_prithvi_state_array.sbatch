@@ -106,14 +106,30 @@ export TORCH_HOME="$CACHE_ROOT/torch"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 if command -v module >/dev/null 2>&1; then
-  module load anaconda3 || true
+  module load anaconda
   module load cuda || true
 fi
 
 if ! command -v uv >/dev/null 2>&1; then
-  echo "ERROR: uv is not available on PATH. Load/install uv before submitting this job." >&2
+  UV_INSTALL_DIR="${UV_INSTALL_DIR:-$CACHE_ROOT/uv-bin}"
+  mkdir -p "$UV_INSTALL_DIR"
+
+  if [[ -x "$UV_INSTALL_DIR/uv" ]]; then
+    export PATH="$UV_INSTALL_DIR:$PATH"
+  else
+    echo "uv is not available on PATH; installing uv into $UV_INSTALL_DIR"
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_INSTALL_DIR" sh
+    export PATH="$UV_INSTALL_DIR:$PATH"
+  fi
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "ERROR: uv is not available after module load/bootstrap. Set UV_INSTALL_DIR or install uv before submitting." >&2
   exit 1
 fi
+
+echo "uv: $(command -v uv)"
+uv --version
 
 cp "$SPRING" "$INPUT_STAGE/"
 cp "$SUMMER" "$INPUT_STAGE/"
