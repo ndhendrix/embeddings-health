@@ -15,12 +15,15 @@ dependencies = [
     "odc-stac>=0.3",
     "planetary-computer>=0.5",
     # ML / inference
-    "torch>=2.1",
-    "torchvision>=0.16",
+    # Sherlock's manylinux_2_17 baseline cannot install torch>=2.7 wheels.
+    "torch>=2.1,<2.7",
+    "torchvision>=0.16,<0.22",
     "transformers>=4.40",
     "timm>=0.9",
     "einops>=0.7",
-    "olmoearth-pretrain>=0.1.0",
+    # OlmoEarth support imports olmoearth_pretrain lazily in embed.py; install
+    # it separately when running --model olmoearth. Its current metadata pins
+    # torch>=2.7, which is incompatible with Sherlock's manylinux baseline.
     # terratorch is optional; we load Prithvi via transformers trust_remote_code
     # "terratorch>=1.2rc4",
     # Analysis / output
@@ -36,7 +39,6 @@ dependencies = [
     "ai2-olmo-core>=2.4.0",
     "class-registry>=2.1.2",
     "setuptools>=82.0.1",
-    "matplotlib>=3.10.9",
 ]
 
 [project.scripts]
@@ -51,3 +53,7 @@ packages = ["."]
 
 [tool.uv]
 managed = true
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
