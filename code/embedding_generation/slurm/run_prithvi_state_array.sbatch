@@ -106,11 +106,12 @@ export TORCH_HOME="$CACHE_ROOT/torch"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 if command -v module >/dev/null 2>&1; then
-  module load contribs poldrack anaconda
+  module load devel
   module load gcc/14.2.0
-  module load rust
-  module load cuda || true
+  module load rust/1.90.0
+  module load cuda/12.6.1 || true
 fi
+export CC="$(command -v gcc)" CXX="$(command -v g++)"
 
 echo "gcc: $(command -v gcc || true)"
 gcc --version | head -n 1 || true
