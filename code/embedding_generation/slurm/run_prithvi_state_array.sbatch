@@ -107,10 +107,13 @@ export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 if command -v module >/dev/null 2>&1; then
   module load contribs poldrack anaconda
-  module load gcc
+  module load gcc/14.2.0
   module load rust
   module load cuda || true
 fi
+
+echo "gcc: $(command -v gcc || true)"
+gcc --version | head -n 1 || true
 
 if ! command -v uv >/dev/null 2>&1; then
   UV_INSTALL_DIR="${UV_INSTALL_DIR:-$CACHE_ROOT/uv-bin}"
