@@ -13,7 +13,7 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-$HOME/embeddings-health}"
 EMBED_DIR="$REPO_DIR/code/embedding_generation"
 YEAR="${YEAR:-2022}"
-DATA_DIR="${DATA_DIR:-$REPO_DIR/data/prithvi_data}"
+DATA_DIR="${DATA_DIR:-$SCRATCH/embeddings-health/data/prithvi_data}"
 
 if [[ -z "${FINAL_OUT_DIR:-}" ]]; then
   : "${SCRATCH:?Set SCRATCH or FINAL_OUT_DIR before submitting.}"
@@ -64,6 +64,7 @@ for input in "$SPRING" "$SUMMER" "$FALL"; do
   fi
 done
 
+# Input staging: fast local SSD for read-heavy inference; wiped at job end
 if [[ -n "${SLURM_TMPDIR:-}" ]]; then
   STAGE_DIR="$SLURM_TMPDIR/prithvi_${STATE}_${VARIANT}_${YEAR}"
 else
@@ -72,35 +73,50 @@ else
 fi
 
 INPUT_STAGE="$STAGE_DIR/input"
-OUTPUT_STAGE="$STAGE_DIR/output"
-FAILED_DIR="$FINAL_OUT_DIR/_failed/$VARIANT/$STATE/job_${SLURM_JOB_ID:-manual}_${TASK_ID}"
 
-cleanup_success() {
+# Checkpoint and output dir on $SCRATCH so they survive preemption/timeout
+CKPT_DIR="$SCRATCH/embeddings-health/checkpoints/$VARIANT/$STATE"
+FINAL_DIR="$FINAL_OUT_DIR/$VARIANT/$STATE"
+
+PREEMPTED=0
+
+cleanup_stage() {
   if [[ -n "${SLURM_TMPDIR:-}" && "$STAGE_DIR" == "$SLURM_TMPDIR/"* ]] || \
      [[ -n "${SCRATCH:-}" && "$STAGE_DIR" == "$SCRATCH/embeddings-health/staging/"* ]]; then
-    rm -rf "$STAGE_DIR"
+    rm -rf "$STAGE_DIR" || true
   else
     echo "Refusing to remove unexpected staging path: $STAGE_DIR" >&2
   fi
 }
 
+cleanup_success() {
+  cleanup_stage
+  rm -rf "$CKPT_DIR" || true
+}
+
+handle_preempt() {
+  PREEMPTED=1
+  echo "Job preempted or timed out — checkpoint preserved at: $CKPT_DIR" >&2
+}
+
 preserve_failure() {
   status=$?
-  echo "ERROR: task failed with status $status" >&2
-  if [[ -d "$OUTPUT_STAGE" ]]; then
-    mkdir -p "$FAILED_DIR"
-    cp -a "$OUTPUT_STAGE"/. "$FAILED_DIR"/ || true
-    echo "Preserved failed output/checkpoint fragments in $FAILED_DIR" >&2
+  if [[ "$PREEMPTED" == 1 ]]; then
+    cleanup_stage
+    exit 0
   fi
+  echo "ERROR: task failed with status $status — partial outputs in $CKPT_DIR" >&2
+  cleanup_stage
   exit "$status"
 }
 
+trap handle_preempt TERM
 trap preserve_failure ERR
 
-mkdir -p "$INPUT_STAGE" "$OUTPUT_STAGE" "$FINAL_OUT_DIR/$VARIANT/$STATE" "$CACHE_ROOT"
+mkdir -p "$INPUT_STAGE" "$CKPT_DIR" "$FINAL_DIR" "$CACHE_ROOT"
 
 export UV_CACHE_DIR="$CACHE_ROOT/uv"
-export UV_PROJECT_ENVIRONMENT="$STAGE_DIR/venv"
+export UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-${SLURMD_NODENAME:-$(hostname -s)}"
 export HF_HOME="$CACHE_ROOT/huggingface"
 export TORCH_HOME="$CACHE_ROOT/torch"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
@@ -147,10 +163,9 @@ STAGED_FALL="$INPUT_STAGE/$(basename "$FALL")"
 
 SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
 OUTPUT_BASENAME="prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}"
-REDUCED_LOCAL="$OUTPUT_STAGE/${OUTPUT_BASENAME}.tif"
-RAW_LOCAL="$OUTPUT_STAGE/${OUTPUT_BASENAME}_raw.tif"
-PCA_LOCAL="$OUTPUT_STAGE/${OUTPUT_BASENAME}.pca.pkl"
-FINAL_DIR="$FINAL_OUT_DIR/$VARIANT/$STATE"
+REDUCED_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.tif"
+RAW_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}_raw.tif"
+PCA_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.pca.pkl"
 
 if [[ -n "${BATCH_SIZE:-}" ]]; then
   RUN_BATCH_SIZE="$BATCH_SIZE"
@@ -165,6 +180,11 @@ if [[ -n "${TEST_CHIPS:-}" ]]; then
   TEST_CHIPS_ARGS="--test-chips $TEST_CHIPS"
 fi
 
+FORCE_FLAG=""
+if [[ -n "${FORCE_RESTART:-}" ]]; then
+  FORCE_FLAG="--force"
+fi
+
 echo "=== Prithvi embedding task ==="
 echo "State: $STATE"
 echo "Year: $YEAR"
@@ -172,6 +192,7 @@ echo "Variant: $VARIANT"
 echo "Task ID: $TASK_ID"
 echo "Input dir: $DATA_DIR"
 echo "Stage dir: $STAGE_DIR"
+echo "Checkpoint dir: $CKPT_DIR"
 echo "Final dir: $FINAL_DIR"
 echo "Batch size: $RUN_BATCH_SIZE"
 echo "Test chips: ${TEST_CHIPS:-none}"
@@ -189,7 +210,7 @@ uv run --python 3.11 python embed.py \
   --year "$YEAR" \
   --batch-size "$RUN_BATCH_SIZE" \
   --checkpoint-every "${CHECKPOINT_EVERY:-25}" \
-  --force \
+  $FORCE_FLAG \
   $TEST_CHIPS_ARGS
 
 for output in "$RAW_LOCAL" "$REDUCED_LOCAL" "$PCA_LOCAL"; do
@@ -203,7 +224,7 @@ mv -f "$RAW_LOCAL" "$FINAL_DIR/"
 mv -f "$REDUCED_LOCAL" "$FINAL_DIR/"
 mv -f "$PCA_LOCAL" "$FINAL_DIR/"
 
-trap - ERR
+trap - ERR TERM
 cleanup_success
 
 echo "=== Done ==="
