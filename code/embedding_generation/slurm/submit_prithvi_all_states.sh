@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 YEAR="${YEAR:-2022}"
-DATA_DIR="${DATA_DIR:-$REPO_DIR/data/prithvi_data}"
+DATA_DIR="${DATA_DIR:-$SCRATCH/embeddings-health/data/prithvi_data}"
 
 if [[ -z "${FINAL_OUT_DIR:-}" ]]; then
   : "${SCRATCH:?Set SCRATCH or FINAL_OUT_DIR before submitting.}"
@@ -14,7 +14,7 @@ fi
 SCRIPT="$SCRIPT_DIR/run_prithvi_state_array.sbatch"
 LOG_DIR="$SCRIPT_DIR/logs"
 NUM_MODELS=2
-SBATCH_TIME="${SBATCH_TIME:-2:00:00}"
+SBATCH_TIME="${SBATCH_TIME:-1:00:00}"
 SBATCH_MEM="${SBATCH_MEM:-128G}"
 
 STATES=()
