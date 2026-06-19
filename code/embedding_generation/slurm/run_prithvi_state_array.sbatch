@@ -163,9 +163,7 @@ STAGED_FALL="$INPUT_STAGE/$(basename "$FALL")"
 
 SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
 OUTPUT_BASENAME="prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}"
-REDUCED_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.tif"
-RAW_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}_raw.tif"
-PCA_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.pca.pkl"
+RAW_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.tif"
 
 if [[ -n "${BATCH_SIZE:-}" ]]; then
   RUN_BATCH_SIZE="$BATCH_SIZE"
@@ -204,25 +202,19 @@ uv run --python 3.11 python embed.py \
   --model prithvi \
   --variant "$VARIANT" \
   --input "$STAGED_SPRING" "$STAGED_SUMMER" "$STAGED_FALL" \
-  --output "$REDUCED_LOCAL" \
-  --raw-output "$RAW_LOCAL" \
-  --pca-dims 64 \
+  --output "$RAW_LOCAL" \
   --year "$YEAR" \
   --batch-size "$RUN_BATCH_SIZE" \
   --checkpoint-every "${CHECKPOINT_EVERY:-25}" \
   $FORCE_FLAG \
   $TEST_CHIPS_ARGS
 
-for output in "$RAW_LOCAL" "$REDUCED_LOCAL" "$PCA_LOCAL"; do
-  if [[ ! -s "$output" ]]; then
-    echo "ERROR: expected output missing or empty: $output" >&2
-    exit 1
-  fi
-done
+if [[ ! -s "$RAW_LOCAL" ]]; then
+  echo "ERROR: expected output missing or empty: $RAW_LOCAL" >&2
+  exit 1
+fi
 
 mv -f "$RAW_LOCAL" "$FINAL_DIR/"
-mv -f "$REDUCED_LOCAL" "$FINAL_DIR/"
-mv -f "$PCA_LOCAL" "$FINAL_DIR/"
 
 trap - ERR TERM
 cleanup_success

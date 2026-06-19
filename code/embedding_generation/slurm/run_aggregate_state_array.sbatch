@@ -21,6 +21,7 @@ TRACT_YEAR="${TRACT_YEAR:-2020}"   # TIGER/Line vintage
 EMBED_OUT_DIR="${EMBED_OUT_DIR:-$SCRATCH/embeddings-health/prithvi_embeddings}"
 TRACT_DIR="${TRACT_DIR:-$SCRATCH/embeddings-health/data/census_tracts}"
 AGG_OUT_DIR="${AGG_OUT_DIR:-$SCRATCH/embeddings-health/prithvi_aggregated}"
+NATIONAL_PCA_DIR="${NATIONAL_PCA_DIR:-$SCRATCH/embeddings-health/prithvi_aggregated/national_pca}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
 
 MODEL_VARIANTS=("tiny" "300M-TL")
@@ -86,27 +87,46 @@ cd "$EMBED_DIR"
 
 for VARIANT in "${MODEL_VARIANTS[@]}"; do
   SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
-  EMBED_TIF="$EMBED_OUT_DIR/$VARIANT/$STATE/prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}.tif"
-  AGG_CSV="$AGG_OUT_DIR/$VARIANT/prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}_tracts.csv"
 
-  if [[ ! -s "$EMBED_TIF" ]]; then
-    echo "SKIP $VARIANT $STATE — embedding not yet complete"
+  # Prefer the *_raw.tif written by older PCA-enabled runs; fall back to *.tif
+  # (written by newer --no-pca runs where the primary output is already raw).
+  RAW_CANDIDATE="$EMBED_OUT_DIR/$VARIANT/$STATE/prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}_raw.tif"
+  PLAIN_CANDIDATE="$EMBED_OUT_DIR/$VARIANT/$STATE/prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}.tif"
+  if [[ -s "$RAW_CANDIDATE" ]]; then
+    EMBED_TIF="$RAW_CANDIDATE"
+  elif [[ -s "$PLAIN_CANDIDATE" ]]; then
+    EMBED_TIF="$PLAIN_CANDIDATE"
+  else
+    echo "SKIP $VARIANT $STATE — no complete embedding found"
     continue
   fi
+
+  AGG_CSV="$AGG_OUT_DIR/$VARIANT/prithvi_${SAFE_VARIANT}_${STATE}_${YEAR}_tracts.csv"
   if [[ -s "$AGG_CSV" ]]; then
     echo "SKIP $VARIANT $STATE — already aggregated ($AGG_CSV)"
     continue
   fi
 
+  # Use the national PCA model when available so all states share the same embedding space.
+  PCA_MODEL="$NATIONAL_PCA_DIR/prithvi_${SAFE_VARIANT}_national_pca.pkl"
+  PCA_MODEL_ARG=""
+  if [[ -f "$PCA_MODEL" ]]; then
+    PCA_MODEL_ARG="--pca-model $PCA_MODEL"
+  else
+    echo "  NOTE: national PCA not found at $PCA_MODEL — aggregating raw dimensions"
+  fi
+
   mkdir -p "$(dirname "$AGG_CSV")"
   echo ""
-  echo "--- $VARIANT / $STATE ---"
+  echo "--- $VARIANT / $STATE  (embedding: $(basename "$EMBED_TIF")) ---"
+  # shellcheck disable=SC2086
   uv run --python 3.11 python aggregate.py \
     --embedding   "$EMBED_TIF" \
     --tracts      "$TRACT_ZIP" \
     --output      "$AGG_CSV" \
     --year        "$YEAR" \
-    --model       prithvi
+    --model       prithvi \
+    $PCA_MODEL_ARG
 
   echo "Saved: $AGG_CSV  ($(wc -l < "$AGG_CSV") rows)"
 done

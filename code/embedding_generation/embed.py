@@ -24,13 +24,15 @@ Usage (Prithvi tiny — 3 seasonal composites; 4th frame auto-padded):
 Flags:
   --variant STR         Model variant. OlmoEarth: Base (default) / Large.
                         Prithvi: tiny (default) / 300M-TL / 300M / 600M.
-  --no-pca              Store raw embeddings instead of PCA-compressing.
+  --pca                 Apply PCA compression after inference (opt-in; default is raw output).
   --raw-output PATH     Also write the pre-PCA raw embedding COG to this path.
-                        Lets you re-run PCA/UMAP later without re-doing GPU inference.
-                        No-op when --no-pca is set (--output already has raw embeddings).
-  --pca-dims N          PCA target dimensionality (default 64).
-  --pca-model PATH      Path to pre-fitted .pkl PCA; if absent a new PCA is fitted
-                        and saved next to the output TIF.
+                        Only meaningful when --pca is set; ignored otherwise (--output
+                        already contains raw embeddings).
+  --pca-dims N          PCA target dimensionality (default 64). Requires --pca.
+  --pca-model PATH      Path to a pre-fitted .pkl PCA; if absent a new per-state PCA is
+                        fitted and saved next to the output TIF. Requires --pca.
+                        For nationally comparable embeddings, fit a single PCA across all
+                        states with fit_national_pca.py and apply it at aggregation time.
   --force               Delete any existing output and checkpoint files before
                         starting. Without this flag, checkpoints are resumed
                         automatically.
@@ -591,8 +593,10 @@ def main() -> None:
                         help="Also write the pre-PCA raw embeddings to this COG path. "
                              "Useful for re-running PCA/UMAP without redoing GPU inference. "
                              "Ignored when --no-pca is set (--output already has raw embeddings).")
-    parser.add_argument("--no-pca", action="store_true",
-                        help="Skip PCA; store raw embeddings to --output.")
+    parser.add_argument("--pca", action="store_true",
+                        help="Apply PCA after inference. Default is raw output. "
+                             "For nationally comparable embeddings, omit this flag and "
+                             "apply a national PCA at aggregation time instead.")
     parser.add_argument("--pca-dims", type=int, default=64)
     parser.add_argument("--pca-model", type=Path, default=None)
     parser.add_argument("--force", action="store_true",
@@ -695,13 +699,13 @@ def main() -> None:
 
     raw_band_names = [f"{col_prefix}{i:04d}" for i in range(embed_dim)]
 
-    # Optionally save the pre-PCA raw embeddings.
-    if args.raw_output and not args.no_pca:
+    # Optionally save the pre-PCA raw embeddings alongside the PCA output.
+    if args.raw_output and args.pca:
         print(f"Writing raw embedding COG: {args.raw_output}  {raw.shape}")
         write_cog(raw, out_transform, crs_in, args.raw_output, band_names=raw_band_names)
 
-    # PCA compression (or pass-through).
-    if args.no_pca:
+    # PCA compression (opt-in via --pca; default is raw output).
+    if not args.pca:
         final = raw
         band_names = raw_band_names
     else:

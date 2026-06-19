@@ -19,6 +19,7 @@ YEAR="${YEAR:-2022}"
 : "${SCRATCH:?Set SCRATCH before submitting.}"
 EMBED_OUT_DIR="${EMBED_OUT_DIR:-$SCRATCH/embeddings-health/prithvi_embeddings}"
 AGG_OUT_DIR="${AGG_OUT_DIR:-$SCRATCH/embeddings-health/prithvi_aggregated}"
+NATIONAL_PCA_DIR="${NATIONAL_PCA_DIR:-$SCRATCH/embeddings-health/prithvi_aggregated/national_pca}"
 TRACT_DIR="${TRACT_DIR:-$SCRATCH/embeddings-health/data/census_tracts}"
 LOG_DIR="$SCRIPT_DIR/logs"
 SCRIPT="$SCRIPT_DIR/run_aggregate_state_array.sbatch"
@@ -27,13 +28,19 @@ MODEL_VARIANTS=("tiny" "300M-TL")
 
 # Discover states with at least one complete embedding variant
 STATES=()
+_has_raw_tif() {
+  local variant="$1" state="$2" safe_var="$3"
+  local raw="$EMBED_OUT_DIR/$variant/$state/prithvi_${safe_var}_${state}_${YEAR}_raw.tif"
+  local plain="$EMBED_OUT_DIR/$variant/$state/prithvi_${safe_var}_${state}_${YEAR}.tif"
+  [[ -s "$raw" || -s "$plain" ]]
+}
+
 for state_dir in "$EMBED_OUT_DIR/tiny"/*/; do
   [[ -d "$state_dir" ]] || continue
   state=$(basename "$state_dir")
   for VARIANT in "${MODEL_VARIANTS[@]}"; do
     SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
-    tif="$EMBED_OUT_DIR/$VARIANT/$state/prithvi_${SAFE_VARIANT}_${state}_${YEAR}.tif"
-    if [[ -s "$tif" ]]; then
+    if _has_raw_tif "$VARIANT" "$state" "$SAFE_VARIANT"; then
       STATES+=("$state")
       break  # at least one variant done — include this state
     fi
@@ -55,9 +62,8 @@ for i in "${!STATES[@]}"; do
   needs_work=0
   for VARIANT in "${MODEL_VARIANTS[@]}"; do
     SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
-    tif="$EMBED_OUT_DIR/$VARIANT/$state/prithvi_${SAFE_VARIANT}_${state}_${YEAR}.tif"
     csv="$AGG_OUT_DIR/$VARIANT/prithvi_${SAFE_VARIANT}_${state}_${YEAR}_tracts.csv"
-    if [[ -s "$tif" && ! -s "$csv" ]]; then
+    if _has_raw_tif "$VARIANT" "$state" "$SAFE_VARIANT" && [[ ! -s "$csv" ]]; then
       needs_work=1
       break
     fi
@@ -89,11 +95,11 @@ for i in "${INCOMPLETE_TASKS[@]}"; do
   printf "  [%2d] %s\n" "$i" "$state"
   for VARIANT in "${MODEL_VARIANTS[@]}"; do
     SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
-    tif="$EMBED_OUT_DIR/$VARIANT/$state/prithvi_${SAFE_VARIANT}_${state}_${YEAR}.tif"
     csv="$AGG_OUT_DIR/$VARIANT/prithvi_${SAFE_VARIANT}_${state}_${YEAR}_tracts.csv"
-    tif_done=$( [[ -s "$tif" ]] && echo "embed=done" || echo "embed=pending" )
-    csv_done=$( [[ -s "$csv" ]] && echo "agg=done"   || echo "agg=todo"    )
-    printf "       %-10s  %s  %s\n" "$VARIANT" "$tif_done" "$csv_done"
+    tif_done=$( _has_raw_tif "$VARIANT" "$state" "$SAFE_VARIANT" && echo "embed=done" || echo "embed=pending" )
+    csv_done=$( [[ -s "$csv" ]] && echo "agg=done" || echo "agg=todo" )
+    pca_done=$( [[ -f "$NATIONAL_PCA_DIR/prithvi_${SAFE_VARIANT}_national_pca.pkl" ]] && echo "pca=ready" || echo "pca=missing" )
+    printf "       %-10s  %s  %s  %s\n" "$VARIANT" "$tif_done" "$csv_done" "$pca_done"
   done
 done
 
@@ -106,7 +112,7 @@ fi
 mkdir -p "$LOG_DIR" "$AGG_OUT_DIR"
 TASK_ARRAY=$(IFS=,; echo "${INCOMPLETE_TASKS[*]}")
 
-export REPO_DIR EMBED_OUT_DIR AGG_OUT_DIR TRACT_DIR YEAR STATE_LIST
+export REPO_DIR EMBED_OUT_DIR AGG_OUT_DIR NATIONAL_PCA_DIR TRACT_DIR YEAR STATE_LIST
 
 JOB_ID=$(cd "$REPO_DIR" && sbatch \
   --export=ALL \
