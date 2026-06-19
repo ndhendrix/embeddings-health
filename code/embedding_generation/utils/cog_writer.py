@@ -54,6 +54,7 @@ def write_cog(
             tiled=True,
             blockxsize=512,
             blockysize=512,
+            BIGTIFF="IF_SAFER",
         ) as dst:
             dst.write(arr.astype("float32"))
             if band_names:
@@ -85,4 +86,5 @@ def _add_overviews_and_copy_as_cog(src_path: Path, dst_path: Path, compress: str
         tiled=True,
         blockxsize=512,
         blockysize=512,
+        BIGTIFF="IF_SAFER",
     )
