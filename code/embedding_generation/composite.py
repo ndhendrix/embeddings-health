@@ -64,7 +64,7 @@ SEASONS = {
     "fall":   (f"09-01", "11-30"),
 }
 
-# Approximate bounding boxes for all 48 contiguous US states
+# Approximate bounding boxes for the 48 contiguous US states and DC
 # (lon_min, lat_min, lon_max, lat_max) in WGS84.
 STATE_BBOXES: dict[str, tuple[float, float, float, float]] = {
     "AL": (-88.473,  30.144,  -84.889,  35.008),
@@ -73,6 +73,7 @@ STATE_BBOXES: dict[str, tuple[float, float, float, float]] = {
     "CA": (-124.409, 32.534, -114.131,  42.009),
     "CO": (-109.060, 36.992, -102.042,  41.003),
     "CT": (-73.728,  40.980,  -71.787,  42.050),
+    "DC": (-77.119,  38.791,  -76.909,  38.995),
     "DE": (-75.789,  38.451,  -74.984,  39.839),
     "FL": (-87.634,  24.396,  -79.974,  31.001),
     "GA": (-85.605,  30.356,  -80.840,  35.001),
@@ -432,7 +433,7 @@ def main() -> None:
                         help="Two-letter state abbreviation (must be in STATE_BBOXES). "
                              "Ignored when --all-states is set.")
     parser.add_argument("--all-states", action="store_true",
-                        help="Process all 48 contiguous US states sequentially, "
+                        help="Process all 48 contiguous US states and DC sequentially, "
                              "skipping any whose output files already exist.")
     parser.add_argument("--bbox", nargs=4, type=float, metavar=("W", "S", "E", "N"),
                         help="Override state bbox: W S E N in WGS84. Single state only.")
