@@ -14,6 +14,7 @@ Run from project root:
     uv run python code/analyses/predictive_dependency.py
 """
 
+import argparse
 import warnings
 from pathlib import Path
 
@@ -34,14 +35,15 @@ from sklearn.preprocessing import StandardScaler
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_DIR    = Path("data")
 OUTPUTS_DIR = Path("outputs")
-OUTPUTS_DIR.mkdir(exist_ok=True)
 
 USE_CACHED = True   # set False to refit models from scratch
 
-# ── Embedding feature columns (320 stats from 64 AlphaEarth channels) ─────────
+# ── Embedding feature columns ──────────────────────────────────────────────────
+# EMB_COLS and FEATURE_COLS are populated at runtime by load_data() so the
+# script works with any embedding source (AlphaEarth, Prithvi tiny, etc.).
 STAT_SUFFIXES = ["MEAN", "MEDIAN", "MINIMUM", "MAXIMUM", "STD"]
-EMB_COLS      = [f"A{i:02d}_{s}" for i in range(64) for s in STAT_SUFFIXES]
-FEATURE_COLS  = EMB_COLS + ["ALAND", "AWATER"]
+EMB_COLS     = []  # set by load_data
+FEATURE_COLS = []  # set by load_data
 
 # ── Target variables and metadata ─────────────────────────────────────────────
 TARGET_VARS = [
@@ -127,19 +129,43 @@ LGBM_KW = dict(n_estimators=300, learning_rate=0.05, num_leaves=31,
 
 # ── Step 0: Load and prepare data ─────────────────────────────────────────────
 
-def load_data() -> pd.DataFrame:
+def load_data(
+    embeddings_path: Path = DATA_DIR / "alphaearth_embeddings.csv",
+) -> pd.DataFrame:
     """Return a pandas DataFrame with FEATURE_COLS + TARGET_VARS + 'state' column."""
+    global EMB_COLS, FEATURE_COLS
 
     # Embeddings (2022 only, drop tracts with null channel data)
-    emb = (
-        pl.read_csv(DATA_DIR / "alphaearth_embeddings.csv", infer_schema_length=10_000)
-        .filter((pl.col("year") == 2022) & pl.col("A00_MAXIMUM").is_not_null())
-        .with_columns(
-            pl.col("GEOID").cast(pl.Utf8).str.zfill(11).alias("tract_fips")
-        )
-        .select(["tract_fips"] + FEATURE_COLS)
+    _raw = pl.read_csv(
+        embeddings_path,
+        infer_schema_length=10_000,
+        schema_overrides={"GEOID": pl.Utf8},
     )
-    print(f"Embeddings: {len(emb):,} tracts")
+
+    # Detect embedding columns: any *_STAT column that isn't geographic metadata
+    _meta = {"GEOID", "year", "ALAND", "AWATER", "tract_fips", "NAME"}
+    _stat_set = set(STAT_SUFFIXES)
+    _null_col = next(
+        (c for c in _raw.columns
+         if any(c.endswith(f"_{s}") for s in _stat_set) and c not in _meta),
+        None,
+    )
+
+    emb = (
+        _raw
+        .filter(pl.col("year") == 2022)
+        .pipe(lambda df: df.filter(pl.col(_null_col).is_not_null()) if _null_col else df)
+        .with_columns(pl.col("GEOID").str.zfill(11).alias("tract_fips"))
+    )
+
+    EMB_COLS = [
+        c for c in emb.columns
+        if any(c.endswith(f"_{s}") for s in _stat_set) and c not in _meta
+    ]
+    FEATURE_COLS = EMB_COLS + [c for c in ["ALAND", "AWATER"] if c in emb.columns]
+
+    emb = emb.select(["tract_fips"] + FEATURE_COLS)
+    print(f"Embeddings: {len(emb):,} tracts, {len(EMB_COLS)} embedding features")
 
     # ACS — rename raw Census variable codes to human names
     ACS_RENAME = {
@@ -658,10 +684,31 @@ def plot_pca_biplot(oof: pd.DataFrame) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    _parser = argparse.ArgumentParser(
+        description="Predictive dependency analysis.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    _parser.add_argument(
+        "--embeddings",
+        type=Path,
+        default=DATA_DIR / "alphaearth_embeddings.csv",
+        help="Path to combined embeddings CSV",
+    )
+    _parser.add_argument(
+        "--outputs-dir",
+        type=Path,
+        default=Path("outputs"),
+        help="Directory for output files",
+    )
+    _args = _parser.parse_args()
+
+    OUTPUTS_DIR = _args.outputs_dir
+    OUTPUTS_DIR.mkdir(exist_ok=True)
+
     warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
     print("=== Step 0: Loading data ===")
-    df = load_data()
+    df = load_data(_args.embeddings)
 
     print("\n=== Step 1: Out-of-fold predictions ===")
     oof = get_oof_predictions(df)

@@ -96,6 +96,70 @@ Output CSV columns follow the schema `{BAND}_{STAT}` (e.g. `PR0000_MEAN`, `PR000
 
 ---
 
+## Analysis pipeline
+
+Scripts live in `code/analyses/`. Run all commands from the project root.
+
+### Preparing embeddings for analysis (`prepare_embeddings.py`)
+
+The aggregation pipeline (Step 3 above) produces one CSV per state. This script
+concatenates them into a single file and joins `ALAND`/`AWATER` from
+`data/alphaearth_embeddings.csv` using lazy column selection (only those three
+columns are read from the 2.3 GB file).
+
+```bash
+# Prithvi tiny (run once; output already exists at data/prithvi_tiny_2022_all_tracts.csv)
+.venv/bin/python code/analyses/prepare_embeddings.py \
+    --input-dir data/prithvi_aggregated/tiny \
+    --output data/prithvi_tiny_2022_all_tracts.csv
+
+# Prithvi 300M-TL (run after the GPU cluster finishes all states)
+.venv/bin/python code/analyses/prepare_embeddings.py \
+    --input-dir data/prithvi_aggregated/300M-TL \
+    --output data/prithvi_300M-TL_2022_all_tracts.csv
+```
+
+Output columns: `GEOID`, `year`, embedding features (`PC00_MEAN` … `PC63_STD`
+for tiny; `PR0000_MEAN` … `PR5119_STD` for 300M-TL), `ALAND`, `AWATER`.
+
+### Full analyses notebook (`analyses.ipynb`)
+
+Open `code/analyses/analyses.ipynb`. **Cell 0** is the only cell you need to edit — uncomment the two lines for the embedding source you want (AlphaEarth or Prithvi tiny), then run all cells. `OUTPUTS_DIR` and `EMBEDDINGS_PATH` propagate through the rest of the notebook automatically.
+
+```python
+# Prithvi tiny (uncomment both lines):
+# EMBEDDINGS_PATH = Path("../../data/prithvi_tiny_2022_all_tracts.csv")
+# OUTPUTS_DIR     = Path("../../outputs/prithvi_tiny")
+```
+
+### Predictive dependency analysis (`predictive_dependency.py`)
+
+Fits LightGBM models (GroupKFold by state) for 20 ACS target variables, builds
+a 20×20 cross-prediction R² matrix, runs mediation decomposition for 5 focal
+pairs, and writes a heatmap and PCA biplot. Column prefix and ALAND/AWATER
+presence are detected automatically from the input file.
+
+```bash
+# AlphaEarth (original)
+.venv/bin/python code/analyses/predictive_dependency.py
+
+# Prithvi tiny
+.venv/bin/python code/analyses/predictive_dependency.py \
+    --embeddings data/prithvi_tiny_2022_all_tracts.csv \
+    --outputs-dir outputs/prithvi_tiny
+
+# Prithvi 300M-TL (after prepare step above)
+.venv/bin/python code/analyses/predictive_dependency.py \
+    --embeddings data/prithvi_300M-TL_2022_all_tracts.csv \
+    --outputs-dir outputs/prithvi_300M-TL
+```
+
+Add `--outputs-dir` so each model's results land in a separate folder and don't
+overwrite each other. Set `USE_CACHED = False` at the top of the script to
+refit from scratch rather than loading cached OOF predictions.
+
+---
+
 ## To do
 
 - [ ] Add TESSERA embeddings
