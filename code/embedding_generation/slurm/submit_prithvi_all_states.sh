@@ -46,6 +46,9 @@ chips_to_walltime() {
 # GDAL's library paths don't leak into the compute node environment.
 LOADED_GDAL=0
 if command -v module >/dev/null 2>&1 && ! command -v gdalinfo >/dev/null 2>&1; then
+  # gdal/3.10.2 depends on gcc/12.4.0 (from devel). Load devel first so this
+  # works both from a login shell and from the resubmit batch job environment.
+  module load devel 2>/dev/null || true
   module load physics gdal/3.10.2 2>/dev/null && LOADED_GDAL=1 || true
 fi
 
