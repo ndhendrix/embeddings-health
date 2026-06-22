@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 YEAR="${YEAR:-2022}"
 DATA_DIR="${DATA_DIR:-$SCRATCH/embeddings-health/data/prithvi_data}"
+CKPT_BASE="${CKPT_BASE:-$SCRATCH/embeddings-health/checkpoints}"
 
 if [[ -z "${FINAL_OUT_DIR:-}" ]]; then
   : "${SCRATCH:?Set SCRATCH or FINAL_OUT_DIR before submitting.}"
@@ -21,21 +22,22 @@ SBATCH_MEM="${SBATCH_MEM:-128G}"
 # for a 2409x3295 TIF → ceil(2409/224)*ceil(3295/224) = 11*15 = 165).
 CHIP_SIZE=224
 
-# Walltime tiers based on 300M-TL timing from RI (165 chips, 2m37s) with a
-# 1.5x safety margin. All thresholds are in chips (ceil(w/224)*ceil(h/224)).
+# Walltime tiers include ~1.5h setup overhead (venv build, input staging) on
+# top of inference time. Thresholds in chips (ceil(w/224)*ceil(h/224)).
 #
-#  <=  500 chips  →  30 min   (DC, RI, DE)
-#  <= 2000 chips  →   1 hr    (CT, NJ, MD, VT, NH, MA, HI)
-#  <= 6000 chips  →   3 hr    (most mid-size states)
-#  <= 14000 chips →   6 hr    (large: CO, WY, OR, WA, NM, AZ, NV, MT)
-#  >  14000 chips →  12 hr    (CA, TX; may still use checkpoints+resubmit)
+#  == 0 chips    →   3 hr   gdalinfo unavailable; covers setup + most small states
+#  <=  500 chips →  1h30m   (DC, RI, DE)
+#  <= 2000 chips →   2 hr   (CT, NJ, MD, VT, NH, MA, HI)
+#  <= 8000 chips →   4 hr   (most mid-size states; raised from 3h to absorb setup variance)
+#  <=20000 chips →   8 hr   (large: CO, WY, OR, WA, NM, AZ, NV, MT)
+#  > 20000 chips →  12 hr   (CA, TX; may still use checkpoints+resubmit)
 chips_to_walltime() {
   local chips="$1"
-  if   (( chips == 0 ));     then echo "01:00:00"  # gdalinfo unavailable; safe default
-  elif (( chips <= 500 ));   then echo "00:30:00"
-  elif (( chips <= 2000 ));  then echo "01:00:00"
-  elif (( chips <= 6000 ));  then echo "03:00:00"
-  elif (( chips <= 14000 )); then echo "06:00:00"
+  if   (( chips == 0 ));     then echo "03:00:00"  # gdalinfo unavailable; safe default
+  elif (( chips <= 500 ));   then echo "01:30:00"
+  elif (( chips <= 2000 ));  then echo "02:00:00"
+  elif (( chips <= 8000 ));  then echo "04:00:00"
+  elif (( chips <= 20000 )); then echo "08:00:00"
   else                            echo "12:00:00"
   fi
 }
@@ -49,17 +51,30 @@ fi
 
 get_chips() {
   local tif="$1"
-  if ! command -v gdalinfo >/dev/null 2>&1; then
-    echo "0"; return
+  if command -v gdalinfo >/dev/null 2>&1; then
+    local size_line width height w_chips h_chips
+    size_line=$(gdalinfo "$tif" 2>/dev/null | grep "^Size is" || true)
+    if [[ -n "$size_line" ]]; then
+      width=$(echo  "$size_line" | sed 's/Size is //' | cut -d',' -f1 | tr -d ' ')
+      height=$(echo "$size_line" | sed 's/Size is //' | cut -d',' -f2 | tr -d ' ')
+      echo $(( ((width + CHIP_SIZE - 1) / CHIP_SIZE) * ((height + CHIP_SIZE - 1) / CHIP_SIZE) ))
+      return
+    fi
   fi
-  local size_line width height w_chips h_chips
-  size_line=$(gdalinfo "$tif" 2>/dev/null | grep "^Size is" || true)
-  if [[ -z "$size_line" ]]; then echo "0"; return; fi
-  width=$(echo  "$size_line" | sed 's/Size is //' | cut -d',' -f1 | tr -d ' ')
-  height=$(echo "$size_line" | sed 's/Size is //' | cut -d',' -f2 | tr -d ' ')
-  w_chips=$(( (width  + CHIP_SIZE - 1) / CHIP_SIZE ))
-  h_chips=$(( (height + CHIP_SIZE - 1) / CHIP_SIZE ))
-  echo $(( w_chips * h_chips ))
+  # gdalinfo unavailable or failed — estimate from 300M-TL ckpt.npy size.
+  # The ckpt is pre-allocated as float32 (D=1024, H, W); chips ≈ H*W/100.
+  # Calibration: TX 26GB ckpt.npy → ~67k chips → 26e9 / (1024*4*100) ≈ 63k.
+  local state tif_base ckpt_npy npy_bytes
+  tif_base="$(basename "$tif")"
+  # Extract state from filename: s2_spring_<STATE>_<YEAR>_prithvi.tif
+  state="$(echo "$tif_base" | sed -E "s/^s2_spring_(.*)_${YEAR}_prithvi\.tif$/\1/")"
+  ckpt_npy="$CKPT_BASE/300M-TL/$state/prithvi_300M-TL_${state}_${YEAR}.ckpt.npy"
+  if [[ -f "$ckpt_npy" ]]; then
+    npy_bytes=$(stat -c%s "$ckpt_npy" 2>/dev/null || echo "0")
+    echo $(( npy_bytes / 409600 ))  # 1024 * 4 * 100
+    return
+  fi
+  echo "0"
 }
 
 # Discover states from spring TIF files in DATA_DIR
