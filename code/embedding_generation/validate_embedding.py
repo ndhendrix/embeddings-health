@@ -29,7 +29,13 @@ import rasterio
 from rasterio.enums import Resampling
 
 
-SAMPLE_BANDS = [0, 63, 127, 255, 511, 767, 1023]  # indices, not 1-based
+SAMPLE_BANDS = [0, 63, 127, 255, 511, 767, 1023]  # indices, not 1-based; clipped to actual count
+
+# Known valid band counts:
+#   192  = Prithvi tiny raw embedding
+#  1024  = Prithvi 300M-TL raw embedding
+#    64  = PCA-reduced 300M-TL (old pipeline; file has _raw.tif sibling with 1024 bands)
+VALID_BAND_COUNTS = {192, 1024, 64}
 
 
 def _read_overview(src, band_indices, overview_level=4):
@@ -107,7 +113,10 @@ def validate(tif_path: Path, ref_path: Path | None = None, overview_level: int =
         print(f"  Overviews: {overviews}")
         print(f"  File size: {tif_path.stat().st_size / 1e9:.1f} GB")
 
-        if n_bands not in (192, 1024):
+        if n_bands == 64:
+            print(f"  NOTE: 64 bands = PCA-reduced file (old pipeline). "
+                  f"Use _raw.tif sibling for raw-embedding comparison.")
+        elif n_bands not in VALID_BAND_COUNTS:
             print(f"  WARNING: unexpected band count {n_bands}")
             ok = False
 
