@@ -196,6 +196,25 @@ Current tiers (see `chips_to_walltime` in the submit script for latest):
 
 ---
 
+## Running one-off scripts on a compute node
+
+For short scripts that are too heavy for the login node but don't warrant a
+full batch job (validation checks, quick data inspection, etc.), use `srun`
+to run the command directly on an allocated compute node:
+
+```bash
+srun -p normal -c 2 --mem=16G --time=00:15:00 \
+  "$SCRATCH/embeddings-health/cache/venv-3.11-cpu/bin/python" \
+  validate_embedding.py <tif> --ref <ref_tif>
+```
+
+`srun` blocks until the command exits and streams stdout/stderr back to your
+terminal. It goes through the normal queue, so it may wait briefly for a slot.
+For GPU work, add `-p gpu -G 1`. For a full interactive shell instead of a
+single command, use `sh_dev` (CPU) or `sh_dev -g 1` (GPU).
+
+---
+
 ## Useful commands
 
 ```bash
@@ -207,5 +226,6 @@ sh_quota -g                          # group storage usage
 ml spider <name>                     # find module and its prerequisites
 sh_dev -g 1                          # quick interactive GPU shell
 salloc -p gpu --gpus 1               # interactive GPU allocation
+srun -p normal -c 2 --mem=16G --time=00:15:00 <cmd>  # one-off on compute node
 scancel <jobid>                      # cancel a job or resubmit chain
 ```

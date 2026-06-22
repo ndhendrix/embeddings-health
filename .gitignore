@@ -1,5 +1,4 @@
 data/*
 .DS_Store
-CLAUDE.md
 .env
 outputs/
