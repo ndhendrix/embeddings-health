@@ -61,14 +61,16 @@ def _check_zero_pixels(data, label="overview"):
     return n_zero, n_total
 
 
-def _check_nan_pixels(data, label="overview"):
+def _check_nan_pixels(data, label="overview", silent=False):
     any_nan = np.any(np.isnan(data), axis=0)
     n_nan = int(any_nan.sum())
-    if n_nan:
-        print(f"  NaN pixels  ({label}): {n_nan:,}  *** WARNING ***")
-    else:
-        print(f"  NaN pixels  ({label}): 0  OK")
-    return n_nan
+    n_total = any_nan.size
+    if not silent:
+        if n_nan:
+            print(f"  NaN pixels  ({label}): {n_nan:,}  *** WARNING ***")
+        else:
+            print(f"  NaN pixels  ({label}): 0  OK")
+    return n_nan, n_total
 
 
 def _band_stats(data, band_indices):
@@ -129,46 +131,79 @@ def validate(tif_path: Path, ref_path: Path | None = None, overview_level: int =
               f"~1/{2**overview_level} resolution)")
         data = _read_overview(src, sample, overview_level)
         nz, nt = _check_zero_pixels(data, f"level-{overview_level} overview")
-        _check_nan_pixels(data, f"level-{overview_level} overview")
+        nan_at_overview, _ = _check_nan_pixels(data, f"level-{overview_level} overview",
+                                                silent=True)
+        # NaN at overview is expected when large NoData regions exist (e.g. border
+        # chips outside state boundary): GDAL average resampling propagates NaN if
+        # ANY pixel in the averaging window is NaN.  Only the zero-pixel count is
+        # a reliable chip-gap indicator at overview resolution.
+        if nan_at_overview == nt:
+            print(f"  NaN pixels  (level-{overview_level} overview): {nan_at_overview:,} / {nt:,}"
+                  f"  (all NaN — large NoData border expected; using full-res crops for stats)")
+        else:
+            print(f"  NaN pixels  (level-{overview_level} overview): {nan_at_overview:,} / {nt:,}"
+                  f"  ({'%.1f' % (100*nan_at_overview/nt)}%)")
 
         if nz / nt > 0.01:
             print("  WARNING: >1% zero pixels — possible chip gaps from checkpointing")
             ok = False
 
-        print(f"\nBand statistics (sampled at overview level {overview_level})")
-        _band_stats(data, sample)
-
-        # Full-resolution check on a small centre crop (~50×50 chips) to catch
-        # any overview-averaging artefacts hiding individual zero chips.
-        cx, cy = width // 2, height // 2
+        # Full-resolution crops at 5 locations: centre + quadrant interiors.
+        # This catches chip gaps that overview averaging might obscure, and
+        # handles the all-NaN-overview case caused by NoData border regions.
         crop_r = 25
-        window = rasterio.windows.Window(
-            max(0, cx - crop_r), max(0, cy - crop_r),
-            min(width,  2 * crop_r), min(height, 2 * crop_r),
-        )
-        print(f"\nFull-resolution centre crop ({window.width}×{window.height} chips)")
-        crop_data = src.read(
-            indexes=[b + 1 for b in sample],
-            window=window,
-        )
-        nzc, ntc = _check_zero_pixels(crop_data, "centre crop")
-        _check_nan_pixels(crop_data, "centre crop")
-        if nzc / ntc > 0.01:
-            print("  WARNING: >1% zero pixels in centre crop")
+        locations = {
+            "centre":       (width // 2,       height // 2),
+            "upper-left":   (width // 4,        height // 4),
+            "upper-right":  (3 * width // 4,    height // 4),
+            "lower-left":   (width // 4,        3 * height // 4),
+            "lower-right":  (3 * width // 4,    3 * height // 4),
+        }
+        print(f"\nFull-resolution spot checks ({2*crop_r}×{2*crop_r} chips each)")
+        stats_data = None  # use first non-all-NaN crop for stats
+        any_crop_bad = False
+        for loc_name, (cx, cy) in locations.items():
+            window = rasterio.windows.Window(
+                max(0, cx - crop_r), max(0, cy - crop_r),
+                min(width,  2 * crop_r), min(height, 2 * crop_r),
+            )
+            crop_data = src.read(indexes=[b + 1 for b in sample], window=window)
+            nzc, ntc = _check_zero_pixels(crop_data, loc_name)
+            nan_c, _ = _check_nan_pixels(crop_data, loc_name, silent=True)
+            # A crop that is entirely NaN is just a NoData border region — skip it.
+            if nan_c == ntc:
+                print(f"  {loc_name}: all NoData (border region — skipping)")
+                continue
+            valid_pct = 100.0 * (ntc - nan_c) / ntc
+            print(f"  {loc_name}: {valid_pct:.1f}% valid pixels, "
+                  f"{nan_c} NaN, {nzc} zero")
+            if stats_data is None:
+                stats_data = crop_data
+            if nzc / ntc > 0.01:
+                print(f"  WARNING: >1% zero pixels at {loc_name}")
+                any_crop_bad = True
+        if any_crop_bad:
             ok = False
 
-    # Reference comparison
+        print(f"\nBand statistics (full-resolution crop sample)")
+        if stats_data is not None:
+            _band_stats(stats_data, sample)
+        else:
+            print("  (all crops were NoData — cannot compute stats)")
+
+    # Reference comparison — use full-res crop for target if overview is all-NaN
     if ref_path and ref_path.exists():
         print(f"\nReference comparison: {ref_path.name}")
+        target_for_stats = stats_data if (stats_data is not None) else data
         with rasterio.open(ref_path) as ref:
             ref_sample = [b for b in sample if b < ref.count]
             ref_data = _read_overview(ref, ref_sample, overview_level)
 
         print(f"  {'Band':>6}  {'Target mean':>12}  {'Ref mean':>12}  {'Ratio':>8}")
         for idx, bi in enumerate(sample):
-            if bi >= data.shape[0] or bi >= ref_data.shape[0]:
+            if idx >= target_for_stats.shape[0] or idx >= ref_data.shape[0]:
                 continue
-            t_mean = float(np.nanmean(data[idx]))
+            t_mean = float(np.nanmean(target_for_stats[idx]))
             r_mean = float(np.nanmean(ref_data[idx]))
             ratio  = t_mean / r_mean if r_mean != 0 else float("nan")
             flag   = "  ***" if not (0.1 < abs(ratio) < 10) else ""
