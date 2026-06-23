@@ -5,7 +5,7 @@ Processes the raster in non-overlapping chip-sized windows, extracts spatial
 patch embeddings from the encoder, assembles them into a multi-band COG, then
 optionally PCA-compresses to 64 dimensions.
 
-OlmoEarth output resolution:   80 m/pixel  (patch_size=8 × 10 m input)
+OlmoEarth output resolution:   40 m/pixel  (patch_size=4 × 10 m input)
 Prithvi output resolution:    480 m/pixel  (patch_size=16 × 30 m input)
 
 Usage (OlmoEarth):
@@ -68,9 +68,14 @@ from utils.cog_writer import write_cog
 # Model IDs
 # ---------------------------------------------------------------------------
 OLMOEARTH_REPO = {
-    "Base":  "OlmoEarth-v1-Base",
-    "Large": "OlmoEarth-v1-Large",
+    "Base":       "OlmoEarth-v1-Base",
+    "Large":      "OlmoEarth-v1-Large",
+    "v1_1-Base":  "OlmoEarth-v1_1-Base",
+    "v1_1-Large": "OlmoEarth-v1_1-Large",
 }
+# Switch the output accumulation array to a disk-backed memmap when the array
+# would exceed this size — prevents OOM on large states at 80m/768-dim output.
+_MEMMAP_THRESHOLD_BYTES = 8 * 1024 ** 3
 PRITHVI_REPO = {
     "tiny": "ibm-nasa-geospatial/Prithvi-EO-2.0-tiny-TL",
     "300M-TL": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL",
@@ -82,15 +87,15 @@ PRITHVI_REPO = {
 # OlmoEarth parameters (verified from allenai/OlmoEarth-v1-Base config.json
 # and confirmed by dry-run with random weights)
 # ---------------------------------------------------------------------------
-# chip_px should be divisible by patch_size (8)
+# chip_px should be divisible by patch_size (4)
 OLMOEARTH_CHIP_PX = 128
 # patch_size = pixels per patch (NOT tokens per chip).
-# max_patch_size=8 means 8 pixels per patch.
-# For a 128×128 chip: 128/8 = 16 spatial tokens per axis.
-OLMOEARTH_PATCH_SIZE = 8          # pixels per patch
+# max_patch_size=8; using 4 gives 40m output from 10m input (in-distribution).
+# For a 128×128 chip: 128/4 = 32 spatial tokens per axis.
+OLMOEARTH_PATCH_SIZE = 4          # pixels per patch
 OLMOEARTH_EMBED_DIM = 768         # encoder embedding_size (Base variant)
-# Effective output resolution = patch_size × input_resolution = 8 × 10m = 80m
-OLMOEARTH_STRIDE_PX = 8           # output stride in input pixels
+# Effective output resolution = patch_size × input_resolution = 4 × 10m = 40m
+OLMOEARTH_STRIDE_PX = 4           # output stride in input pixels
 
 # ---------------------------------------------------------------------------
 # Prithvi parameters
@@ -118,12 +123,26 @@ def load_olmoearth(variant: str = "Base"):
 
     Note: we call model.encoder directly (bypassing the LatentMIM top-level
     and the broken eval_wrapper import chain) to get spatial patch embeddings.
-    """
-    from olmoearth_pretrain.model_loader import ModelID, load_model_from_id
 
-    model_id = ModelID(f"OlmoEarth-v1-{variant}")
-    print(f"Loading OlmoEarth {variant} from HuggingFace ({model_id.repo_id()})…")
-    model = load_model_from_id(model_id)
+    Uses load_model_from_path + hf_hub_download to bypass the ModelID enum,
+    which only covers v1 and would reject v1.1 model names.
+    """
+    from pathlib import Path
+    from huggingface_hub import hf_hub_download
+    from olmoearth_pretrain.model_loader import load_model_from_path
+
+    model_name = OLMOEARTH_REPO.get(variant)
+    if model_name is None:
+        raise SystemExit(
+            f"Unknown OlmoEarth variant '{variant}'. "
+            f"Valid variants: {list(OLMOEARTH_REPO)}"
+        )
+    repo_id = f"allenai/{model_name}"
+    print(f"Loading OlmoEarth {variant} ({repo_id}) from HuggingFace…")
+    # Download config and weights; both land in the same snapshot directory.
+    config_local = hf_hub_download(repo_id=repo_id, filename="config.json")
+    hf_hub_download(repo_id=repo_id, filename="weights.pth")
+    model = load_model_from_path(Path(config_local).parent)
     model.eval()
     return model
 
@@ -250,11 +269,10 @@ def run_olmoearth_batch(
 ) -> np.ndarray:
     """Return (B, P_H, P_W, 768) float32 spatial patch embeddings.
 
-    P_H = P_W = chip_px / OLMOEARTH_PATCH_SIZE = 128/8 = 16.
-    Effective spatial resolution: 80m.
+    P_H = P_W = chip_px / OLMOEARTH_PATCH_SIZE = 128/4 = 32.
+    Effective spatial resolution: 40m.
     """
     from olmoearth_pretrain.datatypes import OlmoEarthSample, MaskedOlmoEarthSample
-    from olmoearth_pretrain.nn.flexi_vit import PoolingType
 
     chips = _impute_nan(chips)             # fill NaN before model sees them
     B, C, H, W = chips.shape
@@ -271,8 +289,10 @@ def run_olmoearth_batch(
         # fast_pass=True skips the target encoder branch (inference-only).
         enc_out = model.encoder(masked, patch_size=OLMOEARTH_PATCH_SIZE, fast_pass=True)
         tokens_and_masks = enc_out["tokens_and_masks"]
-        # pool_spatially averages over T and Band_Sets dims → (B, P_H, P_W, D)
-        spatial_emb = tokens_and_masks.pool_spatially(PoolingType.MEAN)
+        # sentinel2_l2a tokens: (B, P_H, P_W, T, Band_Sets, D)
+        # Average over T (dim=-3) and Band_Sets (dim=-2) → (B, P_H, P_W, D)
+        tokens = tokens_and_masks.sentinel2_l2a
+        spatial_emb = tokens.mean(dim=(-2, -3))
 
     return spatial_emb.float().cpu().numpy()
 
@@ -406,6 +426,7 @@ def checkpoint_load(ckpt_path: Path) -> tuple[np.ndarray, int] | tuple[None, int
 def checkpoint_delete(ckpt_path: Path) -> None:
     ckpt_path.unlink(missing_ok=True)
     ckpt_path.with_suffix(".n").unlink(missing_ok=True)
+    ckpt_path.with_suffix(".mmap").unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -456,18 +477,46 @@ def embed_olmoearth(
 
     Output shape: (768, ceil(H/8), ceil(W/8)) — one 768-dim vector per 8×8 pixel (80m) patch.
     Periodically checkpoints to ckpt_path so interrupted jobs can resume.
+
+    When the output array would exceed _MEMMAP_THRESHOLD_BYTES (8 GB by default),
+    a disk-backed numpy memmap is used automatically so large states (TX, CA, MT…)
+    don't OOM. The memmap file lives next to the checkpoint as <ckpt>.mmap and is
+    removed by checkpoint_delete() after the COG is written.
     """
     h, w = src.height, src.width
     stride = OLMOEARTH_STRIDE_PX
     out_h = (h + stride - 1) // stride
     out_w = (w + stride - 1) // stride
+    shape = (OLMOEARTH_EMBED_DIM, out_h, out_w)
+
+    array_bytes = OLMOEARTH_EMBED_DIM * out_h * out_w * 4
+    use_memmap = array_bytes > _MEMMAP_THRESHOLD_BYTES
+    mmap_path = ckpt_path.with_suffix(".mmap") if (use_memmap and ckpt_path) else None
 
     # Resume from checkpoint if available
-    out, n_skip = (None, 0)
+    out, n_skip = None, 0
     if ckpt_path:
-        out, n_skip = checkpoint_load(ckpt_path)
+        n_path = ckpt_path.with_suffix(".n")
+        if n_path.exists():
+            try:
+                n_skip = int(n_path.read_text().strip())
+                if use_memmap and mmap_path and mmap_path.exists():
+                    out = np.memmap(str(mmap_path), dtype="float32", mode="r+", shape=shape)
+                    print(f"Resuming from memmap: {n_skip} chips done  ({mmap_path})")
+                elif not use_memmap:
+                    out, n_skip = checkpoint_load(ckpt_path)
+            except Exception as e:
+                print(f"Warning: checkpoint unreadable ({e}); starting from scratch.")
+                n_skip, out = 0, None
+
     if out is None:
-        out = np.full((OLMOEARTH_EMBED_DIM, out_h, out_w), np.nan, dtype="float32")
+        if use_memmap:
+            print(f"Output array {array_bytes / 1024**3:.1f} GB — using disk-backed memmap"
+                  f" ({mmap_path})")
+            out = np.memmap(str(mmap_path), dtype="float32", mode="w+", shape=shape)
+        else:
+            out = np.full(shape, np.nan, dtype="float32")
+        out[:] = np.nan
 
     n_processed = 0
     for batch in tqdm(chips_to_batches(iter_chips(src, OLMOEARTH_CHIP_PX), batch_size),
@@ -500,8 +549,14 @@ def embed_olmoearth(
         n_processed += len(batch)
 
         if ckpt_path and (n_processed % checkpoint_every == 0):
-            checkpoint_save(out, n_processed, ckpt_path)
+            if use_memmap:
+                out.flush()
+                ckpt_path.with_suffix(".n").write_text(str(n_processed))
+            else:
+                checkpoint_save(out, n_processed, ckpt_path)
 
+    if use_memmap:
+        out.flush()
     return out
 
 
@@ -625,7 +680,8 @@ def main() -> None:
     ckpt_path = args.output.with_suffix(".ckpt.npy")
 
     if args.force:
-        for p in [args.output, ckpt_path, ckpt_path.with_suffix(".n")]:
+        for p in [args.output, ckpt_path, ckpt_path.with_suffix(".n"),
+                  ckpt_path.with_suffix(".mmap")]:
             if p and p.exists():
                 p.unlink()
         if args.raw_output and args.raw_output.exists():
@@ -702,7 +758,7 @@ def main() -> None:
     # Optionally save the pre-PCA raw embeddings alongside the PCA output.
     if args.raw_output and args.pca:
         print(f"Writing raw embedding COG: {args.raw_output}  {raw.shape}")
-        write_cog(raw, out_transform, crs_in, args.raw_output, band_names=raw_band_names)
+        write_cog(raw, out_transform, crs_in, args.raw_output, band_names=raw_band_names, overviews=False)
 
     # PCA compression (opt-in via --pca; default is raw output).
     if not args.pca:
@@ -727,7 +783,7 @@ def main() -> None:
         band_names = [f"{col_prefix}{i:02d}" for i in range(args.pca_dims)]
 
     print(f"Writing COG: {args.output}  {final.shape}")
-    write_cog(final, out_transform, crs_in, args.output, band_names=band_names)
+    write_cog(final, out_transform, crs_in, args.output, band_names=band_names, overviews=False)
     checkpoint_delete(ckpt_path)
     print("Done.")
 

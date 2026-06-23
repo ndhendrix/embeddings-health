@@ -15,8 +15,9 @@ def write_cog(
     band_names: list[str] | None = None,
     compress: str = "lzw",
     nodata: float | None = np.nan,
+    overviews: bool = True,
 ) -> None:
-    """Write (C, H, W) float32 array to a COG GeoTIFF with overview pyramids.
+    """Write (C, H, W) float32 array to a tiled GeoTIFF, optionally with COG overviews.
 
     Args:
         arr: (C, H, W) numpy array.
@@ -26,6 +27,9 @@ def write_cog(
         band_names: Optional list of band name strings for metadata tags.
         compress: Compression codec (lzw, deflate, zstd).
         nodata: Nodata value; use np.nan for float data.
+        overviews: Build overview pyramids and copy as COG. Set False for
+            high-band-count arrays (e.g. embeddings) where overview
+            generation across hundreds of bands would take hours.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,11 +65,13 @@ def write_cog(
                 for i, name in enumerate(band_names, 1):
                     dst.update_tags(i, name=name)
 
-        # Build overview levels and copy as COG
-        _add_overviews_and_copy_as_cog(tmp_path, path, compress)
+        if overviews:
+            _add_overviews_and_copy_as_cog(tmp_path, path, compress)
+        else:
+            tmp_path.rename(path)
     finally:
         if tmp_path.exists():
-            tmp_path.unlink()
+            tmp_path.unlink(missing_ok=True)
 
 
 def _add_overviews_and_copy_as_cog(src_path: Path, dst_path: Path, compress: str) -> None:

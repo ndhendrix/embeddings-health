@@ -159,7 +159,7 @@ def load_and_composite(
     crs: str,
     resolution: int,
     max_cloud_cover: int = 30,
-    max_scenes_per_month: int | None = 3,
+    max_scenes_per_month: int | None = 2,
 ) -> np.ndarray | None:
     """Query STAC, cloud-mask, and return pixel-wise median as (C, H, W) float32.
 
@@ -322,9 +322,11 @@ def _run_composite(
     out_path: Path,
     resolution: int,
     max_cloud_cover: int,
-    max_scenes_per_month: int | None = 3,
+    max_scenes_per_month: int | None = 2,
     label: str = "",
     force: bool = False,
+    tile_index: int | None = None,
+    merge_only: bool = False,
 ) -> None:
     """Composite one time window over a list of tiles, merging if necessary.
 
@@ -332,9 +334,68 @@ def _run_composite(
     Individual tiles that already exist are skipped, enabling resume after
     interruption mid-merge. Pass force=True to delete existing outputs and
     reprocess from scratch.
+
+    Per-tile parallel mode:
+      tile_index=N  — process only tile N; write tile TIF, do not merge.
+      merge_only=True — merge all existing tile TIFs into final output; exit
+                        with a warning if any tiles are still missing.
     """
     prefix = f"  [{label}]" if label else " "
+    n = len(tiles)
 
+    # ------------------------------------------------------------------
+    # merge-only: assemble the final mosaic from already-written tile TIFs
+    # ------------------------------------------------------------------
+    if merge_only:
+        if out_path.exists() and not force:
+            print(f"{prefix} Already exists, skipping merge: {out_path.name}")
+            return
+        tile_paths = sorted(out_path.parent.glob(f"{out_path.stem}_tile*.tif"))
+        if len(tile_paths) != n:
+            print(f"{prefix} SKIP merge: expected {n} tiles, found {len(tile_paths)} "
+                  f"({n - len(tile_paths)} still missing)")
+            return
+        print(f"{prefix} Merging {len(tile_paths)}/{n} tiles → {out_path.name}…")
+        _merge_tiles(tile_paths, bands, out_path)
+        return
+
+    # ------------------------------------------------------------------
+    # per-tile mode: process exactly one tile, write its TIF, do not merge
+    # ------------------------------------------------------------------
+    if tile_index is not None:
+        if tile_index < 0 or tile_index >= n:
+            raise SystemExit(f"--tile-index {tile_index} is out of range [0, {n})")
+        if n == 1:
+            # Single-tile state: tile_index=0 writes the final output directly
+            if out_path.exists() and not force:
+                print(f"{prefix} Already exists, skipping: {out_path.name}")
+                return
+            print(f"{prefix} Compositing ({len(bands)} bands)…")
+            arr, transform, out_crs = load_and_composite(
+                client, tiles[0], datetime_str, bands, crs, resolution,
+                max_cloud_cover, max_scenes_per_month,
+            )
+            if arr is not None:
+                save_tif(arr, transform, out_crs, bands, out_path)
+            return
+        tile_path = out_path.with_name(f"{out_path.stem}_tile{tile_index:03d}.tif")
+        if tile_path.exists() and not force:
+            print(f"{prefix} Tile {tile_index + 1}/{n} already exists, skipping")
+            return
+        print(f"{prefix} Tile {tile_index + 1}/{n} ({len(bands)} bands)…")
+        arr, transform, out_crs = load_and_composite(
+            client, tiles[tile_index], datetime_str, bands, crs, resolution,
+            max_cloud_cover, max_scenes_per_month,
+        )
+        if arr is None:
+            print(f"{prefix} WARNING: tile {tile_index + 1}/{n} returned no data")
+            return
+        save_tif(arr, transform, out_crs, bands, tile_path)
+        return
+
+    # ------------------------------------------------------------------
+    # original sequential mode (all tiles in one job, then merge)
+    # ------------------------------------------------------------------
     if out_path.exists():
         if not force:
             print(f"{prefix} Already exists, skipping: {out_path.name}")
@@ -352,7 +413,6 @@ def _run_composite(
         )
 
     out_bands = bands
-    n = len(tiles)
 
     if n == 1:
         print(f"{prefix} Compositing ({len(out_bands)} bands)…")
@@ -394,8 +454,10 @@ def process_state(
     output_dir: Path,
     max_cloud_cover: int = 30,
     max_tile_km: float = 200.0,
-    max_scenes_per_month: int | None = 3,
+    max_scenes_per_month: int | None = 2,
     force: bool = False,
+    tile_index: int | None = None,
+    merge_only: bool = False,
 ) -> None:
     """Run composite generation for a single state, tiling automatically if needed."""
     crs = bbox_to_utm_epsg(bbox)
@@ -404,8 +466,10 @@ def process_state(
 
     print(f"\n{'='*60}")
     tile_info = f"  {n_tiles} tiles" if n_tiles > 1 else ""
+    mode_info = (f"  tile-index={tile_index}" if tile_index is not None else
+                 "  merge-only" if merge_only else "")
     print(f"State: {state}  Year: {year}  Model: {model}  "
-          f"Source: Element84  CRS: {crs}{tile_info}")
+          f"Source: Element84  CRS: {crs}{tile_info}{mode_info}")
 
     if model == "olmoearth":
         _run_composite(
@@ -413,7 +477,7 @@ def process_state(
             f"{year}-01-01/{year}-12-31",
             output_dir / f"s2_annual_{state}_{year}_olmoearth.tif",
             resolution, max_cloud_cover, max_scenes_per_month,
-            force=force,
+            force=force, tile_index=tile_index, merge_only=merge_only,
         )
 
     elif model == "prithvi":
@@ -424,6 +488,7 @@ def process_state(
                 output_dir / f"s2_{season}_{state}_{year}_prithvi.tif",
                 resolution, max_cloud_cover, max_scenes_per_month,
                 label=season, force=force,
+                tile_index=tile_index, merge_only=merge_only,
             )
 
 
@@ -450,13 +515,20 @@ def main() -> None:
                         help="Maximum tile side length in km (default 200). States wider "
                              "than this are split into a grid of tiles and merged after "
                              "compositing. Reduce if you still hit memory limits.")
-    parser.add_argument("--max-scenes-per-month", type=int, default=3,
+    parser.add_argument("--max-scenes-per-month", type=int, default=2,
                         help="Keep at most N scenes per calendar month, choosing the "
                              "clearest (lowest cloud cover) first (default 3). "
                              "Use 0 to disable sampling and use all available scenes.")
     parser.add_argument("--force", action="store_true",
                         help="Overwrite existing output files instead of skipping them. "
                              "Also removes any leftover tile files from previous runs.")
+    parser.add_argument("--tile-index", type=int, default=None,
+                        help="Process only this tile (0-based index). Writes the tile TIF "
+                             "and exits without merging. Use with --merge-only in a "
+                             "separate job after all tiles complete.")
+    parser.add_argument("--merge-only", action="store_true",
+                        help="Skip downloading; merge existing tile TIFs into the final "
+                             "output. Exits with a warning if any tiles are still missing.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
@@ -488,7 +560,8 @@ def main() -> None:
             raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
         process_state(client, state, bbox, args.model, args.year,
                       resolution, args.output_dir,
-                      args.max_cloud_cover, args.max_tile_km, max_scenes, args.force)
+                      args.max_cloud_cover, args.max_tile_km, max_scenes, args.force,
+                      tile_index=args.tile_index, merge_only=args.merge_only)
 
 
 if __name__ == "__main__":
