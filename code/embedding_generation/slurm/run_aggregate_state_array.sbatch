@@ -2,8 +2,8 @@
 #SBATCH --job-name=prithvi-aggregate
 #SBATCH -p normal
 #SBATCH -c 4
-#SBATCH --mem=16G
-#SBATCH --time=01:00:00
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
 #SBATCH --output=code/embedding_generation/slurm/logs/aggregate_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/aggregate_%A_%a.err
 

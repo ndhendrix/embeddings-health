@@ -32,14 +32,93 @@ import pandas as pd
 import geopandas as gpd
 import rasterio
 import rasterio.mask
+import rasterio.windows
+from rasterio.features import geometry_mask
 from tqdm import tqdm
+
+_STATS = [
+    ("MEAN",    lambda x: np.nanmean(x, axis=1)),
+    ("MEDIAN",  lambda x: np.nanmedian(x, axis=1)),
+    ("MAXIMUM", lambda x: np.nanmax(x, axis=1)),
+    ("MINIMUM", lambda x: np.nanmin(x, axis=1)),
+    ("STD",     lambda x: np.nanstd(x, axis=1)),
+]
+
+
+def _precompute_pca_raster(src: rasterio.DatasetReader, pca) -> np.ndarray:
+    """Load all bands in small batches, apply the PCA projection, return (n_comp, H, W).
+
+    Streams 64 bands at a time so peak extra memory is ~2× the 64-band output,
+    regardless of how many raw bands the file has. NaN pixels (NoData border) are
+    preserved: any pixel where all raw bands are NaN stays NaN in the output.
+    """
+    H, W = src.height, src.width
+    n_comp = pca.n_components_
+    mean = pca.mean_.astype(np.float32)            # (n_features,)
+    components = pca.components_.astype(np.float32)  # (n_comp, n_features)
+
+    out = np.zeros((n_comp, H, W), dtype=np.float32)
+    nodata_mask = None  # (H, W) bool, True = nodata
+
+    BATCH = 64
+    n_bands = src.count
+    for b0 in range(0, n_bands, BATCH):
+        b1 = min(b0 + BATCH, n_bands)
+        data = src.read(list(range(b0 + 1, b1 + 1))).astype(np.float32)  # (batch, H, W)
+
+        if nodata_mask is None:
+            # Identify NoData pixels from the first batch (all-NaN across bands)
+            nodata_mask = np.isnan(data).all(axis=0)  # (H, W)
+
+        data -= mean[b0:b1, None, None]
+        # out += components[:, b0:b1] @ data.reshape(batch, H*W)
+        out += (components[:, b0:b1] @ data.reshape(b1 - b0, H * W)).reshape(n_comp, H, W)
+
+    if nodata_mask is not None and nodata_mask.any():
+        out[:, nodata_mask] = np.nan
+
+    return out
+
+
+def _fast_aggregate(pca_raster: np.ndarray, geom, transform) -> dict | None:
+    """Per-tract zonal stats directly from an in-memory (n_comp, H, W) array.
+
+    No disk I/O — all operations are numpy.  Uses the same all_touched=False
+    rasterisation rule as the original rasterio.mask path.
+    """
+    H, W = pca_raster.shape[1:]
+
+    window = rasterio.windows.from_bounds(*geom.bounds, transform=transform)
+    row_start = max(0, int(np.floor(window.row_off)))
+    col_start = max(0, int(np.floor(window.col_off)))
+    row_end   = min(H, int(np.ceil(window.row_off + window.height)))
+    col_end   = min(W, int(np.ceil(window.col_off + window.width)))
+
+    if row_start >= row_end or col_start >= col_end:
+        return None
+
+    crop = pca_raster[:, row_start:row_end, col_start:col_end]  # (C, h, w)
+
+    win = rasterio.windows.Window(col_start, row_start, col_end - col_start, row_end - row_start)
+    win_transform = rasterio.windows.transform(win, transform)
+    inside = geometry_mask([geom], transform=win_transform, invert=True,
+                           out_shape=(row_end - row_start, col_end - col_start))
+
+    flat = crop[:, inside]               # (C, N)
+    valid = ~np.isnan(flat).any(axis=0)  # exclude NoData border pixels
+    flat = flat[:, valid]
+
+    if flat.shape[1] == 0:
+        return None
+
+    return {stat: fn(flat) for stat, fn in _STATS}
 
 
 def aggregate_tract(src: rasterio.DatasetReader, geom, pca=None) -> dict | None:
-    """Extract pixels within geom, optionally apply national PCA, return per-dim stats.
+    """Per-tract aggregation reading directly from the open raster (no-PCA fallback path).
 
-    Returns None if no valid pixels intersect the tract.
-    pca: a fitted sklearn PCA object, or None to skip transformation.
+    When pca is supplied, prefer _precompute_pca_raster + _fast_aggregate instead;
+    this path reads all raw bands from disk for every tract and is slow on large files.
     """
     try:
         masked, _ = rasterio.mask.mask(src, [geom], crop=True, nodata=np.nan, all_touched=False)
@@ -54,19 +133,9 @@ def aggregate_tract(src: rasterio.DatasetReader, geom, pca=None) -> dict | None:
         return None
 
     if pca is not None:
-        # flat is (D, N); pca.transform expects (N, D)
         flat = pca.transform(flat.T).astype("float32").T  # → (n_components, N)
 
-    stats = {}
-    for stat, fn in [
-        ("MEAN",    lambda x: np.nanmean(x, axis=1)),
-        ("MEDIAN",  lambda x: np.nanmedian(x, axis=1)),
-        ("MAXIMUM", lambda x: np.nanmax(x, axis=1)),
-        ("MINIMUM", lambda x: np.nanmin(x, axis=1)),
-        ("STD",     lambda x: np.nanstd(x, axis=1)),
-    ]:
-        stats[stat] = fn(flat)
-    return stats
+    return {stat: fn(flat) for stat, fn in _STATS}
 
 
 def main() -> None:
@@ -116,9 +185,18 @@ def main() -> None:
         if pca is not None:
             print(f"Output dims: {pca.n_components_} (national PCA space)")
 
+        if pca is not None:
+            print(f"Pre-computing PCA projection ({src.count} bands → {pca.n_components_} "
+                  f"components, streaming {min(64, src.count)} bands at a time)…")
+            pca_raster = _precompute_pca_raster(src, pca)
+            src_transform = src.transform
+
         rows = []
         for _, tract in tqdm(tracts.iterrows(), total=len(tracts), desc="Aggregating tracts"):
-            stats = aggregate_tract(src, tract.geometry, pca=pca)
+            if pca is not None:
+                stats = _fast_aggregate(pca_raster, tract.geometry, src_transform)
+            else:
+                stats = aggregate_tract(src, tract.geometry, pca=None)
             if stats is None:
                 continue
 
