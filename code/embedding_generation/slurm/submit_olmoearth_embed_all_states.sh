@@ -22,7 +22,7 @@ VARIANT="${VARIANT:-v1_1-Base}"
 COMPOSITE_DIR="${COMPOSITE_DIR:-$SCRATCH/embeddings-health/olmoearth_composites}"
 FINAL_OUT_DIR="${FINAL_OUT_DIR:-$SCRATCH/embeddings-health/olmoearth_embeddings}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
-LOG_DIR="$SCRIPT_DIR/logs"
+LOG_DIR="${LOG_DIR:-$SCRATCH/embeddings-health/logs}"
 SCRIPT="$SCRIPT_DIR/run_olmoearth_embed_state_array.sbatch"
 SBATCH_MEM="${SBATCH_MEM:-128G}"
 
@@ -152,6 +152,8 @@ for wt in "${!TIER_TASKS[@]}"; do
     --time="$wt" \
     --mem="$SBATCH_MEM" \
     --array="$TASK_ARRAY" \
+    --output="$LOG_DIR/oe_embed_%A_%a.out" \
+    --error="$LOG_DIR/oe_embed_%A_%a.err" \
     --parsable \
     "$SCRIPT" | cut -d';' -f1)
   echo "Submitted job $JOB_ID  time=$wt  ${#_ids[@]} tasks"

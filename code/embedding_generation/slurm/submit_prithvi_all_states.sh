@@ -13,7 +13,7 @@ if [[ -z "${FINAL_OUT_DIR:-}" ]]; then
 fi
 
 SCRIPT="$SCRIPT_DIR/run_prithvi_state_array.sbatch"
-LOG_DIR="$SCRIPT_DIR/logs"
+LOG_DIR="${LOG_DIR:-$SCRATCH/embeddings-health/logs}"
 MODEL_VARIANTS=("tiny" "300M-TL")
 NUM_MODELS="${#MODEL_VARIANTS[@]}"
 SBATCH_MEM="${SBATCH_MEM:-128G}"
@@ -169,7 +169,10 @@ for wt in "${!TIER_TASKS[@]}"; do
   TASK_ARRAY=$(IFS=,; echo "${_ids[*]}")
   JOB_ID=$(cd "$REPO_DIR" && sbatch \
     --export=ALL --time="$wt" --mem="$SBATCH_MEM" \
-    --array="$TASK_ARRAY" --parsable "$SCRIPT" | cut -d';' -f1)
+    --array="$TASK_ARRAY" \
+    --output="$LOG_DIR/prithvi_embed_%A_%a.out" \
+    --error="$LOG_DIR/prithvi_embed_%A_%a.err" \
+    --parsable "$SCRIPT" | cut -d';' -f1)
   echo "Submitted job $JOB_ID  time=$wt  ${#_ids[@]} tasks"
   JOB_IDS+=("$JOB_ID")
 done

@@ -38,6 +38,7 @@ STATE="${STATES[$TASK_ID]}"
 mkdir -p "$OUT_DIR" "$CACHE_ROOT"
 
 export UV_CACHE_DIR="$CACHE_ROOT/uv"
+export UV_DATA_DIR="$CACHE_ROOT/uv-data"
 export UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-${SLURMD_NODENAME:-$(hostname -s)}"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 

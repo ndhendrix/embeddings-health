@@ -116,6 +116,7 @@ trap preserve_failure ERR
 mkdir -p "$INPUT_STAGE" "$CKPT_DIR" "$FINAL_DIR" "$CACHE_ROOT"
 
 export UV_CACHE_DIR="$CACHE_ROOT/uv"
+export UV_DATA_DIR="$CACHE_ROOT/uv-data"
 export UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-${SLURMD_NODENAME:-$(hostname -s)}"
 export HF_HOME="$CACHE_ROOT/huggingface"
 export TORCH_HOME="$CACHE_ROOT/torch"

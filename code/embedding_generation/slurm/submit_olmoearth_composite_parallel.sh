@@ -22,7 +22,7 @@ YEAR="${YEAR:-2022}"
 : "${SCRATCH:?Set SCRATCH before submitting.}"
 OUT_DIR="${OUT_DIR:-$SCRATCH/embeddings-health/olmoearth_composites}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
-LOG_DIR="$SCRIPT_DIR/logs"
+LOG_DIR="${LOG_DIR:-$SCRATCH/embeddings-health/logs}"
 TILE_SCRIPT="$SCRIPT_DIR/run_olmoearth_composite_tile.sbatch"
 MERGE_SCRIPT="$SCRIPT_DIR/run_olmoearth_composite_merge.sbatch"
 
@@ -152,6 +152,8 @@ if (( total_tiles > 0 )); then
     JOB_ID=$(cd "$REPO_DIR" && sbatch \
       --export=ALL \
       --array="0-$(( count - 1 ))%200" \
+      --output="$LOG_DIR/oe_tile_%A_%a.out" \
+      --error="$LOG_DIR/oe_tile_%A_%a.err" \
       --parsable \
       "$TILE_SCRIPT" | cut -d';' -f1)
     echo "Submitted tile batch $batch: job $JOB_ID  ($count tasks, ≤200 concurrent)"
@@ -177,6 +179,8 @@ if (( ${#MERGE_STATES[@]} > 0 )); then
     --export=ALL \
     $MERGE_DEP \
     --array="0-${MERGE_LAST_IDX}" \
+    --output="$LOG_DIR/oe_merge_%A_%a.out" \
+    --error="$LOG_DIR/oe_merge_%A_%a.err" \
     --parsable \
     "$MERGE_SCRIPT" | cut -d';' -f1)
   echo "Submitted merge array job  $MERGE_JOB_ID  (${#MERGE_STATES[@]} states)"

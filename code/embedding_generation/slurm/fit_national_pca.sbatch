@@ -32,6 +32,7 @@ OUTPUT_PKL="$NATIONAL_PCA_DIR/prithvi_${SAFE_VARIANT}_national_pca.pkl"
 
 mkdir -p "$NATIONAL_PCA_DIR" "$CACHE_ROOT"
 export UV_CACHE_DIR="$CACHE_ROOT/uv"
+export UV_DATA_DIR="$CACHE_ROOT/uv-data"
 export UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-cpu"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-4}"
 

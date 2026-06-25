@@ -3,7 +3,7 @@
 #SBATCH -p normal
 #SBATCH -c 4
 #SBATCH --mem=32G
-#SBATCH --time=00:30:00
+#SBATCH --time=08:00:00
 #SBATCH --output=code/embedding_generation/slurm/logs/oe_merge_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/oe_merge_%A_%a.err
 
@@ -32,6 +32,7 @@ STATE="${STATES[$TASK_ID]}"
 mkdir -p "$OUT_DIR" "$CACHE_ROOT"
 
 export UV_CACHE_DIR="$CACHE_ROOT/uv"
+export UV_DATA_DIR="$CACHE_ROOT/uv-data"
 export UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-${SLURMD_NODENAME:-$(hostname -s)}"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-4}"
 
@@ -51,7 +52,7 @@ echo "State: $STATE  (merge-only)"
 echo ""
 
 cd "$EMBED_DIR"
-uv run --python 3.11 python composite.py \
+PYTHONUNBUFFERED=1 uv run --python 3.11 python composite.py \
   --state        "$STATE" \
   --model        olmoearth \
   --year         "$YEAR" \

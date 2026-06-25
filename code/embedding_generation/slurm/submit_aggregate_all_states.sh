@@ -21,7 +21,7 @@ EMBED_OUT_DIR="${EMBED_OUT_DIR:-$SCRATCH/embeddings-health/prithvi_embeddings}"
 AGG_OUT_DIR="${AGG_OUT_DIR:-$SCRATCH/embeddings-health/prithvi_aggregated}"
 NATIONAL_PCA_DIR="${NATIONAL_PCA_DIR:-$SCRATCH/embeddings-health/prithvi_aggregated/national_pca}"
 TRACT_DIR="${TRACT_DIR:-$SCRATCH/embeddings-health/data/census_tracts}"
-LOG_DIR="$SCRIPT_DIR/logs"
+LOG_DIR="${LOG_DIR:-$SCRATCH/embeddings-health/logs}"
 SCRIPT="$SCRIPT_DIR/run_aggregate_state_array.sbatch"
 
 MODEL_VARIANTS=("tiny" "300M-TL")
@@ -117,6 +117,8 @@ export REPO_DIR EMBED_OUT_DIR AGG_OUT_DIR NATIONAL_PCA_DIR TRACT_DIR YEAR STATE_
 JOB_ID=$(cd "$REPO_DIR" && sbatch \
   --export=ALL \
   --array="$TASK_ARRAY" \
+  --output="$LOG_DIR/aggregate_%A_%a.out" \
+  --error="$LOG_DIR/aggregate_%A_%a.err" \
   --parsable \
   "$SCRIPT" | cut -d';' -f1)
 

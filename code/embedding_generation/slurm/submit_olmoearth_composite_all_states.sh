@@ -20,7 +20,7 @@ YEAR="${YEAR:-2022}"
 : "${SCRATCH:?Set SCRATCH before submitting.}"
 OUT_DIR="${OUT_DIR:-$SCRATCH/embeddings-health/olmoearth_composites}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
-LOG_DIR="$SCRIPT_DIR/logs"
+LOG_DIR="${LOG_DIR:-$SCRATCH/embeddings-health/logs}"
 SCRIPT="$SCRIPT_DIR/run_olmoearth_composite_array.sbatch"
 
 # Land area (km²) used to pick a walltime tier.
@@ -117,6 +117,8 @@ for wt in "${!TIER_TASKS[@]}"; do
     --export=ALL \
     --time="$wt" \
     --array="$TASK_ARRAY" \
+    --output="$LOG_DIR/oe_composite_%A_%a.out" \
+    --error="$LOG_DIR/oe_composite_%A_%a.err" \
     --parsable \
     "$SCRIPT" | cut -d';' -f1)
   echo "Submitted job $JOB_ID  time=$wt  ${#_ids[@]} tasks"
