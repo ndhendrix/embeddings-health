@@ -19,7 +19,6 @@ from pathlib import Path
 import numpy as np
 import rasterio
 import rasterio.errors
-from rasterio.merge import merge as rio_merge
 import pystac_client
 import odc.stac
 from dask.diagnostics import ProgressBar
@@ -301,13 +300,40 @@ def split_bbox_into_tiles(
 
 
 def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> None:
-    """Mosaic completed tile TIFs into a single output file, then delete the tiles."""
+    """Mosaic tile TIFs via windowed writes — no full-scene RAM allocation."""
     datasets = [rasterio.open(p) for p in tile_paths]
-    merged_arr, merged_transform = rio_merge(datasets, nodata=np.nan)
-    out_crs = datasets[0].crs.to_wkt()
-    for ds in datasets:
-        ds.close()
-    save_tif(merged_arr.astype("float32"), merged_transform, out_crs, bands, out_path)
+
+    # Compute output extent from all tile bounds
+    out_left   = min(ds.bounds.left   for ds in datasets)
+    out_bottom = min(ds.bounds.bottom for ds in datasets)
+    out_right  = max(ds.bounds.right  for ds in datasets)
+    out_top    = max(ds.bounds.top    for ds in datasets)
+
+    res_x, res_y = datasets[0].res
+    out_transform = rasterio.transform.from_origin(out_left, out_top, res_x, res_y)
+    out_width  = round((out_right  - out_left)   / res_x)
+    out_height = round((out_top    - out_bottom)  / res_y)
+
+    profile = datasets[0].profile.copy()
+    profile.update(
+        height=out_height, width=out_width, transform=out_transform,
+        compress="deflate", tiled=True, blockxsize=512, blockysize=512,
+        nodata=np.nan,
+    )
+
+    tmp_path = out_path.with_suffix(".tmp.tif")
+    with rasterio.open(tmp_path, "w", **profile) as dst:
+        for i, band_name in enumerate(bands, 1):
+            dst.set_band_description(i, band_name)
+        for ds in datasets:
+            window = rasterio.windows.from_bounds(
+                ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
+                transform=out_transform,
+            ).round_offsets().round_lengths()
+            dst.write(ds.read(), window=window)
+            ds.close()
+
+    tmp_path.rename(out_path)
     for p in tile_paths:
         p.unlink()
         print(f"      Removed tile: {p.name}")
@@ -532,7 +558,8 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
 
-    client = pystac_client.Client.open(STAC_ENDPOINT)
+    # --merge-only reads only from disk; skip the network round-trip to Element84.
+    client = None if args.merge_only else pystac_client.Client.open(STAC_ENDPOINT)
 
     # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (S2 resampled)
     resolution = args.resolution or (10 if args.model == "olmoearth" else 30)
