@@ -188,7 +188,7 @@ if (( ${#MERGE_STATES[@]} > 0 )); then
   MERGE_JOB_ID=$(cd "$REPO_DIR" && sbatch \
     --export=ALL \
     $MERGE_DEP \
-    --array="0-${MERGE_LAST_IDX}%8" \
+    --array="0-${MERGE_LAST_IDX}" \
     --output="$LOG_DIR/oe_merge_%A_%a.out" \
     --error="$LOG_DIR/oe_merge_%A_%a.err" \
     --parsable \
