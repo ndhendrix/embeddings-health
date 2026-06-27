@@ -318,7 +318,7 @@ def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> No
     profile.update(
         height=out_height, width=out_width, transform=out_transform,
         compress="deflate", tiled=True, blockxsize=512, blockysize=512,
-        nodata=np.nan,
+        nodata=np.nan, BIGTIFF="YES",
     )
 
     tmp_path = out_path.with_suffix(".tmp.tif")
