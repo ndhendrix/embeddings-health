@@ -116,7 +116,17 @@ echo "Tile jobs to submit:               $total_tiles"
 echo ""
 
 if (( total_tiles == 0 && ${#MERGE_STATES[@]} == 0 )); then
-  echo "All composites present — nothing to submit."
+  echo "All OlmoEarth composites present in $OUT_DIR — nothing to submit."
+  if [[ "${EMBED_ON_COMPLETE:-0}" == "1" ]]; then
+    echo ""
+    echo "All composites complete — submitting embedding trigger..."
+    mkdir -p "$LOG_DIR"
+    sbatch \
+      --export=ALL \
+      --output="$LOG_DIR/start_embeddings_%j.out" \
+      --error="$LOG_DIR/start_embeddings_%j.err" \
+      "$SCRIPT_DIR/start_embeddings.sbatch"
+  fi
   exit 0
 fi
 
@@ -178,7 +188,7 @@ if (( ${#MERGE_STATES[@]} > 0 )); then
   MERGE_JOB_ID=$(cd "$REPO_DIR" && sbatch \
     --export=ALL \
     $MERGE_DEP \
-    --array="0-${MERGE_LAST_IDX}" \
+    --array="0-${MERGE_LAST_IDX}%8" \
     --output="$LOG_DIR/oe_merge_%A_%a.out" \
     --error="$LOG_DIR/oe_merge_%A_%a.err" \
     --parsable \

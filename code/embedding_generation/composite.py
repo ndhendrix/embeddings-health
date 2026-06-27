@@ -330,7 +330,8 @@ def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> No
                 ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
                 transform=out_transform,
             ).round_offsets().round_lengths()
-            dst.write(ds.read(), window=window)
+            for band_idx in range(1, ds.count + 1):
+                dst.write(ds.read(band_idx), indexes=band_idx, window=window)
             ds.close()
 
     tmp_path.rename(out_path)
