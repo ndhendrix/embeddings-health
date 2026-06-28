@@ -322,10 +322,30 @@ def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> No
     )
 
     tmp_path = out_path.with_suffix(".tmp.tif")
-    with rasterio.open(tmp_path, "w", **profile) as dst:
-        for i, band_name in enumerate(bands, 1):
-            dst.set_band_description(i, band_name)
-        for ds in datasets:
+    ckpt_path = out_path.with_suffix(".merge_ckpt")
+
+    # Resume an interrupted merge if both tmp file and checkpoint exist.
+    # The checkpoint records which tile paths have already been written so
+    # the output file can be opened in append mode and remaining tiles skipped.
+    resuming = tmp_path.exists() and ckpt_path.exists()
+    already_merged: set[str] = set()
+    if resuming:
+        already_merged = set(ckpt_path.read_text().splitlines())
+        print(f"      Resuming merge: {len(already_merged)}/{len(tile_paths)} tiles already written")
+        dst_ctx = rasterio.open(tmp_path, "r+")
+    else:
+        ckpt_path.unlink(missing_ok=True)
+        dst_ctx = rasterio.open(tmp_path, "w", **profile)
+
+    with dst_ctx as dst:
+        if not resuming:
+            for i, band_name in enumerate(bands, 1):
+                dst.set_band_description(i, band_name)
+        for idx, ds in enumerate(datasets):
+            tile_key = str(tile_paths[idx])
+            if tile_key in already_merged:
+                ds.close()
+                continue
             window = rasterio.windows.from_bounds(
                 ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
                 transform=out_transform,
@@ -333,8 +353,11 @@ def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> No
             for band_idx in range(1, ds.count + 1):
                 dst.write(ds.read(band_idx), indexes=band_idx, window=window)
             ds.close()
+            already_merged.add(tile_key)
+            ckpt_path.write_text("\n".join(sorted(already_merged)))
 
     tmp_path.rename(out_path)
+    ckpt_path.unlink(missing_ok=True)
     for p in tile_paths:
         p.unlink()
         print(f"      Removed tile: {p.name}")
