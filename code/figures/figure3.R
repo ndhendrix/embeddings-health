@@ -83,53 +83,64 @@ OUTCOME_LABELS <- c(
 
 
 # ── Canonical outcome order (ReADI × AlphaEarth, ascending so top = highest) ──
-canonical_order <- function() {
-  read_csv(MODEL_SOURCES[["AlphaEarth"]], show_col_types = FALSE) |>
+# metric: "absolute" sorts by ΔR²; "pct" sorts by share of unexplained variance
+canonical_order <- function(metric = "absolute") {
+  df <- read_csv(MODEL_SOURCES[["AlphaEarth"]], show_col_types = FALSE) |>
     filter(index == "ReADI") |>
-    arrange(additional_var) |>
-    pull(outcome)
+    mutate(pct_resid = additional_var / (1 - r2_index))
+  sort_col <- if (metric == "pct") "pct_resid" else "additional_var"
+  df |> arrange(.data[[sort_col]]) |> pull(outcome)
 }
 
 
 # ── Data assembly ──────────────────────────────────────────────────────────────
-# outcome_order_asc: character vector of outcome codes, ascending ΔR²
+# outcome_order_asc: character vector of outcome codes, ascending by metric
 # (lowest first → appears at bottom of chart; highest last → appears at top).
 # When NULL, computed from this index's AlphaEarth data.
-build_data <- function(index, outcome_order_asc = NULL) {
+# metric: "absolute" plots ΔR²; "pct" plots share of unexplained variance
+build_data <- function(index, outcome_order_asc = NULL, metric = "absolute") {
   mock_names <- names(Filter(is.null, MODEL_SOURCES))
 
   real <- imap_dfr(MODEL_SOURCES, function(path, name) {
     if (is.null(path)) return(NULL)
     read_csv(path, show_col_types = FALSE) |>
       filter(index == !!index) |>
-      transmute(
-        outcome,
-        additional_var,
+      mutate(
+        pct_resid   = additional_var / (1 - r2_index),
         model_key   = name,
         model_label = MODEL_LABELS[[name]],
         mocked      = FALSE
-      )
+      ) |>
+      select(outcome, additional_var, pct_resid, model_key, model_label, mocked)
   })
 
   if (is.null(outcome_order_asc)) {
+    sort_col <- if (metric == "pct") "pct_resid" else "additional_var"
     outcome_order_asc <- real |>
       filter(model_key == "AlphaEarth") |>
-      arrange(additional_var) |>
+      arrange(.data[[sort_col]]) |>
       pull(outcome)
   }
 
   # Keep only the outcomes we intend to display
-  real    <- real |> filter(outcome %in% outcome_order_asc)
+  real <- real |> filter(outcome %in% outcome_order_asc)
 
-  mock_lo <- min(real$additional_var) * 0.85
-  mock_hi <- max(real$additional_var) * 1.05
+  # Mock ranges calibrated separately per metric
+  mock_lo_abs <- min(real$additional_var) * 0.85
+  mock_hi_abs <- max(real$additional_var) * 1.05
+  mock_lo_pct <- min(real$pct_resid)     * 0.85
+  mock_hi_pct <- max(real$pct_resid)     * 1.05
 
   mock <- map_dfr(mock_names, function(name) {
     seed <- MOCK_SEEDS[[name]]
     set.seed(seed)
+    abs_vals <- runif(length(outcome_order_asc), mock_lo_abs, mock_hi_abs)
+    set.seed(seed + 50L)
+    pct_vals <- runif(length(outcome_order_asc), mock_lo_pct, mock_hi_pct)
     tibble(
       outcome        = outcome_order_asc,
-      additional_var = runif(length(outcome_order_asc), mock_lo, mock_hi),
+      additional_var = abs_vals,
+      pct_resid      = pct_vals,
       model_key      = name,
       model_label    = MODEL_LABELS[[name]],
       mocked         = TRUE
@@ -153,19 +164,22 @@ build_data <- function(index, outcome_order_asc = NULL) {
 # show_y: whether to draw outcome labels (FALSE for non-leftmost panels)
 # show_x_lbl: whether to draw the x-axis title (set TRUE for one panel only)
 # compact: TRUE = dense layout for supplementary; FALSE = full size for main paper
+# metric: "absolute" = ΔR²; "pct" = share of index-unexplained variance
 make_panel <- function(
     index,
     outcome_order_asc = NULL,
     x_limits          = NULL,
     show_y            = TRUE,
     show_x_lbl        = TRUE,
-    compact           = FALSE
+    compact           = FALSE,
+    metric            = "absolute"
 ) {
-  d <- build_data(index, outcome_order_asc)
+  d       <- build_data(index, outcome_order_asc, metric)
+  plot_col <- if (metric == "pct") "pct_resid" else "additional_var"
 
   if (is.null(x_limits)) {
-    x_max <- max(d$additional_var) * 1.08
-    x_min <- min(min(d$additional_var), 0) - 0.01
+    x_max <- max(d[[plot_col]]) * 1.08
+    x_min <- min(min(d[[plot_col]]), 0) - 0.01
   } else {
     x_min <- x_limits[1]
     x_max <- x_limits[2]
@@ -187,7 +201,7 @@ make_panel <- function(
   }
 
   ggplot(d, aes(
-    x     = additional_var,
+    x     = .data[[plot_col]],
     y     = outcome_label,
     fill  = model_label,
     alpha = mocked
@@ -215,13 +229,18 @@ make_panel <- function(
     ) +
     scale_x_continuous(
       limits = c(x_min, x_max),
-      labels = scales::label_number(accuracy = 0.01),
+      labels = if (metric == "pct") scales::label_percent(accuracy = 1)
+               else                 scales::label_number(accuracy = 0.01),
       expand = expansion(mult = c(0, 0.02))
     ) +
     scale_y_discrete(labels = y_labels) +
     labs(
       title = index,
-      x     = if (show_x_lbl) expression(Delta * R^2 ~ "(additional variance beyond index alone)") else NULL,
+      x     = if (!show_x_lbl) NULL
+               else if (metric == "pct")
+                 "Unexplained variance explained by embeddings (%)"
+               else
+                 expression(Delta * R^2 ~ "(additional variance beyond index alone)"),
       y     = NULL
     ) +
     theme_minimal(base_size = bs) +
@@ -349,6 +368,53 @@ figure3_all <- function() {
 }
 
 
+# ── Pct-metric composite figures ──────────────────────────────────────────────
+.composite <- function(indices, order, xlim, compact, metric, out_path, w, h) {
+  plots <- imap(indices, function(idx, i) {
+    make_panel(idx,
+               outcome_order_asc = order,
+               x_limits          = xlim,
+               show_y            = (i == 1L),
+               show_x_lbl        = (i == 2L),
+               compact           = compact,
+               metric            = metric)
+  })
+  composite <- wrap_plots(plots, nrow = 1) +
+    plot_layout(guides = "collect") +
+    plot_annotation(
+      caption = "* placeholder — embedding run not yet complete",
+      theme   = theme(plot.caption = element_text(size = 7.5, color = "#888888",
+                                                   face = "italic", hjust = 0,
+                                                   margin = margin(t = 4)))
+    ) &
+    theme(legend.position = "bottom")
+  ggsave(out_path, composite, width = w, height = h, dpi = 300, bg = "white")
+  message("Saved → ", out_path)
+  invisible(composite)
+}
+
+figure3b_main <- function() {
+  indices  <- c("ReADI", "SDI", "SVI")
+  order    <- canonical_order(metric = "pct")
+  sel      <- select_percentile_outcomes(order)
+  message("3b main outcomes (", length(sel), "): ", paste(sel, collapse = ", "))
+  all_vals <- map_dfr(indices, ~ build_data(.x, sel, metric = "pct"))$pct_resid
+  xlim     <- c(min(all_vals, 0) - 0.005, max(all_vals) * 1.08)
+  .composite(indices, sel, xlim, compact = FALSE, metric = "pct",
+             out_path = file.path(FIG_DIR, "figure3b_main.png"), w = 7.5, h = 7.0)
+}
+
+figure3b_all <- function() {
+  indices  <- c("ReADI", "SDI", "SVI")
+  order    <- canonical_order(metric = "pct")
+  all_vals <- map_dfr(indices, ~ build_data(.x, order, metric = "pct"))$pct_resid
+  xlim     <- c(min(all_vals, 0) - 0.005, max(all_vals) * 1.08)
+  .composite(indices, order, xlim, compact = TRUE, metric = "pct",
+             out_path = file.path(FIG_DIR, "figure3b_all.png"),
+             w = 18, h = .fig_height())
+}
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -356,6 +422,10 @@ if ("--all" %in% args) {
   figure3_all()
 } else if ("--main" %in% args) {
   figure3_main()
+} else if ("--pct-main" %in% args) {
+  figure3b_main()
+} else if ("--pct-all" %in% args) {
+  figure3b_all()
 } else {
   index  <- "ReADI"
   flag_i <- which(args == "--index")
