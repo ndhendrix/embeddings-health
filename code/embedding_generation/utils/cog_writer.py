@@ -1,6 +1,7 @@
 """Write multi-band numpy arrays as Cloud-Optimized GeoTIFFs."""
 import numpy as np
 import rasterio
+import rasterio.windows
 from rasterio.transform import Affine
 from rasterio.crs import CRS
 from rasterio.enums import Resampling
@@ -39,6 +40,12 @@ def write_cog(
 
     n_bands, height, width = arr.shape
 
+    # Rows per write strip. Keeps peak RAM at strip_rows × width × n_bands × 4 B,
+    # which is a few GB even for 1024-dim Clay embeddings over Texas.
+    # Materialising the full array at once OOMs on large states (LA: 137 GB,
+    # TX: ~1 TB) because arr may be a disk-backed memmap.
+    _STRIP_ROWS = 64
+
     # Write to a temporary in-memory file first, then copy as COG.
     # The copy step reorganises internal tiling and adds overviews.
     tmp_path = path.with_suffix(".tmp.tif")
@@ -60,7 +67,11 @@ def write_cog(
             blockysize=512,
             BIGTIFF="IF_SAFER",
         ) as dst:
-            dst.write(arr.astype("float32"))
+            for row_start in range(0, height, _STRIP_ROWS):
+                row_end = min(row_start + _STRIP_ROWS, height)
+                strip = np.array(arr[:, row_start:row_end, :], dtype="float32")
+                win = rasterio.windows.Window(0, row_start, width, row_end - row_start)
+                dst.write(strip, window=win)
             if band_names:
                 for i, name in enumerate(band_names, 1):
                     dst.update_tags(i, name=name)

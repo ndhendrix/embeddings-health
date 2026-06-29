@@ -1,17 +1,27 @@
 """
-Run OlmoEarth or Prithvi-EO-2.0 inference on a composite GeoTIFF.
+Run OlmoEarth, Clay, or Prithvi-EO-2.0 inference on a composite GeoTIFF.
 
 Processes the raster in non-overlapping chip-sized windows, extracts spatial
 patch embeddings from the encoder, assembles them into a multi-band COG, then
 optionally PCA-compresses to 64 dimensions.
 
 OlmoEarth output resolution:   40 m/pixel  (patch_size=4 × 10 m input)
+Clay v1.5 output resolution:   80 m/pixel  (patch_size=8 × 10 m input)
 Prithvi output resolution:    480 m/pixel  (patch_size=16 × 30 m input)
 
-Usage (OlmoEarth):
-  python embed.py --model olmoearth \\
+Usage (OlmoEarth v1.1-Base or Nano):
+  python embed.py --model olmoearth --variant v1_1-Base \\
     --input outputs/composites/s2_annual_RI_2022_olmoearth.tif \\
     --output outputs/embeddings/olmoearth_RI_2022.tif
+
+  python embed.py --model olmoearth --variant Nano \\
+    --input outputs/composites/s2_annual_RI_2022_olmoearth.tif \\
+    --output outputs/embeddings/olmoearth_Nano_RI_2022.tif
+
+Usage (Clay v1.5 — single 12-band OlmoEarth composite; 10 bands selected internally):
+  python embed.py --model clay \\
+    --input outputs/composites/s2_annual_RI_2022_olmoearth.tif \\
+    --output outputs/embeddings/clay_v1.5_RI_2022.tif
 
 Usage (Prithvi tiny — 3 seasonal composites; 4th frame auto-padded):
   python embed.py --model prithvi --variant tiny \\
@@ -22,8 +32,9 @@ Usage (Prithvi tiny — 3 seasonal composites; 4th frame auto-padded):
     --raw-output outputs/embeddings/prithvi_tiny_RI_2022_raw.tif
 
 Flags:
-  --variant STR         Model variant. OlmoEarth: Base (default) / Large.
-                        Prithvi: tiny (default) / 300M-TL / 300M / 600M.
+  --variant STR         Model variant. OlmoEarth: Base (default) / Large / Nano /
+                        v1_1-Base / v1_1-Large. Prithvi: tiny (default) / 300M-TL /
+                        300M / 600M. Unused for Clay (always v1.5 large).
   --pca                 Apply PCA compression after inference (opt-in; default is raw output).
   --raw-output PATH     Also write the pre-PCA raw embedding COG to this path.
                         Only meaningful when --pca is set; ignored otherwise (--output
@@ -72,6 +83,7 @@ OLMOEARTH_REPO = {
     "Large":      "OlmoEarth-v1-Large",
     "v1_1-Base":  "OlmoEarth-v1_1-Base",
     "v1_1-Large": "OlmoEarth-v1_1-Large",
+    "Nano":       "OlmoEarth-v1_1-Nano",
 }
 # Switch the output accumulation array to a disk-backed memmap when the array
 # would exceed this size — prevents OOM on large states at 80m/768-dim output.
@@ -93,9 +105,53 @@ OLMOEARTH_CHIP_PX = 128
 # max_patch_size=8; using 4 gives 40m output from 10m input (in-distribution).
 # For a 128×128 chip: 128/4 = 32 spatial tokens per axis.
 OLMOEARTH_PATCH_SIZE = 4          # pixels per patch
-OLMOEARTH_EMBED_DIM = 768         # encoder embedding_size (Base variant)
+OLMOEARTH_EMBED_DIM = 768         # encoder embedding_size (Base / v1_1-Base / Large variants)
 # Effective output resolution = patch_size × input_resolution = 4 × 10m = 40m
 OLMOEARTH_STRIDE_PX = 4           # output stride in input pixels
+
+# Embedding dimension per variant (verified from each model's config.json).
+# Nano embedding_size=128 confirmed from allenai/OlmoEarth-v1_1-Nano config.json.
+OLMOEARTH_EMBED_DIMS = {
+    "Base":       768,
+    "Large":      1024,
+    "v1_1-Base":  768,
+    "v1_1-Large": 1024,
+    "Nano":       128,
+}
+
+# ---------------------------------------------------------------------------
+# Clay v1.5 parameters (verified from clay-foundation.github.io spec page
+# and made-with-clay/Clay v1.5/clay-v1.5.ckpt config)
+# ---------------------------------------------------------------------------
+# Clay uses 256×256 chips at 10 m GSD; patch_size=8 → 32×32 patches per chip.
+CLAY_CHIP_PX = 256
+CLAY_PATCH_SIZE = 8               # pixels per patch
+CLAY_EMBED_DIM = 1024             # ViT-Large encoder dim
+# Effective output resolution = patch_size × input_resolution = 8 × 10m = 80m
+CLAY_STRIDE_PX = 8                # output stride in input pixels
+
+# Clay uses 10 Sentinel-2 L2A bands.  The 12-band OlmoEarth composite stores
+# bands as [B02, B03, B04, B08, B05, B06, B07, B8A, B11, B12, B01, B09]
+# (indices 0-11).  Clay expects [B02, B03, B04, B05, B06, B07, B08, B8A, B11,
+# B12] — note B08 and B05-B07 are reordered relative to the composite.
+CLAY_BAND_INDICES = [0, 1, 2, 4, 5, 6, 3, 7, 8, 9]  # composite → Clay order
+
+# Per-band normalization statistics for Sentinel-2 L2A from Clay metadata.yaml.
+# Units match composite pixel values (surface reflectance × 10000, i.e. DN).
+# Order: blue, green, red, rededge1, rededge2, rededge3, nir, nir08, swir16, swir22
+CLAY_MEANS = np.array(
+    [1105., 1355., 1552., 1887., 2422., 2630., 2743., 2785., 2388., 1835.],
+    dtype="float32",
+)
+CLAY_STDS = np.array(
+    [1809., 1757., 1888., 1870., 1732., 1697., 1742., 1648., 1470., 1379.],
+    dtype="float32",
+)
+# Centre wavelengths in micrometres, matching CLAY_BAND_INDICES order.
+CLAY_WAVELENGTHS = torch.tensor(
+    [0.493, 0.560, 0.665, 0.704, 0.740, 0.783, 0.842, 0.865, 1.610, 2.190],
+    dtype=torch.float32,
+)
 
 # ---------------------------------------------------------------------------
 # Prithvi parameters
@@ -224,6 +280,55 @@ def _load_prithvi_hf(repo: str, cfg_dict: dict) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# Clay v1.5 model loading
+# ---------------------------------------------------------------------------
+
+def load_clay():
+    """Download Clay v1.5 checkpoint and return the encoder (inference-only).
+
+    Uses the bundled clay_encoder.py (extracted from the Clay Foundation Model
+    GitHub repo, Apache 2.0) to avoid the broken claymodel PyPI wheel and the
+    heavyweight lightning/vit-pytorch dependencies it pulls in.
+
+    The checkpoint is a Lightning .ckpt file (~5 GB).  Only the 'model.encoder.*'
+    weights are loaded into the ClayEncoder; decoder and teacher are discarded.
+    """
+    import math as _math
+    from huggingface_hub import hf_hub_download
+    from clay_encoder import ClayEncoder
+
+    ckpt_path = hf_hub_download(
+        repo_id="made-with-clay/Clay",
+        filename="v1.5/clay-v1.5.ckpt",
+    )
+    print(f"Loading Clay v1.5 checkpoint from {ckpt_path}…")
+    # weights_only=False: Lightning checkpoints store Python dicts/scalars in
+    # addition to tensors, so unpickling requires full deserialization.
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    encoder_state = {
+        k[len("model.encoder."):]: v
+        for k, v in ckpt["state_dict"].items()
+        if k.startswith("model.encoder.")
+    }
+    encoder = ClayEncoder(
+        mask_ratio=0.0,    # no masking at inference → all patches returned
+        patch_size=CLAY_PATCH_SIZE,
+        shuffle=False,     # deterministic row-major patch order
+        dim=CLAY_EMBED_DIM,
+        depth=24,
+        heads=16,
+        dim_head=64,
+        mlp_ratio=4,
+    )
+    missing, unexpected = encoder.load_state_dict(encoder_state, strict=True)
+    if missing:
+        print(f"  WARNING: missing keys: {missing[:5]}…")
+    encoder.eval()
+    print(f"  Clay v1.5 encoder loaded — {CLAY_EMBED_DIM}-dim, patch_size={CLAY_PATCH_SIZE}")
+    return encoder
+
+
+# ---------------------------------------------------------------------------
 # NaN imputation
 # ---------------------------------------------------------------------------
 
@@ -340,6 +445,85 @@ def run_prithvi_batch(
 
     # Average temporal tokens → spatial embedding map (B, grid, grid, D)
     spatial = hidden.reshape(B, T, grid, grid, D).mean(dim=1)
+    return spatial.float().cpu().numpy()
+
+
+# ---------------------------------------------------------------------------
+# Clay batch inference
+# ---------------------------------------------------------------------------
+
+def _make_clay_time_latlon(
+    batch_size: int,
+    latlons: np.ndarray,   # (B, 2) float32 — [lat, lon] in degrees
+    year: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return (time, latlon) encoding tensors for Clay.
+
+    Clay encodes time as [sin_week, cos_week, sin_hour, cos_hour] and
+    latlon as [sin_lat_rad, cos_lat_rad, sin_lon_rad, cos_lon_rad].
+    Annual composites use week=26 (mid-year) and hour=12 (noon).
+    """
+    import math as _math
+    week, hour = 26, 12
+    sin_w = _math.sin(week * 2 * _math.pi / 52)
+    cos_w = _math.cos(week * 2 * _math.pi / 52)
+    sin_h = _math.sin(hour * 2 * _math.pi / 24)
+    cos_h = _math.cos(hour * 2 * _math.pi / 24)
+    time = torch.tensor(
+        [[sin_w, cos_w, sin_h, cos_h]] * batch_size,
+        dtype=torch.float32, device=device,
+    )
+
+    lat_rad = latlons[:, 0] * np.pi / 180
+    lon_rad = latlons[:, 1] * np.pi / 180
+    latlon_enc = np.stack(
+        [np.sin(lat_rad), np.cos(lat_rad), np.sin(lon_rad), np.cos(lon_rad)],
+        axis=1,
+    ).astype("float32")
+    latlon = torch.from_numpy(latlon_enc).to(device)
+    return time, latlon
+
+
+def run_clay_batch(
+    model,
+    chips: np.ndarray,    # (B, 12, 256, 256) float32 — raw DN from OlmoEarth composite
+    latlons: np.ndarray,  # (B, 2) float32 — chip centre [lat, lon] in degrees
+    device: torch.device,
+    year: int = 2022,
+) -> np.ndarray:
+    """Return (B, 32, 32, 1024) float32 spatial patch embeddings.
+
+    Selects and reorders 10 of the 12 composite bands (CLAY_BAND_INDICES),
+    normalises with Clay's Sentinel-2 L2A statistics, and runs the Clay
+    ViT-Large encoder with mask_ratio=0, shuffle=False so all 32×32=1024
+    patch tokens are returned in row-major spatial order.
+    """
+    # Band selection and reorder: composite order → Clay order
+    chips_clay = chips[:, CLAY_BAND_INDICES, :, :]  # (B, 10, 256, 256)
+    chips_clay = _impute_nan(chips_clay)
+
+    # Normalise: (pixel - mean) / std, broadcasting over H×W
+    chips_norm = (chips_clay - CLAY_MEANS[:, None, None]) / CLAY_STDS[:, None, None]
+
+    B = chips_norm.shape[0]
+    pixels = torch.from_numpy(chips_norm).to(device)  # (B, 10, 256, 256)
+
+    time, latlon = _make_clay_time_latlon(B, latlons, year, device)
+
+    datacube = {
+        "pixels": pixels,
+        "time":   time,
+        "latlon": latlon,
+        "gsd":    torch.tensor(10.0, device=device),
+        "waves":  CLAY_WAVELENGTHS.to(device),
+    }
+
+    with torch.no_grad():
+        encoded, *_ = model(datacube)   # (B, 1025, 1024) — index 0 is CLS
+
+    # Drop CLS; reshape flat token sequence back to 2-D spatial grid
+    spatial = encoded[:, 1:, :].reshape(B, 32, 32, CLAY_EMBED_DIM)
     return spatial.float().cpu().numpy()
 
 
@@ -472,10 +656,11 @@ def embed_olmoearth(
     year: int,
     ckpt_path: Path | None = None,
     checkpoint_every: int = 500,
+    embed_dim: int = OLMOEARTH_EMBED_DIM,
 ) -> np.ndarray:
-    """Return (768, H_out, W_out) embedding map at 80m effective resolution.
+    """Return (embed_dim, H_out, W_out) embedding map at 40m effective resolution.
 
-    Output shape: (768, ceil(H/8), ceil(W/8)) — one 768-dim vector per 8×8 pixel (80m) patch.
+    Output shape: (embed_dim, ceil(H/4), ceil(W/4)).
     Periodically checkpoints to ckpt_path so interrupted jobs can resume.
 
     When the output array would exceed _MEMMAP_THRESHOLD_BYTES (8 GB by default),
@@ -487,9 +672,9 @@ def embed_olmoearth(
     stride = OLMOEARTH_STRIDE_PX
     out_h = (h + stride - 1) // stride
     out_w = (w + stride - 1) // stride
-    shape = (OLMOEARTH_EMBED_DIM, out_h, out_w)
+    shape = (embed_dim, out_h, out_w)
 
-    array_bytes = OLMOEARTH_EMBED_DIM * out_h * out_w * 4
+    array_bytes = embed_dim * out_h * out_w * 4
     use_memmap = array_bytes > _MEMMAP_THRESHOLD_BYTES
     mmap_path = ckpt_path.with_suffix(".mmap") if (use_memmap and ckpt_path) else None
 
@@ -520,7 +705,7 @@ def embed_olmoearth(
 
     n_processed = 0
     for batch in tqdm(chips_to_batches(iter_chips(src, OLMOEARTH_CHIP_PX), batch_size),
-                      desc="OlmoEarth chips", initial=n_skip // batch_size):
+                      desc=f"OlmoEarth chips (dim={embed_dim})", initial=n_skip // batch_size):
         # Skip chips already completed in a previous run
         if n_processed < n_skip:
             n_processed += len(batch)
@@ -633,6 +818,101 @@ def embed_prithvi(
 
 
 # ---------------------------------------------------------------------------
+# Full-raster embedding (Clay)
+# ---------------------------------------------------------------------------
+
+def embed_clay(
+    src: rasterio.DatasetReader,
+    model,
+    device: torch.device,
+    batch_size: int,
+    test_chips: int | None,
+    year: int,
+    ckpt_path: Path | None = None,
+    checkpoint_every: int = 500,
+) -> np.ndarray:
+    """Return (1024, H_out, W_out) embedding map at 80m effective resolution.
+
+    Output shape: (1024, ceil(H/8), ceil(W/8)).
+    Reuses the memmap + checkpointing strategy of embed_olmoearth for large
+    states where the output array would exceed _MEMMAP_THRESHOLD_BYTES.
+    """
+    h, w = src.height, src.width
+    stride = CLAY_STRIDE_PX
+    out_h = (h + stride - 1) // stride
+    out_w = (w + stride - 1) // stride
+    shape = (CLAY_EMBED_DIM, out_h, out_w)
+
+    array_bytes = CLAY_EMBED_DIM * out_h * out_w * 4
+    use_memmap = array_bytes > _MEMMAP_THRESHOLD_BYTES
+    mmap_path = ckpt_path.with_suffix(".mmap") if (use_memmap and ckpt_path) else None
+
+    out, n_skip = None, 0
+    if ckpt_path:
+        n_path = ckpt_path.with_suffix(".n")
+        if n_path.exists():
+            try:
+                n_skip = int(n_path.read_text().strip())
+                if use_memmap and mmap_path and mmap_path.exists():
+                    out = np.memmap(str(mmap_path), dtype="float32", mode="r+", shape=shape)
+                    print(f"Resuming from memmap: {n_skip} chips done  ({mmap_path})")
+                elif not use_memmap:
+                    out, n_skip = checkpoint_load(ckpt_path)
+            except Exception as e:
+                print(f"Warning: checkpoint unreadable ({e}); starting from scratch.")
+                n_skip, out = 0, None
+
+    if out is None:
+        if use_memmap:
+            print(f"Output array {array_bytes / 1024**3:.1f} GB — using disk-backed memmap"
+                  f" ({mmap_path})")
+            out = np.memmap(str(mmap_path), dtype="float32", mode="w+", shape=shape)
+        else:
+            out = np.full(shape, np.nan, dtype="float32")
+        out[:] = np.nan
+
+    n_processed = 0
+    for batch in tqdm(chips_to_batches(iter_chips(src, CLAY_CHIP_PX), batch_size),
+                      desc="Clay chips", initial=n_skip // batch_size):
+        if n_processed < n_skip:
+            n_processed += len(batch)
+            continue
+        if test_chips is not None and (n_processed - n_skip) >= test_chips:
+            break
+
+        rows, cols, wins, datas = zip(*batch)
+        chips = np.stack(datas, axis=0)
+
+        latlons = np.array([
+            chip_center_latlon(src.transform, src.crs, r, c, CLAY_CHIP_PX)
+            for r, c in zip(rows, cols)
+        ], dtype="float32")
+
+        spatial = run_clay_batch(model, chips, latlons, device, year)
+
+        for i, (row_off, col_off, win) in enumerate(zip(rows, cols, wins)):
+            out_r = row_off // stride
+            out_c = col_off // stride
+            valid_h = int(np.ceil(win.height / stride))
+            valid_w = int(np.ceil(win.width  / stride))
+            emb = spatial[i, :valid_h, :valid_w, :].transpose(2, 0, 1)
+            out[:, out_r:out_r + valid_h, out_c:out_c + valid_w] = emb
+
+        n_processed += len(batch)
+
+        if ckpt_path and (n_processed % checkpoint_every == 0):
+            if use_memmap:
+                out.flush()
+                ckpt_path.with_suffix(".n").write_text(str(n_processed))
+            else:
+                checkpoint_save(out, n_processed, ckpt_path)
+
+    if use_memmap:
+        out.flush()
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -640,9 +920,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--model", choices=["olmoearth", "prithvi"], required=True)
+    parser.add_argument("--model", choices=["olmoearth", "prithvi", "clay"], required=True)
     parser.add_argument("--input", nargs="+", required=True,
-                        help="Composite TIF(s): one for OlmoEarth; one-to-four for Prithvi.")
+                        help="Composite TIF(s): one for OlmoEarth/Clay; one-to-four for Prithvi.")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--raw-output", type=Path, default=None,
                         help="Also write the pre-PCA raw embeddings to this COG path. "
@@ -696,18 +976,46 @@ def main() -> None:
         if len(args.input) != 1:
             raise SystemExit("OlmoEarth requires exactly one --input TIF.")
 
+        embed_dim = OLMOEARTH_EMBED_DIMS.get(variant, OLMOEARTH_EMBED_DIM)
         with rasterio.open(args.input[0]) as src:
             print(f"Input: {args.input[0]}  shape={src.count}×{src.height}×{src.width}  CRS={src.crs}")
             raw = embed_olmoearth(src, model, device, args.batch_size,
                                   args.test_chips, args.year,
                                   ckpt_path=ckpt_path,
-                                  checkpoint_every=args.checkpoint_every)
+                                  checkpoint_every=args.checkpoint_every,
+                                  embed_dim=embed_dim)
             transform_in = src.transform
             crs_in = src.crs
 
-        embed_dim = OLMOEARTH_EMBED_DIM
         stride = OLMOEARTH_STRIDE_PX
         col_prefix = "OE"
+
+    elif args.model == "clay":
+        model = load_clay()
+        model = model.to(device)
+
+        if len(args.input) != 1:
+            raise SystemExit(
+                "Clay requires exactly one --input TIF "
+                "(12-band OlmoEarth composite; 10 bands selected internally)."
+            )
+
+        with rasterio.open(args.input[0]) as src:
+            if src.count < 10:
+                raise SystemExit(
+                    f"Clay requires at least 10 bands; input has {src.count}."
+                )
+            print(f"Input: {args.input[0]}  shape={src.count}×{src.height}×{src.width}  CRS={src.crs}")
+            raw = embed_clay(src, model, device, args.batch_size,
+                             args.test_chips, args.year,
+                             ckpt_path=ckpt_path,
+                             checkpoint_every=args.checkpoint_every)
+            transform_in = src.transform
+            crs_in = src.crs
+
+        embed_dim = CLAY_EMBED_DIM
+        stride = CLAY_STRIDE_PX
+        col_prefix = "CL"
 
     elif args.model == "prithvi":
         variant = args.variant or "tiny"
