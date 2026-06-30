@@ -1,0 +1,17 @@
+[project]
+name = "analyses"
+version = "0.1.0"
+description = "LightGBM-based embedding-vs-index analyses for the embeddings-health project"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.9.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "scipy>=1.11.0,<1.12",       # 1.17+ has no manylinux_2_17 wheel; must pin
+    "scikit-learn>=1.3.0,<1.4",  # 1.4+ would pull scipy>=1.17 without the pin above
+    "lightgbm>=4.0.0",
+    "polars>=1.0.0",
+    "pyarrow>=14.0.0,<17",          # 17+ drops manylinux_2_17; pin for CentOS 7 nodes
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.0",
+]
