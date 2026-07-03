@@ -3,7 +3,7 @@
 #SBATCH -p normal
 #SBATCH -c 4
 #SBATCH --mem=64G
-#SBATCH --time=02:00:00
+#SBATCH --time=08:00:00
 #SBATCH --output=code/embedding_generation/slurm/logs/oe_merge_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/oe_merge_%A_%a.err
 

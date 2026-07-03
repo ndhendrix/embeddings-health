@@ -57,12 +57,13 @@ echo ""
 
 cd "$EMBED_DIR"
 uv run --python 3.11 python composite.py \
-  --state        "$STATE" \
-  --model        olmoearth \
-  --year         "$YEAR" \
-  --output-dir   "$OUT_DIR" \
-  --max-tile-km  100 \
-  --tile-index   "$TILE_IDX"
+  --state          "$STATE" \
+  --model          olmoearth \
+  --year           "$YEAR" \
+  --output-dir     "$OUT_DIR" \
+  --max-tile-km    100 \
+  --max-cloud-cover "${MAX_CLOUD_COVER:-30}" \
+  --tile-index     "$TILE_IDX"
 
 echo ""
 echo "=== Done: $STATE tile $TILE_IDX ==="
