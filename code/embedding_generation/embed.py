@@ -66,6 +66,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+import rasterio.windows
 from rasterio.transform import Affine
 from rasterio.windows import Window
 import torch
@@ -73,6 +74,7 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 from utils.cog_writer import write_cog
+from utils.tile_merge import merge_tiles
 
 
 # ---------------------------------------------------------------------------
@@ -689,10 +691,14 @@ def embed_olmoearth(
     ckpt_path: Path | None = None,
     checkpoint_every: int = 500,
     embed_dim: int = OLMOEARTH_EMBED_DIM,
+    row_px_bounds: tuple[int, int] | None = None,
 ) -> np.ndarray:
     """Return (embed_dim, H_out, W_out) embedding map at 40m effective resolution.
 
-    Output shape: (embed_dim, ceil(H/4), ceil(W/4)).
+    Output shape: (embed_dim, ceil(H/4), ceil(W/4)) for the full raster, or
+    (embed_dim, ceil(tile_H/4), ceil(W/4)) when row_px_bounds restricts to a
+    row-band tile — H_out is always relative to the tile's own top row.
+
     Periodically checkpoints to ckpt_path so interrupted jobs can resume.
 
     When the output array would exceed _MEMMAP_THRESHOLD_BYTES (8 GB by default),
@@ -702,7 +708,9 @@ def embed_olmoearth(
     """
     h, w = src.height, src.width
     stride = OLMOEARTH_STRIDE_PX
-    out_h = (h + stride - 1) // stride
+    row_start_px, row_end_px = row_px_bounds if row_px_bounds is not None else (0, h)
+    tile_h = row_end_px - row_start_px
+    out_h = (tile_h + stride - 1) // stride
     out_w = (w + stride - 1) // stride
     shape = (embed_dim, out_h, out_w)
 
@@ -736,7 +744,7 @@ def embed_olmoearth(
         out[:] = np.nan
 
     n_processed = 0
-    for batch in tqdm(chips_to_batches(iter_chips(src, OLMOEARTH_CHIP_PX), batch_size),
+    for batch in tqdm(chips_to_batches(iter_chips(src, OLMOEARTH_CHIP_PX, row_px_bounds), batch_size),
                       desc=f"OlmoEarth chips (dim={embed_dim})", initial=n_skip // batch_size):
         # Skip chips already completed in a previous run
         if n_processed < n_skip:
@@ -756,7 +764,7 @@ def embed_olmoearth(
         spatial = run_olmoearth_batch(model, chips, latlons, device, year)
 
         for i, (row_off, col_off, win) in enumerate(zip(rows, cols, wins)):
-            out_r = row_off // stride
+            out_r = (row_off - row_start_px) // stride
             out_c = col_off // stride
             valid_h = int(np.ceil(win.height / stride))
             valid_w = int(np.ceil(win.width  / stride))
@@ -862,6 +870,7 @@ def embed_clay(
     year: int,
     ckpt_path: Path | None = None,
     checkpoint_every: int = 500,
+    row_px_bounds: tuple[int, int] | None = None,
 ) -> np.ndarray:
     """Return (1024, H_out, W_out) embedding map at 80m effective resolution.
 
@@ -871,7 +880,9 @@ def embed_clay(
     """
     h, w = src.height, src.width
     stride = CLAY_STRIDE_PX
-    out_h = (h + stride - 1) // stride
+    row_start_px, row_end_px = row_px_bounds if row_px_bounds is not None else (0, h)
+    tile_h = row_end_px - row_start_px
+    out_h = (tile_h + stride - 1) // stride
     out_w = (w + stride - 1) // stride
     shape = (CLAY_EMBED_DIM, out_h, out_w)
 
@@ -904,7 +915,7 @@ def embed_clay(
         out[:] = np.nan
 
     n_processed = 0
-    for batch in tqdm(chips_to_batches(iter_chips(src, CLAY_CHIP_PX), batch_size),
+    for batch in tqdm(chips_to_batches(iter_chips(src, CLAY_CHIP_PX, row_px_bounds), batch_size),
                       desc="Clay chips", initial=n_skip // batch_size):
         if n_processed < n_skip:
             n_processed += len(batch)
@@ -923,7 +934,7 @@ def embed_clay(
         spatial = run_clay_batch(model, chips, latlons, device, year)
 
         for i, (row_off, col_off, win) in enumerate(zip(rows, cols, wins)):
-            out_r = row_off // stride
+            out_r = (row_off - row_start_px) // stride
             out_c = col_off // stride
             valid_h = int(np.ceil(win.height / stride))
             valid_w = int(np.ceil(win.width  / stride))
@@ -953,9 +964,24 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--model", choices=["olmoearth", "prithvi", "clay"], required=True)
-    parser.add_argument("--input", nargs="+", required=True,
-                        help="Composite TIF(s): one for OlmoEarth/Clay; one-to-four for Prithvi.")
+    parser.add_argument("--input", nargs="+", default=None,
+                        help="Composite TIF(s): one for OlmoEarth/Clay; one-to-four for Prithvi. "
+                             "Required unless --merge-only is set.")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--tile-index", type=int, default=0,
+                        help="Which row-band tile to process (0-indexed). Only meaningful "
+                             "with --num-tiles > 1.")
+    parser.add_argument("--num-tiles", type=int, default=1,
+                        help="Split the input into this many row-band tiles; each run with "
+                             "a given --tile-index processes one band and writes a standalone "
+                             "<output.stem>_tile###<output.suffix> file. Default 1 processes "
+                             "the whole raster and writes directly to --output (today's "
+                             "behavior, unchanged). OlmoEarth/Clay only — not supported for "
+                             "--model prithvi.")
+    parser.add_argument("--merge-only", action="store_true",
+                        help="Skip inference; mosaic existing <output.stem>_tile###<output.suffix> "
+                             "files into --output. Exits with a message (not an error) if any "
+                             "expected tiles are still missing, or if --output already exists.")
     parser.add_argument("--raw-output", type=Path, default=None,
                         help="Also write the pre-PCA raw embeddings to this COG path. "
                              "Useful for re-running PCA/UMAP without redoing GPU inference. "
@@ -980,6 +1006,43 @@ def main() -> None:
                         help="Save recovery checkpoint every N chips (default 500).")
     args = parser.parse_args()
 
+    if not args.merge_only and not args.input:
+        parser.error("--input is required unless --merge-only is set")
+    if args.num_tiles > 1 and args.model == "prithvi":
+        parser.error("--num-tiles > 1 is not supported for --model prithvi")
+    if args.pca and args.num_tiles > 1:
+        parser.error(
+            "--pca with --num-tiles > 1 is not supported: PCA would be fit "
+            "independently per tile, producing incompatible bases across tiles. "
+            "Apply --pca only after merging (num_tiles=1)."
+        )
+    if not (0 <= args.tile_index < max(args.num_tiles, 1)):
+        parser.error(f"--tile-index {args.tile_index} out of range [0, {args.num_tiles})")
+
+    if args.merge_only:
+        if args.output.exists() and not args.force:
+            print(f"Already exists, skipping merge: {args.output}")
+            return
+        tile_paths = sorted(
+            args.output.parent.glob(f"{args.output.stem}_tile*{args.output.suffix}")
+        )
+        if len(tile_paths) != args.num_tiles:
+            print(f"SKIP merge: expected {args.num_tiles} tiles, found {len(tile_paths)} "
+                  f"({args.num_tiles - len(tile_paths)} still missing)")
+            return
+        if args.model == "olmoearth":
+            variant = args.variant or "Base"
+            embed_dim = OLMOEARTH_EMBED_DIMS.get(variant, OLMOEARTH_EMBED_DIM)
+            band_names = [f"OE{i:04d}" for i in range(embed_dim)]
+        elif args.model == "clay":
+            band_names = [f"CL{i:04d}" for i in range(CLAY_EMBED_DIM)]
+        else:
+            raise SystemExit(f"--merge-only is not supported for --model {args.model}")
+        print(f"Merging {len(tile_paths)}/{args.num_tiles} tiles → {args.output}…")
+        merge_tiles(tile_paths, band_names, args.output)
+        print("Done.")
+        return
+
     device = torch.device(
         "cuda" if torch.cuda.is_available() else
         "mps"  if torch.backends.mps.is_available() else "cpu"
@@ -988,16 +1051,33 @@ def main() -> None:
     if args.test_chips:
         print(f"DEBUG: processing only first {args.test_chips} chips.")
 
+    # When tiling, this task's true working output is <output>_tile###<suffix>,
+    # not the final --output path (that name is reserved for the merged file).
+    # num_tiles=1 (the default) writes directly to --output — today's behavior.
+    if args.num_tiles > 1:
+        output_path = args.output.with_name(
+            f"{args.output.stem}_tile{args.tile_index:03d}{args.output.suffix}"
+        )
+        raw_output_path = (
+            args.raw_output.with_name(
+                f"{args.raw_output.stem}_tile{args.tile_index:03d}{args.raw_output.suffix}"
+            )
+            if args.raw_output else None
+        )
+    else:
+        output_path = args.output
+        raw_output_path = args.raw_output
+
     # Resolve checkpoint path early so --force can clean it up before model loading.
-    ckpt_path = args.output.with_suffix(".ckpt.npy")
+    ckpt_path = output_path.with_suffix(".ckpt.npy")
 
     if args.force:
-        for p in [args.output, ckpt_path, ckpt_path.with_suffix(".n"),
+        for p in [output_path, ckpt_path, ckpt_path.with_suffix(".n"),
                   ckpt_path.with_suffix(".mmap")]:
             if p and p.exists():
                 p.unlink()
-        if args.raw_output and args.raw_output.exists():
-            args.raw_output.unlink()
+        if raw_output_path and raw_output_path.exists():
+            raw_output_path.unlink()
         print("--force: cleared existing outputs and checkpoints.")
 
     if args.model == "olmoearth":
@@ -1011,12 +1091,27 @@ def main() -> None:
         embed_dim = OLMOEARTH_EMBED_DIMS.get(variant, OLMOEARTH_EMBED_DIM)
         with rasterio.open(args.input[0]) as src:
             print(f"Input: {args.input[0]}  shape={src.count}×{src.height}×{src.width}  CRS={src.crs}")
+            n_row_chips = (src.height + OLMOEARTH_CHIP_PX - 1) // OLMOEARTH_CHIP_PX
+            row_px_bounds = None
+            if args.num_tiles > 1:
+                row_start, row_end = tile_row_bounds(n_row_chips, args.tile_index, args.num_tiles)
+                row_px_bounds = (row_start * OLMOEARTH_CHIP_PX,
+                                  min(row_end * OLMOEARTH_CHIP_PX, src.height))
+                print(f"Tile {args.tile_index}/{args.num_tiles}: rows "
+                      f"[{row_px_bounds[0]}, {row_px_bounds[1]}) of {src.height}")
             raw = embed_olmoearth(src, model, device, args.batch_size,
                                   args.test_chips, args.year,
                                   ckpt_path=ckpt_path,
                                   checkpoint_every=args.checkpoint_every,
-                                  embed_dim=embed_dim)
-            transform_in = src.transform
+                                  embed_dim=embed_dim,
+                                  row_px_bounds=row_px_bounds)
+            transform_in = (
+                rasterio.windows.transform(
+                    Window(0, row_px_bounds[0], src.width, row_px_bounds[1] - row_px_bounds[0]),
+                    src.transform,
+                )
+                if row_px_bounds else src.transform
+            )
             crs_in = src.crs
 
         stride = OLMOEARTH_STRIDE_PX
@@ -1038,11 +1133,26 @@ def main() -> None:
                     f"Clay requires at least 10 bands; input has {src.count}."
                 )
             print(f"Input: {args.input[0]}  shape={src.count}×{src.height}×{src.width}  CRS={src.crs}")
+            n_row_chips = (src.height + CLAY_CHIP_PX - 1) // CLAY_CHIP_PX
+            row_px_bounds = None
+            if args.num_tiles > 1:
+                row_start, row_end = tile_row_bounds(n_row_chips, args.tile_index, args.num_tiles)
+                row_px_bounds = (row_start * CLAY_CHIP_PX,
+                                  min(row_end * CLAY_CHIP_PX, src.height))
+                print(f"Tile {args.tile_index}/{args.num_tiles}: rows "
+                      f"[{row_px_bounds[0]}, {row_px_bounds[1]}) of {src.height}")
             raw = embed_clay(src, model, device, args.batch_size,
                              args.test_chips, args.year,
                              ckpt_path=ckpt_path,
-                             checkpoint_every=args.checkpoint_every)
-            transform_in = src.transform
+                             checkpoint_every=args.checkpoint_every,
+                             row_px_bounds=row_px_bounds)
+            transform_in = (
+                rasterio.windows.transform(
+                    Window(0, row_px_bounds[0], src.width, row_px_bounds[1] - row_px_bounds[0]),
+                    src.transform,
+                )
+                if row_px_bounds else src.transform
+            )
             crs_in = src.crs
 
         embed_dim = CLAY_EMBED_DIM
@@ -1096,9 +1206,9 @@ def main() -> None:
     raw_band_names = [f"{col_prefix}{i:04d}" for i in range(embed_dim)]
 
     # Optionally save the pre-PCA raw embeddings alongside the PCA output.
-    if args.raw_output and args.pca:
-        print(f"Writing raw embedding COG: {args.raw_output}  {raw.shape}")
-        write_cog(raw, out_transform, crs_in, args.raw_output, band_names=raw_band_names, overviews=False)
+    if raw_output_path and args.pca:
+        print(f"Writing raw embedding COG: {raw_output_path}  {raw.shape}")
+        write_cog(raw, out_transform, crs_in, raw_output_path, band_names=raw_band_names, overviews=False)
 
     # PCA compression (opt-in via --pca; default is raw output).
     if not args.pca:
@@ -1112,7 +1222,7 @@ def main() -> None:
         else:
             print(f"Fitting PCA ({args.pca_dims} components)…")
             pca = fit_pca(raw, n_components=args.pca_dims)
-            pca_path = args.output.with_suffix(".pca.pkl")
+            pca_path = output_path.with_suffix(".pca.pkl")
             pca_path.parent.mkdir(parents=True, exist_ok=True)
             with open(pca_path, "wb") as f:
                 pickle.dump(pca, f)
@@ -1122,8 +1232,8 @@ def main() -> None:
         final = apply_pca(raw, pca)
         band_names = [f"{col_prefix}{i:02d}" for i in range(args.pca_dims)]
 
-    print(f"Writing COG: {args.output}  {final.shape}")
-    write_cog(final, out_transform, crs_in, args.output, band_names=band_names, overviews=False)
+    print(f"Writing COG: {output_path}  {final.shape}")
+    write_cog(final, out_transform, crs_in, output_path, band_names=band_names, overviews=False)
     checkpoint_delete(ckpt_path)
     print("Done.")
 
