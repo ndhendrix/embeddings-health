@@ -531,14 +531,46 @@ def run_clay_batch(
 # Chip iteration helpers
 # ---------------------------------------------------------------------------
 
-def iter_chips(src: rasterio.DatasetReader, chip_px: int):
+def tile_row_bounds(n_row_chips: int, tile_index: int, num_tiles: int) -> tuple[int, int]:
+    """Split n_row_chips chip-rows into num_tiles contiguous, roughly-equal bands.
+
+    Returns (row_start, row_end) as chip-row indices (row_end exclusive) for
+    tile_index. Splitting by row only (not a 2-D grid) is sufficient here:
+    unlike composite.py's per-tile STAC searches, embed.py does windowed reads
+    against an already-materialized raster, so there's no locality benefit to
+    square tiles — only the total per-tile chip count matters.
+    """
+    if num_tiles < 1:
+        raise ValueError(f"num_tiles must be >= 1, got {num_tiles}")
+    if tile_index < 0 or tile_index >= num_tiles:
+        raise ValueError(f"tile_index {tile_index} out of range [0, {num_tiles})")
+    if num_tiles > n_row_chips:
+        raise ValueError(
+            f"num_tiles ({num_tiles}) exceeds n_row_chips ({n_row_chips}); reduce num_tiles."
+        )
+    base, rem = divmod(n_row_chips, num_tiles)
+    if tile_index < rem:
+        row_start = tile_index * (base + 1)
+        row_end = row_start + (base + 1)
+    else:
+        row_start = rem * (base + 1) + (tile_index - rem) * base
+        row_end = row_start + base
+    return row_start, row_end
+
+
+def iter_chips(src: rasterio.DatasetReader, chip_px: int,
+               row_px_bounds: tuple[int, int] | None = None):
     """Yield (row_off, col_off, win, chip_data) for non-overlapping chips.
 
     Edge chips are zero-padded to chip_px × chip_px.
     chip_data: (C, chip_px, chip_px) float32.
+    row_px_bounds, if given, restricts iteration to pixel rows
+    [row_px_bounds[0], row_px_bounds[1]) of the full raster — used for tiling.
+    Columns are never restricted (tiling is row-band only).
     """
     h, w = src.height, src.width
-    for row_off in range(0, h, chip_px):
+    row_start, row_end = row_px_bounds if row_px_bounds is not None else (0, h)
+    for row_off in range(row_start, row_end, chip_px):
         for col_off in range(0, w, chip_px):
             read_h = min(chip_px, h - row_off)
             read_w = min(chip_px, w - col_off)
