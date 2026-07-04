@@ -8,14 +8,13 @@ Slurm timeout on a huge state) resumes instead of restarting.
 Used by composite.py (composite tiles) and embed.py (embedding tiles).
 """
 from pathlib import Path
-from typing import List
 
 import numpy as np
 import rasterio
 import rasterio.windows
 
 
-def merge_tiles(tile_paths, band_names, out_path):
+def merge_tiles(tile_paths: list[Path], band_names: list[str], out_path: Path) -> None:
     """Mosaic tile TIFs via windowed writes — no full-scene RAM allocation."""
     datasets = [rasterio.open(p) for p in tile_paths]
 
@@ -41,7 +40,7 @@ def merge_tiles(tile_paths, band_names, out_path):
 
     # Resume an interrupted merge if both tmp file and checkpoint exist.
     resuming = tmp_path.exists() and ckpt_path.exists()
-    already_merged: set = set()
+    already_merged: set[str] = set()
     if resuming:
         already_merged = set(ckpt_path.read_text().splitlines())
         print(f"      Resuming merge: {len(already_merged)}/{len(tile_paths)} tiles already written")

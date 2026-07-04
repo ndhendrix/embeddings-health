@@ -1,11 +1,10 @@
 """Plain assert-based test for utils.tile_merge.merge_tiles (no pytest in this repo).
 
-Run: ml load python/3.9.0 && python tests/test_tile_merge.py
+Run: uv run --python 3.11 python tests/test_tile_merge.py
 """
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List
 
 import numpy as np
 import rasterio
