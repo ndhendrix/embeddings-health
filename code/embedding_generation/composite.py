@@ -24,6 +24,7 @@ import odc.stac
 from dask.diagnostics import ProgressBar
 
 from utils.cloud_mask import mask_s2_l2a
+from utils.tile_merge import merge_tiles
 
 # Treat NotGeoreferencedWarning as a printed warning only — never as an error.
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
@@ -299,70 +300,6 @@ def split_bbox_into_tiles(
     return tiles
 
 
-def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> None:
-    """Mosaic tile TIFs via windowed writes — no full-scene RAM allocation."""
-    datasets = [rasterio.open(p) for p in tile_paths]
-
-    # Compute output extent from all tile bounds
-    out_left   = min(ds.bounds.left   for ds in datasets)
-    out_bottom = min(ds.bounds.bottom for ds in datasets)
-    out_right  = max(ds.bounds.right  for ds in datasets)
-    out_top    = max(ds.bounds.top    for ds in datasets)
-
-    res_x, res_y = datasets[0].res
-    out_transform = rasterio.transform.from_origin(out_left, out_top, res_x, res_y)
-    out_width  = round((out_right  - out_left)   / res_x)
-    out_height = round((out_top    - out_bottom)  / res_y)
-
-    profile = datasets[0].profile.copy()
-    profile.update(
-        height=out_height, width=out_width, transform=out_transform,
-        compress="deflate", tiled=True, blockxsize=512, blockysize=512,
-        nodata=np.nan, BIGTIFF="YES",
-    )
-
-    tmp_path = out_path.with_suffix(".tmp.tif")
-    ckpt_path = out_path.with_suffix(".merge_ckpt")
-
-    # Resume an interrupted merge if both tmp file and checkpoint exist.
-    # The checkpoint records which tile paths have already been written so
-    # the output file can be opened in append mode and remaining tiles skipped.
-    resuming = tmp_path.exists() and ckpt_path.exists()
-    already_merged: set[str] = set()
-    if resuming:
-        already_merged = set(ckpt_path.read_text().splitlines())
-        print(f"      Resuming merge: {len(already_merged)}/{len(tile_paths)} tiles already written")
-        dst_ctx = rasterio.open(tmp_path, "r+")
-    else:
-        ckpt_path.unlink(missing_ok=True)
-        dst_ctx = rasterio.open(tmp_path, "w", **profile)
-
-    with dst_ctx as dst:
-        if not resuming:
-            for i, band_name in enumerate(bands, 1):
-                dst.set_band_description(i, band_name)
-        for idx, ds in enumerate(datasets):
-            tile_key = str(tile_paths[idx])
-            if tile_key in already_merged:
-                ds.close()
-                continue
-            window = rasterio.windows.from_bounds(
-                ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
-                transform=out_transform,
-            ).round_offsets().round_lengths()
-            for band_idx in range(1, ds.count + 1):
-                dst.write(ds.read(band_idx), indexes=band_idx, window=window)
-            ds.close()
-            already_merged.add(tile_key)
-            ckpt_path.write_text("\n".join(sorted(already_merged)))
-
-    tmp_path.rename(out_path)
-    ckpt_path.unlink(missing_ok=True)
-    for p in tile_paths:
-        p.unlink()
-        print(f"      Removed tile: {p.name}")
-
-
 def _run_composite(
     client: pystac_client.Client,
     tiles: list[tuple[float, float, float, float]],
@@ -410,7 +347,7 @@ def _run_composite(
             print(f"{prefix} WARNING: {n - len(tile_paths)}/{n} tiles missing "
                   f"(likely ocean/no-coverage) — those areas will be nodata")
         print(f"{prefix} Merging {len(tile_paths)}/{n} tiles → {out_path.name}…")
-        _merge_tiles(tile_paths, bands, out_path)
+        merge_tiles(tile_paths, bands, out_path)
         return
 
     # ------------------------------------------------------------------
@@ -495,7 +432,7 @@ def _run_composite(
         return
 
     print(f"{prefix} Merging {len(tile_paths)}/{n} tiles → {out_path.name}…")
-    _merge_tiles(tile_paths, out_bands, out_path)
+    merge_tiles(tile_paths, out_bands, out_path)
 
 
 def process_state(
