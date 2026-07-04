@@ -401,10 +401,14 @@ def _run_composite(
             print(f"{prefix} Already exists, skipping merge: {out_path.name}")
             return
         tile_paths = sorted(out_path.parent.glob(f"{out_path.stem}_tile*.tif"))
-        if len(tile_paths) != n:
+        max_missing = max(0, n // 20)  # tolerate up to 5% missing (ocean / no-coverage tiles)
+        if len(tile_paths) < n - max_missing:
             print(f"{prefix} SKIP merge: expected {n} tiles, found {len(tile_paths)} "
-                  f"({n - len(tile_paths)} still missing)")
+                  f"({n - len(tile_paths)} still missing, max allowed {max_missing})")
             return
+        if len(tile_paths) < n:
+            print(f"{prefix} WARNING: {n - len(tile_paths)}/{n} tiles missing "
+                  f"(likely ocean/no-coverage) — those areas will be nodata")
         print(f"{prefix} Merging {len(tile_paths)}/{n} tiles → {out_path.name}…")
         _merge_tiles(tile_paths, bands, out_path)
         return
