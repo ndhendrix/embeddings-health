@@ -371,14 +371,14 @@ def test_iter_chips_row_bounds_restricts_iteration():
             all_chips = list(iter_chips(src, chip_px=2))
             assert len(all_chips) == 16, len(all_chips)
 
-            # Restrict to rows [2, 4) (pixel rows, i.e. chip-rows 1..1 of the 4-row grid)
-            # -> should yield exactly the 2 chips in that row (row_off == 2), covering
-            # both columns.
+            # Restrict to rows [2, 4) (pixel rows, i.e. chip-row 1 of the 4-row grid)
+            # -> should yield exactly the 4 chips in that row (row_off == 2), covering
+            # all 4 columns (width=8, chip_px=2 -> col_off in {0, 2, 4, 6}).
             restricted = list(iter_chips(src, chip_px=2, row_px_bounds=(2, 4)))
-            assert len(restricted) == 2, len(restricted)
+            assert len(restricted) == 4, len(restricted)
             assert all(row_off == 2 for row_off, col_off, win, data in restricted)
             cols = sorted(col_off for row_off, col_off, win, data in restricted)
-            assert cols == [0, 2], cols
+            assert cols == [0, 2, 4, 6], cols
     finally:
         tmp.unlink(missing_ok=True)
     print("test_iter_chips_row_bounds_restricts_iteration: PASS")
