@@ -5,6 +5,7 @@
 #SBATCH -c 8
 #SBATCH --mem=128G
 #SBATCH --time=04:00:00
+#SBATCH --signal=B:TERM@600
 #SBATCH --output=code/embedding_generation/slurm/logs/clay_embed_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/clay_embed_%A_%a.err
 
@@ -53,8 +54,21 @@ if [[ ! -s "$COMPOSITE" ]]; then
   exit 1
 fi
 
-if [[ -n "${SLURM_TMPDIR:-}" ]]; then
-  STAGE_DIR="$SLURM_TMPDIR/clay_${STATE}_${YEAR}"
+# Staging: prefer node-local SSD (auto-wiped at job end regardless of how the
+# job dies) when the composite fits; Sherlock's node-local mount is
+# $L_SCRATCH, not $SLURM_TMPDIR (which Sherlock never sets). Fall back to
+# $SCRATCH for composites too big for local disk.
+STAGE_ON_LOCAL=0
+if [[ -n "${L_SCRATCH:-}" ]]; then
+  COMPOSITE_BYTES=$(stat -c%s "$COMPOSITE")
+  AVAIL_BYTES=$(df --output=avail -B1 "$L_SCRATCH" 2>/dev/null | tail -1)
+  if [[ -n "$AVAIL_BYTES" ]] && (( COMPOSITE_BYTES < AVAIL_BYTES * 8 / 10 )); then
+    STAGE_ON_LOCAL=1
+  fi
+fi
+
+if [[ "$STAGE_ON_LOCAL" == 1 ]]; then
+  STAGE_DIR="$L_SCRATCH/clay_${STATE}_${YEAR}"
 else
   STAGE_DIR="$SCRATCH/embeddings-health/staging/${SLURM_JOB_ID:-manual}_${TASK_ID}"
 fi
@@ -66,7 +80,7 @@ FINAL_DIR="$FINAL_OUT_DIR/$STATE"
 PREEMPTED=0
 
 cleanup_stage() {
-  if [[ -n "${SLURM_TMPDIR:-}" && "$STAGE_DIR" == "$SLURM_TMPDIR/"* ]] || \
+  if [[ -n "${L_SCRATCH:-}" && "$STAGE_DIR" == "$L_SCRATCH/"* ]] || \
      [[ -n "${SCRATCH:-}" && "$STAGE_DIR" == "$SCRATCH/embeddings-health/staging/"* ]]; then
     rm -rf "$STAGE_DIR" || true
   else
@@ -79,9 +93,25 @@ cleanup_success() {
   rm -rf "$CKPT_DIR" || true
 }
 
+CHILD_PID=""
+
+# Slurm's --signal=B:TERM@600 delivers this 10 minutes before the hard time
+# limit. Forward it to the embed.py child and give it up to 30s to exit
+# gracefully (it may write a final checkpoint) before force-killing, so the
+# remaining buffer is available for cleanup_stage() instead of being eaten by
+# a GPU process that doesn't respond promptly to SIGTERM. Without this, Slurm's
+# eventual SIGKILL hits the whole process group at once and no trap ever runs.
 handle_preempt() {
   PREEMPTED=1
   echo "Job preempted or timed out — checkpoint preserved at: $CKPT_DIR" >&2
+  if [[ -n "$CHILD_PID" ]] && kill -0 "$CHILD_PID" 2>/dev/null; then
+    kill -TERM "$CHILD_PID" 2>/dev/null || true
+    for _ in $(seq 1 30); do
+      kill -0 "$CHILD_PID" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL "$CHILD_PID" 2>/dev/null || true
+  fi
 }
 
 preserve_failure() {
@@ -167,6 +197,10 @@ nvidia-smi || true
 
 cd "$EMBED_DIR"
 
+# Run in background and wait: bash's `wait` builtin returns as soon as a
+# trapped signal arrives, whereas a foreground command can block trap
+# execution until the child exits on its own. This is what lets
+# handle_preempt() run promptly on the --signal=B:TERM@600 warning.
 uv run --python 3.11 python embed.py \
   --model        clay \
   --input        "$STAGED_COMPOSITE" \
@@ -175,10 +209,15 @@ uv run --python 3.11 python embed.py \
   --batch-size   "$BATCH_SIZE" \
   --checkpoint-every "${CHECKPOINT_EVERY:-25}" \
   $FORCE_FLAG \
-  $TEST_CHIPS_ARGS
+  $TEST_CHIPS_ARGS &
+CHILD_PID=$!
+wait "$CHILD_PID"
 
 if [[ ! -s "$RAW_LOCAL" ]]; then
   echo "ERROR: expected output missing or empty: $RAW_LOCAL" >&2
+  # exit (rather than a failing command) does not trigger the ERR trap, so
+  # clean up the staging copy explicitly here instead of relying on preserve_failure.
+  cleanup_stage
   exit 1
 fi
 
