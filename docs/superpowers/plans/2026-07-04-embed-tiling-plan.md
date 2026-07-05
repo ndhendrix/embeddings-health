@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - No pytest/test framework exists in this repo — tests are plain assert-based Python scripts run directly (`uv run --python 3.11 python <script>`), matching existing conventions (`validate_embedding.py`).
-- Per `[[testing-before-submitting]]` memory: test new code paths interactively via `srun` before submitting any batch array. Do not submit a real production batch array as part of this plan without explicit user go-ahead — Task 10 is a manual checkpoint, not an automated step.
+- Per `[[testing-before-submitting]]` memory: test new code paths interactively via `srun` before submitting any batch array. Do not submit a real production batch array as part of this plan without explicit user go-ahead — Task 11 is a manual checkpoint, not an automated step.
 - Sherlock's node-local `$L_SCRATCH` variable, not `$SLURM_TMPDIR` (already fixed in the staging-leak work; not touched further here since tiling removes staging from these three pipelines entirely).
 - Composites are already COG-structured (tiled, block-organized GeoTIFFs) — direct windowed reads from `$SCRATCH` are expected to be efficient without local staging (per approved spec `docs/superpowers/specs/2026-07-04-embed-tiling-design.md`).
 - Tiling is row-band only (split the chip grid by rows, full width per tile) — simpler than `composite.py`'s 2-D geographic grid, and equally correct here since embed.py does windowed reads against an already-materialized raster (no STAC-locality benefit to square tiles). This is a plan-level refinement of the spec's "roughly-square" language; the spec's actual requirement (bounded, roughly-equal per-tile chip counts) is preserved.
@@ -1806,9 +1806,411 @@ rm -f /tmp/one_task.txt
 
 No commit — validation only. If Step 3 shows a tile still running close to the walltime limit, lower `TARGET_CHIPS_PER_TILE` in Task 6 and re-plan before proceeding to Task 8.
 
+**Update after running this task:** inference finished in ~31 minutes for a ~125K-chip NV tile (well within the 2h walltime — `TARGET_CHIPS_PER_TILE=150000` is confirmed adequate and should not be changed on this evidence), and kill-and-resume passed cleanly. But the subsequent `write_cog()` COG-write step ran for the remaining ~89 minutes and was killed by the walltime without finishing, for a ~65.5GB raw array. This is a previously-unknown bottleneck, unrelated to chip count — see the new Task 8 inserted below, which fixes it before Clay/Base replication proceeds.
+
 ---
 
-## Task 8: Replicate the tile/merge pattern for Clay (`clay-embed`)
+## Task 8: Fix `write_cog()` compression for float32 embeddings
+
+**Files:**
+- Modify: `code/embedding_generation/utils/cog_writer.py`
+- Create: `code/embedding_generation/tests/test_cog_writer_compression.py`
+
+**Interfaces:**
+- `write_cog(arr, transform, crs, path, band_names=None, compress="zstd", nodata=np.nan, overviews=True) -> None` — public signature unchanged; only the `compress` default and the creation options passed to GDAL change. All existing callers (`embed.py`, Task 2) get the new default automatically with no call-site changes needed.
+
+**Why:** Task 7's real-world validation (NV, Nano) found that `embed.py`'s chip inference is fast (31 min for a 125K-chip tile, well inside the 2h walltime), but the subsequent `write_cog()` call — serializing the ~65.5GB raw embedding array — ran for the remaining ~89 minutes and was killed by the walltime without finishing. `cog_writer.py` uses `compress="lzw"` by default. LZW is a dictionary/byte-pattern codec built for repeated values (8-bit categorical imagery); it is both slower and a worse compression ratio than `zstd` on continuous float32 embedding data, which has little byte-level repetition for LZW to exploit. GDAL's GTiff driver supports `ZSTD` (confirmed available on this cluster via `gdalinfo --format GTiff`) and a `PREDICTOR` creation option — value `3` is the floating-point predictor, which differences neighboring pixel values before compression and is the standard, documented way to improve both speed and ratio for continuous (non-categorical) float rasters with any codec.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `code/embedding_generation/tests/test_cog_writer_compression.py`:
+
+```python
+"""Plain assert-based tests for write_cog()'s compression settings (no pytest
+in this repo). Verifies the default codec is both correct (round-trips
+float32 values and NaN nodata exactly) and faster than the legacy
+LZW-without-predictor settings for continuous float32 data (embeddings),
+per the rationale in cog_writer.py's write_cog() docstring.
+
+Run: uv run --python 3.11 python tests/test_cog_writer_compression.py
+"""
+import shutil
+import tempfile
+import time
+from pathlib import Path
+
+import numpy as np
+import rasterio
+from rasterio.transform import from_origin
+
+from utils.cog_writer import write_cog
+
+
+def _make_test_array(n_bands=32, height=2048, width=2048):
+    # Continuous float32 data, not integer/categorical -- behaves like real
+    # model-embedding output for compression-timing purposes, unlike e.g.
+    # zeros or a repeating pattern which would compress trivially fast under
+    # any codec and hide the LZW-vs-zstd difference this test exists to catch.
+    rng = np.random.default_rng(42)
+    return rng.standard_normal((n_bands, height, width)).astype("float32")
+
+
+def test_written_values_round_trip_correctly():
+    arr = _make_test_array(n_bands=4, height=256, width=256)
+    arr[0, 0, 0] = np.nan  # exercise nodata handling
+    transform = from_origin(0.0, 1000.0, 10, 10)
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        path = tmp / "roundtrip.tif"
+        write_cog(arr, transform, "EPSG:32610", path, overviews=False)
+        with rasterio.open(path) as src:
+            written = src.read()
+            assert np.isnan(written[0, 0, 0]), "NaN nodata value was not preserved"
+            valid = ~np.isnan(arr)
+            assert np.allclose(arr[valid], written[valid], atol=1e-5), \
+                "compressed round-trip values differ from source beyond float32 tolerance"
+    finally:
+        shutil.rmtree(tmp)
+    print("test_written_values_round_trip_correctly: PASS")
+
+
+def test_default_compression_is_faster_than_legacy_lzw():
+    arr = _make_test_array()
+    transform = from_origin(0.0, 1000.0, 10, 10)
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        legacy_path = tmp / "legacy_lzw.tif"
+        new_path = tmp / "new_default.tif"
+
+        start = time.monotonic()
+        write_cog(arr, transform, "EPSG:32610", legacy_path,
+                  compress="lzw", overviews=False)
+        legacy_elapsed = time.monotonic() - start
+        assert legacy_path.exists()
+
+        start = time.monotonic()
+        write_cog(arr, transform, "EPSG:32610", new_path, overviews=False)
+        new_elapsed = time.monotonic() - start
+        assert new_path.exists()
+
+        print(f"legacy lzw: {legacy_elapsed:.1f}s   new default (zstd+predictor): {new_elapsed:.1f}s")
+        assert new_elapsed < legacy_elapsed, (
+            f"expected the new zstd+predictor default to be faster than legacy "
+            f"lzw, got new={new_elapsed:.1f}s vs legacy={legacy_elapsed:.1f}s"
+        )
+    finally:
+        shutil.rmtree(tmp)
+    print("test_default_compression_is_faster_than_legacy_lzw: PASS")
+
+
+if __name__ == "__main__":
+    test_written_values_round_trip_correctly()
+    test_default_compression_is_faster_than_legacy_lzw()
+    print("ALL PASSED")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+srun -p normal -c 4 --mem=16G --time=00:15:00 bash -c \
+  "cd $HOME/embeddings-health/code/embedding_generation && uv run --python 3.11 python tests/test_cog_writer_compression.py"
+```
+
+Expected: `test_written_values_round_trip_correctly: PASS` (the current LZW codec is already correct — this part isn't red), but `test_default_compression_is_faster_than_legacy_lzw` FAILS with an `AssertionError`, because right now the "default" and "legacy lzw" paths use identical settings (both LZW, no predictor) and take essentially the same time — `new_elapsed < legacy_elapsed` is false (or only true by noise, not by design).
+
+- [ ] **Step 3: Change `write_cog()`'s default compression and creation options**
+
+In `code/embedding_generation/utils/cog_writer.py`, replace:
+
+```python
+def write_cog(
+    arr: np.ndarray,
+    transform: Affine,
+    crs: CRS | str,
+    path: Path,
+    band_names: list[str] | None = None,
+    compress: str = "lzw",
+    nodata: float | None = np.nan,
+    overviews: bool = True,
+) -> None:
+    """Write (C, H, W) float32 array to a tiled GeoTIFF, optionally with COG overviews.
+
+    Args:
+        arr: (C, H, W) numpy array.
+        transform: Affine geotransform.
+        crs: Coordinate reference system (EPSG string or rasterio CRS).
+        path: Output file path.
+        band_names: Optional list of band name strings for metadata tags.
+        compress: Compression codec (lzw, deflate, zstd).
+        nodata: Nodata value; use np.nan for float data.
+        overviews: Build overview pyramids and copy as COG. Set False for
+            high-band-count arrays (e.g. embeddings) where overview
+            generation across hundreds of bands would take hours.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(crs, str):
+        crs = CRS.from_string(crs)
+
+    n_bands, height, width = arr.shape
+
+    # Rows per write strip. Keeps peak RAM at strip_rows × width × n_bands × 4 B,
+    # which is a few GB even for 1024-dim Clay embeddings over Texas.
+    # Materialising the full array at once OOMs on large states (LA: 137 GB,
+    # TX: ~1 TB) because arr may be a disk-backed memmap.
+    _STRIP_ROWS = 64
+
+    # Write to a temporary in-memory file first, then copy as COG.
+    # The copy step reorganises internal tiling and adds overviews.
+    tmp_path = path.with_suffix(".tmp.tif")
+    try:
+        with rasterio.open(
+            tmp_path,
+            "w",
+            driver="GTiff",
+            height=height,
+            width=width,
+            count=n_bands,
+            dtype="float32",
+            crs=crs,
+            transform=transform,
+            compress=compress,
+            nodata=nodata,
+            tiled=True,
+            blockxsize=512,
+            blockysize=512,
+            BIGTIFF="IF_SAFER",
+        ) as dst:
+            for row_start in range(0, height, _STRIP_ROWS):
+                row_end = min(row_start + _STRIP_ROWS, height)
+                strip = np.array(arr[:, row_start:row_end, :], dtype="float32")
+                win = rasterio.windows.Window(0, row_start, width, row_end - row_start)
+                dst.write(strip, window=win)
+            if band_names:
+                for i, name in enumerate(band_names, 1):
+                    dst.update_tags(i, name=name)
+
+        if overviews:
+            _add_overviews_and_copy_as_cog(tmp_path, path, compress)
+        else:
+            tmp_path.rename(path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
+
+def _add_overviews_and_copy_as_cog(src_path: Path, dst_path: Path, compress: str) -> None:
+    """Add internal overviews then re-write as a proper COG."""
+    overview_levels = [2, 4, 8, 16, 32]
+
+    with rasterio.open(src_path, "r+") as src:
+        src.build_overviews(overview_levels, Resampling.average)
+        src.update_tags(ns="rio_overview", resampling="average")
+
+    from rasterio.shutil import copy as rio_copy
+    rio_copy(
+        src_path,
+        dst_path,
+        driver="GTiff",
+        compress=compress,
+        copy_src_overviews=True,
+        tiled=True,
+        blockxsize=512,
+        blockysize=512,
+        BIGTIFF="IF_SAFER",
+    )
+```
+
+with:
+
+```python
+def write_cog(
+    arr: np.ndarray,
+    transform: Affine,
+    crs: CRS | str,
+    path: Path,
+    band_names: list[str] | None = None,
+    compress: str = "zstd",
+    nodata: float | None = np.nan,
+    overviews: bool = True,
+) -> None:
+    """Write (C, H, W) float32 array to a tiled GeoTIFF, optionally with COG overviews.
+
+    Args:
+        arr: (C, H, W) numpy array.
+        transform: Affine geotransform.
+        crs: Coordinate reference system (EPSG string or rasterio CRS).
+        path: Output file path.
+        band_names: Optional list of band name strings for metadata tags.
+        compress: Compression codec (zstd, lzw, deflate). Defaults to zstd
+            with a floating-point predictor (see _compression_options below):
+            LZW is a dictionary/byte-pattern codec built for repeated values
+            (8-bit categorical imagery) and is both slower and a worse ratio
+            than zstd+predictor on continuous float32 embedding data, which
+            has little byte-level repetition for LZW to exploit.
+        nodata: Nodata value; use np.nan for float data.
+        overviews: Build overview pyramids and copy as COG. Set False for
+            high-band-count arrays (e.g. embeddings) where overview
+            generation across hundreds of bands would take hours.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(crs, str):
+        crs = CRS.from_string(crs)
+
+    n_bands, height, width = arr.shape
+
+    # Rows per write strip. Keeps peak RAM at strip_rows × width × n_bands × 4 B,
+    # which is a few GB even for 1024-dim Clay embeddings over Texas.
+    # Materialising the full array at once OOMs on large states (LA: 137 GB,
+    # TX: ~1 TB) because arr may be a disk-backed memmap.
+    _STRIP_ROWS = 64
+
+    # Write to a temporary in-memory file first, then copy as COG.
+    # The copy step reorganises internal tiling and adds overviews.
+    tmp_path = path.with_suffix(".tmp.tif")
+    try:
+        with rasterio.open(
+            tmp_path,
+            "w",
+            driver="GTiff",
+            height=height,
+            width=width,
+            count=n_bands,
+            dtype="float32",
+            crs=crs,
+            transform=transform,
+            compress=compress,
+            nodata=nodata,
+            tiled=True,
+            blockxsize=512,
+            blockysize=512,
+            BIGTIFF="IF_SAFER",
+            **_compression_options(compress),
+        ) as dst:
+            for row_start in range(0, height, _STRIP_ROWS):
+                row_end = min(row_start + _STRIP_ROWS, height)
+                strip = np.array(arr[:, row_start:row_end, :], dtype="float32")
+                win = rasterio.windows.Window(0, row_start, width, row_end - row_start)
+                dst.write(strip, window=win)
+            if band_names:
+                for i, name in enumerate(band_names, 1):
+                    dst.update_tags(i, name=name)
+
+        if overviews:
+            _add_overviews_and_copy_as_cog(tmp_path, path, compress)
+        else:
+            tmp_path.rename(path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
+
+def _compression_options(compress: str) -> dict:
+    """Extra GDAL creation options for a given codec, tuned for continuous
+    float32 embedding data rather than 8-bit categorical imagery.
+
+    predictor=3 (floating-point prediction) differences neighboring pixel
+    values before compression -- it applies to LZW, DEFLATE, and ZSTD alike
+    and improves both speed and ratio for continuous data. zstd_level=1
+    trades ratio for speed: embeddings are high-entropy floats where higher
+    zstd levels buy little extra compression for much more CPU time.
+    """
+    opts = {"predictor": 3}
+    if compress == "zstd":
+        opts["zstd_level"] = 1
+    return opts
+
+
+def _add_overviews_and_copy_as_cog(src_path: Path, dst_path: Path, compress: str) -> None:
+    """Add internal overviews then re-write as a proper COG."""
+    overview_levels = [2, 4, 8, 16, 32]
+
+    with rasterio.open(src_path, "r+") as src:
+        src.build_overviews(overview_levels, Resampling.average)
+        src.update_tags(ns="rio_overview", resampling="average")
+
+    from rasterio.shutil import copy as rio_copy
+    rio_copy(
+        src_path,
+        dst_path,
+        driver="GTiff",
+        compress=compress,
+        copy_src_overviews=True,
+        tiled=True,
+        blockxsize=512,
+        blockysize=512,
+        BIGTIFF="IF_SAFER",
+        **_compression_options(compress),
+    )
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+srun -p normal -c 4 --mem=16G --time=00:15:00 bash -c \
+  "cd $HOME/embeddings-health/code/embedding_generation && uv run --python 3.11 python tests/test_cog_writer_compression.py"
+```
+
+Expected: `test_written_values_round_trip_correctly: PASS`, a printed timing line (e.g. `legacy lzw: 42.3s   new default (zstd+predictor): 6.1s`), `test_default_compression_is_faster_than_legacy_lzw: PASS`, `ALL PASSED`. The exact seconds will vary by node/filesystem load; what matters is `new_elapsed < legacy_elapsed` holding.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd "$HOME/embeddings-health"
+git add code/embedding_generation/utils/cog_writer.py code/embedding_generation/tests/test_cog_writer_compression.py
+git commit -m "$(cat <<'EOF'
+perf: switch write_cog() from LZW to zstd+predictor for float32 data
+
+Task 7's real-world validation found chip inference finishes well
+within budget (31 min for a 125K-chip NV tile vs. a 2h walltime) but
+the subsequent write_cog() call ran for the remaining ~89 minutes and
+was killed by the walltime without finishing, for a ~65.5GB raw array.
+LZW is a dictionary codec built for repeated byte patterns (8-bit
+categorical imagery); it is a poor fit for continuous float32
+embedding data. zstd with a floating-point predictor is the standard
+fix for this class of problem.
+EOF
+)"
+```
+
+- [ ] **Step 6: Re-validate end-to-end on the real NV tile that failed in Task 7**
+
+This confirms the fix actually resolves the walltime failure observed on real data, not just the synthetic timing test above.
+
+```bash
+STATE=NV
+CKPT_DIR="$SCRATCH/embeddings-health/checkpoints/olmoearth_nano/$STATE"
+# Task 7 already proved inference finishes in ~31 min and is resumable;
+# re-run tile 0 from scratch here only if its checkpoint no longer exists
+# (Task 7's cleanup deleted it) -- accept the ~31 min inference cost once
+# more to observe the complete, real walltime with the new write codec.
+TILE_TASK_FILE=/tmp/task8_one_task.txt
+echo "$STATE 0 2" > "$TILE_TASK_FILE"
+export TILE_TASK_FILE REPO_DIR="$HOME/embeddings-health" YEAR=2022 VARIANT=Nano \
+       COMPOSITE_DIR="$SCRATCH/embeddings-health/olmoearth_composites" \
+       FINAL_OUT_DIR="$SCRATCH/embeddings-health/olmoearth_nano_embeddings" \
+       CACHE_ROOT="$SCRATCH/embeddings-health/cache"
+srun -p gpu -G 1 -c 8 --mem=64G --time=02:00:00 \
+  bash "$HOME/embeddings-health/code/embedding_generation/slurm/run_olmoearth_nano_embed_state_array.sbatch"
+```
+
+Expected: the job now completes (prints `=== Done: NV tile 0/2 ===`) well before the 2-hour limit, instead of being killed by `TIMEOUT` with an incomplete `.tmp.tif` as it was in Task 7. Note the total wall-clock (inference + write) in the report for the controller to compare against Task 7's numbers.
+
+Clean up afterward:
+
+```bash
+rm -f "$CKPT_DIR"/olmoearth_Nano_NV_2022_tile000*
+rm -f /tmp/task8_one_task.txt
+```
+
+If this run still doesn't finish comfortably within the walltime, report BLOCKED with the timing breakdown (inference time vs. write time) rather than guessing at a further fix — the compression change may need to be paired with a smaller `TARGET_CHIPS_PER_TILE` after all, or there may be a second bottleneck not yet identified.
+
+---
+
+## Task 9: Replicate the tile/merge pattern for Clay (`clay-embed`)
 
 **Files:**
 - Modify: `code/embedding_generation/slurm/run_clay_embed_state_array.sbatch`
@@ -2146,7 +2548,7 @@ CHIP_SIZE=256
 
 # Target chip count per tile — placeholder pending real measurement (Clay's
 # throughput hasn't been benchmarked the way Base/Nano have; validate via
-# srun per Task 8 Step 7 of the embed-tiling plan and adjust if a tile runs
+# srun per Task 9 Step 7 of the embed-tiling plan and adjust if a tile runs
 # close to the 4-hour walltime).
 TARGET_CHIPS_PER_TILE="${TARGET_CHIPS_PER_TILE:-20000}"
 
@@ -2409,14 +2811,14 @@ git commit -m "feat: apply tile/merge pattern to clay-embed"
 
 ---
 
-## Task 9: Replicate the tile/merge pattern for Base (`oe-embed`)
+## Task 10: Replicate the tile/merge pattern for Base (`oe-embed`)
 
 **Files:**
 - Modify: `code/embedding_generation/slurm/run_olmoearth_embed_state_array.sbatch`
 - Create: `code/embedding_generation/slurm/run_olmoearth_embed_merge.sbatch`
 - Modify: `code/embedding_generation/slurm/submit_olmoearth_embed_all_states.sh`
 
-Same pattern as Tasks 4–6 and Task 8, applied to Base. Differences from Nano: `VARIANT` defaults to `v1_1-Base` (not `Nano`); `FINAL_OUT_DIR` default `.../olmoearth_embeddings`; `CKPT_DIR=".../checkpoints/olmoearth/$STATE"`; `--mem=128G`/`--time=04:00:00`; job names `oe-embed`/`oe-merge`/`oe-embed-resubmit`; log prefixes `oe_embed`/`oe_merge`; starting `TARGET_CHIPS_PER_TILE=7000` (from the design spec's measured ~0.75s/chip rate on NY — real data, unlike Clay's placeholder, but still validate per Step 7 below since it came from one state's observation).
+Same pattern as Tasks 4–6 and Task 9, applied to Base. Differences from Nano: `VARIANT` defaults to `v1_1-Base` (not `Nano`); `FINAL_OUT_DIR` default `.../olmoearth_embeddings`; `CKPT_DIR=".../checkpoints/olmoearth/$STATE"`; `--mem=128G`/`--time=04:00:00`; job names `oe-embed`/`oe-merge`/`oe-embed-resubmit`; log prefixes `oe_embed`/`oe_merge`; starting `TARGET_CHIPS_PER_TILE=7000` (from the design spec's measured ~0.75s/chip rate on NY — real data, unlike Clay's placeholder, but still validate per Step 7 below since it came from one state's observation).
 
 - [ ] **Step 1: Replace the whole file**
 
@@ -2774,7 +3176,7 @@ CHIP_SIZE=128
 
 # Target chip count per tile — sized from the measured ~0.75s/chip rate on NY
 # (~90 min of inference + setup/merge margin within the 4h walltime). Real
-# data, but from one state's observation — validate via srun (Task 9 Step 7
+# data, but from one state's observation — validate via srun (Task 10 Step 7
 # of the embed-tiling plan) and adjust if a tile runs close to the limit.
 TARGET_CHIPS_PER_TILE="${TARGET_CHIPS_PER_TILE:-7000}"
 
@@ -3038,7 +3440,7 @@ git commit -m "feat: apply tile/merge pattern to oe-embed"
 
 ---
 
-## Task 10: Manual go/no-go — real batch submission
+## Task 11: Manual go/no-go — real batch submission
 
 **This is a checkpoint, not an automated step.** Do not run these submissions unattended.
 
