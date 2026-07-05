@@ -14,7 +14,7 @@ def write_cog(
     crs: CRS | str,
     path: Path,
     band_names: list[str] | None = None,
-    compress: str = "lzw",
+    compress: str = "zstd",
     nodata: float | None = np.nan,
     overviews: bool = True,
 ) -> None:
@@ -26,7 +26,12 @@ def write_cog(
         crs: Coordinate reference system (EPSG string or rasterio CRS).
         path: Output file path.
         band_names: Optional list of band name strings for metadata tags.
-        compress: Compression codec (lzw, deflate, zstd).
+        compress: Compression codec (zstd, lzw, deflate). Defaults to zstd
+            with a floating-point predictor (see _compression_options below):
+            LZW is a dictionary/byte-pattern codec built for repeated values
+            (8-bit categorical imagery) and is both slower and a worse ratio
+            than zstd+predictor on continuous float32 embedding data, which
+            has little byte-level repetition for LZW to exploit.
         nodata: Nodata value; use np.nan for float data.
         overviews: Build overview pyramids and copy as COG. Set False for
             high-band-count arrays (e.g. embeddings) where overview
@@ -66,6 +71,7 @@ def write_cog(
             blockxsize=512,
             blockysize=512,
             BIGTIFF="IF_SAFER",
+            **_compression_options(compress),
         ) as dst:
             for row_start in range(0, height, _STRIP_ROWS):
                 row_end = min(row_start + _STRIP_ROWS, height)
@@ -83,6 +89,22 @@ def write_cog(
     finally:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
+
+
+def _compression_options(compress: str) -> dict:
+    """Extra GDAL creation options for a given codec, tuned for continuous
+    float32 embedding data rather than 8-bit categorical imagery.
+
+    predictor=3 (floating-point prediction) differences neighboring pixel
+    values before compression -- it applies to LZW, DEFLATE, and ZSTD alike
+    and improves both speed and ratio for continuous data. zstd_level=1
+    trades ratio for speed: embeddings are high-entropy floats where higher
+    zstd levels buy little extra compression for much more CPU time.
+    """
+    opts = {"predictor": 3}
+    if compress == "zstd":
+        opts["zstd_level"] = 1
+    return opts
 
 
 def _add_overviews_and_copy_as_cog(src_path: Path, dst_path: Path, compress: str) -> None:
@@ -104,4 +126,5 @@ def _add_overviews_and_copy_as_cog(src_path: Path, dst_path: Path, compress: str
         blockxsize=512,
         blockysize=512,
         BIGTIFF="IF_SAFER",
+        **_compression_options(compress),
     )
