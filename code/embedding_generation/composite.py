@@ -337,6 +337,7 @@ def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> No
         ckpt_path.unlink(missing_ok=True)
         dst_ctx = rasterio.open(tmp_path, "w", **profile)
 
+    write_error: Exception | None = None
     with dst_ctx as dst:
         if not resuming:
             for i, band_name in enumerate(bands, 1):
@@ -350,11 +351,27 @@ def _merge_tiles(tile_paths: list[Path], bands: list[str], out_path: Path) -> No
                 ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
                 transform=out_transform,
             ).round_offsets().round_lengths()
-            for band_idx in range(1, ds.count + 1):
-                dst.write(ds.read(band_idx), indexes=band_idx, window=window)
+            try:
+                for band_idx in range(1, ds.count + 1):
+                    dst.write(ds.read(band_idx), indexes=band_idx, window=window)
+            except Exception as exc:
+                ds.close()
+                write_error = exc
+                break
             ds.close()
             already_merged.add(tile_key)
             ckpt_path.write_text("\n".join(sorted(already_merged)))
+
+    if write_error is not None:
+        # The tmp file is likely corrupted (e.g. a block was partially written when
+        # a previous job was killed mid-write). Delete both so the next run starts
+        # fresh rather than hitting the same corrupt block again.
+        tmp_path.unlink(missing_ok=True)
+        ckpt_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Tile write failed — deleted corrupted tmp+checkpoint so next run starts fresh. "
+            f"Cause: {write_error}"
+        )
 
     tmp_path.rename(out_path)
     ckpt_path.unlink(missing_ok=True)
