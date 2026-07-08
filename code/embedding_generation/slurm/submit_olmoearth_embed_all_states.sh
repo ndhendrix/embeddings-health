@@ -36,7 +36,7 @@ CHIP_SIZE=128
 # of the embed-tiling plan) and adjust if a tile runs close to the limit.
 TARGET_CHIPS_PER_TILE="${TARGET_CHIPS_PER_TILE:-7000}"
 
-TASK_FILE="$SCRATCH/embeddings-health/cache/oe_tile_tasks_${YEAR}.txt"
+TASK_FILE="$SCRATCH/embeddings-health/cache/oe_embed_tile_tasks_${YEAR}.txt"
 
 LOADED_GDAL=0
 if command -v module >/dev/null 2>&1 && ! command -v gdalinfo >/dev/null 2>&1; then

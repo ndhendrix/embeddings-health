@@ -3180,7 +3180,7 @@ CHIP_SIZE=128
 # of the embed-tiling plan) and adjust if a tile runs close to the limit.
 TARGET_CHIPS_PER_TILE="${TARGET_CHIPS_PER_TILE:-7000}"
 
-TASK_FILE="$SCRATCH/embeddings-health/cache/oe_tile_tasks_${YEAR}.txt"
+TASK_FILE="$SCRATCH/embeddings-health/cache/oe_embed_tile_tasks_${YEAR}.txt"
 
 LOADED_GDAL=0
 if command -v module >/dev/null 2>&1 && ! command -v gdalinfo >/dev/null 2>&1; then
@@ -3398,7 +3398,7 @@ Dry-run the submit script scoped to just that state's tile count:
 
 ```bash
 DRY_RUN=1 bash "$HOME/embeddings-health/code/embedding_generation/slurm/submit_olmoearth_embed_all_states.sh" 2>&1 | grep -A2 "^$STATE " || true
-grep "^$STATE " "$SCRATCH/embeddings-health/cache/oe_tile_tasks_2022.txt"
+grep "^$STATE " "$SCRATCH/embeddings-health/cache/oe_embed_tile_tasks_2022.txt"
 ```
 
 Expected: several lines `$STATE <idx> <NUM_TILES>` — note `NUM_TILES`.
