@@ -175,13 +175,28 @@ export REPO_DIR COMPOSITE_DIR FINAL_OUT_DIR CACHE_ROOT YEAR VARIANT
 # Submit tile arrays in batches of 1000 (Sherlock max_array_tasks=1000).
 # ------------------------------------------------------------------
 MAX_ARRAY=1000
+
+# Sherlock's gpu-partition QOS caps this account at ~100 total submitted jobs
+# at once (MaxSubmitJobsPerUser), shared across all concurrently-running
+# pipelines (Nano/Clay/Base each submit their own tile arrays). A single
+# state can need dozens of tiles, so total_tiles can vastly exceed that
+# ceiling on its own. Cap how many tiles this invocation actually submits;
+# the resubmit chain re-scans real $SCRATCH state on its next run and picks
+# up whatever tiles are still missing, converging over several waves.
+MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-60}"
+SUBMIT_COUNT=$(( total_tiles < MAX_SUBMIT_PER_RUN ? total_tiles : MAX_SUBMIT_PER_RUN ))
+if (( SUBMIT_COUNT < total_tiles )); then
+  echo "NOTE: only submitting $SUBMIT_COUNT/$total_tiles tile tasks this run" \
+       "(MAX_SUBMIT_PER_RUN=$MAX_SUBMIT_PER_RUN); the resubmit chain will pick up the rest."
+fi
+
 TILE_JOB_IDS=()
-if (( total_tiles > 0 )); then
+if (( SUBMIT_COUNT > 0 )); then
   batch=0
   offset=0
-  while (( offset < total_tiles )); do
+  while (( offset < SUBMIT_COUNT )); do
     end=$(( offset + MAX_ARRAY - 1 ))
-    (( end >= total_tiles )) && end=$(( total_tiles - 1 ))
+    (( end >= SUBMIT_COUNT )) && end=$(( SUBMIT_COUNT - 1 ))
     count=$(( end - offset + 1 ))
 
     batch_file="${TASK_FILE%.txt}_batch${batch}.txt"
