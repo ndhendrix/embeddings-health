@@ -9,13 +9,25 @@
 #SBATCH --output=code/embedding_generation/slurm/logs/oe_embed_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/oe_embed_%A_%a.err
 
-# STATE_LIST must be set by the submit script (colon-separated sorted state abbrevs).
-# SLURM_ARRAY_TASK_ID indexes into it.
+# Per-tile OlmoEarth Base embedding job. SLURM_ARRAY_TASK_ID indexes into
+# TILE_TASK_FILE, a newline-delimited file with lines of the form:
+#   STATE TILE_IDX NUM_TILES
+# created by submit_olmoearth_embed_all_states.sh.
 #
-# Checkpoints are written to $SCRATCH every CHECKPOINT_EVERY chips (default 25)
-# so preempted or timed-out jobs resume from the last checkpoint automatically.
-# For large states (output array > 8 GB) embed.py transparently uses a
-# disk-backed memmap on $SCRATCH rather than in-memory allocation.
+# Reads the composite directly from $SCRATCH with windowed reads (no local
+# staging) — each tile only touches its own row-band, so there's no
+# multi-hundred-GB copy to make or leak. Checkpoints every CHECKPOINT_EVERY
+# chips so a timed-out tile resumes mid-tile rather than from scratch. Base's
+# per-chip cost (~0.75s/chip measured on NY) is the main reason tiling is
+# needed here at all — large states need tens of hours of total inference,
+# far more than any single job's walltime, so bounding chip count per task
+# via tiling (rather than trying to fit a whole state in one job) is what
+# makes forward progress possible.
+#
+# NUM_TILES=1 states (the common case for small/medium states) behave exactly
+# as before: embed.py writes directly to the final name, no tile suffix, and
+# this script moves it straight to FINAL_DIR. NUM_TILES>1 states leave their
+# tile output in CKPT_DIR for run_olmoearth_embed_merge.sbatch to mosaic.
 
 set -euo pipefail
 
@@ -28,74 +40,31 @@ VARIANT="${VARIANT:-v1_1-Base}"
 COMPOSITE_DIR="${COMPOSITE_DIR:-$SCRATCH/embeddings-health/olmoearth_composites}"
 FINAL_OUT_DIR="${FINAL_OUT_DIR:-$SCRATCH/embeddings-health/olmoearth_embeddings}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
+: "${TILE_TASK_FILE:?TILE_TASK_FILE must be set to the task list file path}"
 
-: "${STATE_LIST:?STATE_LIST must be set to a colon-separated ordered state list}"
-IFS=: read -ra STATES <<< "$STATE_LIST"
-TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
+LINE=$(sed -n "$(( ${SLURM_ARRAY_TASK_ID:-0} + 1 ))p" "$TILE_TASK_FILE")
+STATE=$(echo "$LINE" | awk '{print $1}')
+TILE_IDX=$(echo "$LINE" | awk '{print $2}')
+NUM_TILES=$(echo "$LINE" | awk '{print $3}')
 
-if (( TASK_ID < 0 || TASK_ID >= ${#STATES[@]} )); then
-  echo "ERROR: TASK_ID=$TASK_ID out of range (${#STATES[@]} states)" >&2
+if [[ -z "$STATE" || -z "$TILE_IDX" || -z "$NUM_TILES" ]]; then
+  echo "ERROR: could not parse line $(( SLURM_ARRAY_TASK_ID + 1 )) of $TILE_TASK_FILE: '$LINE'" >&2
   exit 1
 fi
 
-STATE="${STATES[$TASK_ID]}"
 COMPOSITE="$COMPOSITE_DIR/s2_annual_${STATE}_${YEAR}_olmoearth.tif"
 
 if [[ ! -s "$COMPOSITE" ]]; then
   echo "ERROR: composite not found or empty: $COMPOSITE" >&2
-  echo "  Run submit_olmoearth_composite_all_states.sh first." >&2
   exit 1
 fi
 
-# Staging: prefer node-local SSD (auto-wiped at job end regardless of how the
-# job dies) when the composite fits; Sherlock's node-local mount is
-# $L_SCRATCH, not $SLURM_TMPDIR (which Sherlock never sets). Fall back to
-# $SCRATCH for composites too big for local disk.
-STAGE_ON_LOCAL=0
-if [[ -n "${L_SCRATCH:-}" ]]; then
-  COMPOSITE_BYTES=$(stat -c%s "$COMPOSITE")
-  AVAIL_BYTES=$(df --output=avail -B1 "$L_SCRATCH" 2>/dev/null | tail -1)
-  if [[ -n "$AVAIL_BYTES" ]] && (( COMPOSITE_BYTES < AVAIL_BYTES * 8 / 10 )); then
-    STAGE_ON_LOCAL=1
-  fi
-fi
-
-if [[ "$STAGE_ON_LOCAL" == 1 ]]; then
-  STAGE_DIR="$L_SCRATCH/oe_${STATE}_${YEAR}"
-else
-  STAGE_DIR="$SCRATCH/embeddings-health/staging/${SLURM_JOB_ID:-manual}_${TASK_ID}"
-fi
-
-INPUT_STAGE="$STAGE_DIR/input"
-
-# Checkpoint and final output on $SCRATCH so they survive preemption/timeout
 CKPT_DIR="$SCRATCH/embeddings-health/checkpoints/olmoearth/$STATE"
 FINAL_DIR="$FINAL_OUT_DIR/$STATE"
 
 PREEMPTED=0
-
-cleanup_stage() {
-  if [[ -n "${L_SCRATCH:-}" && "$STAGE_DIR" == "$L_SCRATCH/"* ]] || \
-     [[ -n "${SCRATCH:-}" && "$STAGE_DIR" == "$SCRATCH/embeddings-health/staging/"* ]]; then
-    rm -rf "$STAGE_DIR" || true
-  else
-    echo "Refusing to remove unexpected staging path: $STAGE_DIR" >&2
-  fi
-}
-
-cleanup_success() {
-  cleanup_stage
-  rm -rf "$CKPT_DIR" || true
-}
-
 CHILD_PID=""
 
-# Slurm's --signal=B:TERM@600 delivers this 10 minutes before the hard time
-# limit. Forward it to the embed.py child and give it up to 30s to exit
-# gracefully (it may write a final checkpoint) before force-killing, so the
-# remaining buffer is available for cleanup_stage() instead of being eaten by
-# a GPU process that doesn't respond promptly to SIGTERM. Without this, Slurm's
-# eventual SIGKILL hits the whole process group at once and no trap ever runs.
 handle_preempt() {
   PREEMPTED=1
   echo "Job preempted or timed out — checkpoint preserved at: $CKPT_DIR" >&2
@@ -112,18 +81,16 @@ handle_preempt() {
 preserve_failure() {
   status=$?
   if [[ "$PREEMPTED" == 1 ]]; then
-    cleanup_stage
     exit 0
   fi
   echo "ERROR: task failed with status $status — partial outputs in $CKPT_DIR" >&2
-  cleanup_stage
   exit "$status"
 }
 
 trap handle_preempt TERM
 trap preserve_failure ERR
 
-mkdir -p "$INPUT_STAGE" "$CKPT_DIR" "$FINAL_DIR" "$CACHE_ROOT"
+mkdir -p "$CKPT_DIR" "$FINAL_DIR" "$CACHE_ROOT"
 
 export UV_CACHE_DIR="$CACHE_ROOT/uv"
 export UV_DATA_DIR="$CACHE_ROOT/uv-data"
@@ -140,52 +107,37 @@ if command -v module >/dev/null 2>&1; then
 fi
 export CC="$(command -v gcc)" CXX="$(command -v g++)"
 
-echo "gcc: $(command -v gcc || true)"
-gcc --version | head -n 1 || true
-
 if ! command -v uv >/dev/null 2>&1; then
   UV_INSTALL_DIR="${UV_INSTALL_DIR:-$CACHE_ROOT/uv-bin}"
   mkdir -p "$UV_INSTALL_DIR"
   if [[ -x "$UV_INSTALL_DIR/uv" ]]; then
     export PATH="$UV_INSTALL_DIR:$PATH"
   else
-    echo "uv is not available on PATH; installing uv into $UV_INSTALL_DIR"
+    echo "Installing uv into $UV_INSTALL_DIR"
     curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_INSTALL_DIR" sh
     export PATH="$UV_INSTALL_DIR:$PATH"
   fi
 fi
 
-if ! command -v uv >/dev/null 2>&1; then
-  echo "ERROR: uv not available after module load/bootstrap." >&2
-  exit 1
-fi
-
 echo "uv: $(command -v uv)"
 uv --version
 
-# Bootstrap the venv (creates it on first use, no-ops if already current).
-# Must run before any direct reference to $UV_PROJECT_ENVIRONMENT/bin/*.
 (cd "$EMBED_DIR" && uv sync --python 3.11 2>&1 | tail -5)
 
-# Install olmoearth_pretrain if not already present in this node's venv.
-# It is excluded from pyproject.toml because its metadata pins torch>=2.7,
-# which conflicts with Sherlock's manylinux baseline. Installing with --no-deps
-# bypasses that metadata check; the library works fine with torch<2.7 at runtime.
+# olmoearth_pretrain is excluded from pyproject.toml because its metadata pins
+# torch>=2.7, which conflicts with Sherlock's manylinux baseline. --no-deps
+# bypasses that metadata check; the library works fine with torch<2.7 at
+# runtime.
 if ! "$UV_PROJECT_ENVIRONMENT/bin/python" -c "import olmoearth_pretrain" 2>/dev/null; then
   echo "Installing olmoearth_pretrain (--no-deps to skip torch>=2.7 metadata conflict)..."
   VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT" uv pip install --no-deps \
     git+https://github.com/allenai/olmoearth_pretrain
-  # Install the base runtime deps that --no-deps skipped; torch is already present.
   VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT" uv pip install \
     "einops>=0.7.0" "huggingface_hub" "numpy>=1.26.4" "universal-pathlib>=0.2.5"
   echo "olmoearth_pretrain installed."
 else
   echo "olmoearth_pretrain already present — skipping install."
 fi
-
-# Stage composite to fast local SSD
-cp "$COMPOSITE" "$INPUT_STAGE/"
-STAGED_COMPOSITE="$INPUT_STAGE/$(basename "$COMPOSITE")"
 
 SAFE_VARIANT="${VARIANT//[^A-Za-z0-9._-]/_}"
 OUTPUT_BASENAME="olmoearth_${SAFE_VARIANT}_${STATE}_${YEAR}"
@@ -203,13 +155,12 @@ if [[ -n "${FORCE_RESTART:-}" ]]; then
   FORCE_FLAG="--force"
 fi
 
-echo "=== OlmoEarth embedding task ==="
+echo "=== OlmoEarth Base embedding task ==="
 echo "State:      $STATE"
+echo "Tile:       $TILE_IDX / $NUM_TILES"
 echo "Year:       $YEAR"
 echo "Variant:    $VARIANT"
-echo "Task ID:    $TASK_ID"
 echo "Composite:  $COMPOSITE"
-echo "Stage dir:  $STAGE_DIR"
 echo "Ckpt dir:   $CKPT_DIR"
 echo "Final dir:  $FINAL_DIR"
 echo "Batch size: $BATCH_SIZE"
@@ -218,15 +169,13 @@ nvidia-smi || true
 
 cd "$EMBED_DIR"
 
-# Run in background and wait: bash's `wait` builtin returns as soon as a
-# trapped signal arrives, whereas a foreground command can block trap
-# execution until the child exits on its own. This is what lets
-# handle_preempt() run promptly on the --signal=B:TERM@600 warning.
 uv run --python 3.11 python embed.py \
   --model        olmoearth \
   --variant      "$VARIANT" \
-  --input        "$STAGED_COMPOSITE" \
+  --input        "$COMPOSITE" \
   --output       "$RAW_LOCAL" \
+  --tile-index   "$TILE_IDX" \
+  --num-tiles    "$NUM_TILES" \
   --year         "$YEAR" \
   --batch-size   "$BATCH_SIZE" \
   --checkpoint-every "${CHECKPOINT_EVERY:-25}" \
@@ -235,21 +184,24 @@ uv run --python 3.11 python embed.py \
 CHILD_PID=$!
 wait "$CHILD_PID"
 
-if [[ ! -s "$RAW_LOCAL" ]]; then
-  echo "ERROR: expected output missing or empty: $RAW_LOCAL" >&2
-  # exit (rather than a failing command) does not trigger the ERR trap, so
-  # clean up the staging copy explicitly here instead of relying on preserve_failure.
-  cleanup_stage
-  exit 1
+if (( NUM_TILES > 1 )); then
+  TILE_OUTPUT="$CKPT_DIR/${OUTPUT_BASENAME}_tile$(printf '%03d' "$TILE_IDX").tif"
+  if [[ ! -s "$TILE_OUTPUT" ]]; then
+    echo "ERROR: expected tile output missing or empty: $TILE_OUTPUT" >&2
+    exit 1
+  fi
+  trap - ERR TERM
+  echo "=== Done: $STATE tile $TILE_IDX/$NUM_TILES ==="
+  ls -lh "$TILE_OUTPUT"
+else
+  if [[ ! -s "$RAW_LOCAL" ]]; then
+    echo "ERROR: expected output missing or empty: $RAW_LOCAL" >&2
+    exit 1
+  fi
+  mv -f "$RAW_LOCAL" "$FINAL_DIR/"
+  MMAP_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.ckpt.mmap"
+  [[ -f "$MMAP_LOCAL" ]] && rm -f "$MMAP_LOCAL" || true
+  trap - ERR TERM
+  echo "=== Done ==="
+  echo "Output: $FINAL_DIR/${OUTPUT_BASENAME}.tif"
 fi
-
-mv -f "$RAW_LOCAL" "$FINAL_DIR/"
-# Also move memmap file if present (written by embed.py for large states)
-MMAP_LOCAL="$CKPT_DIR/${OUTPUT_BASENAME}.ckpt.mmap"
-[[ -f "$MMAP_LOCAL" ]] && rm -f "$MMAP_LOCAL" || true
-
-trap - ERR TERM
-cleanup_success
-
-echo "=== Done ==="
-echo "Output: $FINAL_DIR/${OUTPUT_BASENAME}.tif"
