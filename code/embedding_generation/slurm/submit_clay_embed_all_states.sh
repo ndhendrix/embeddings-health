@@ -1,10 +1,8 @@
 #!/bin/bash
-# Submit Clay v1.5 embedding inference for all states with a complete composite.
-# Safe to re-run — states with existing embedding TIFs are skipped.
-#
-# Clay uses 256×256 chips (vs 128×128 for OlmoEarth) so chip count is ~4×
-# lower, but the model is ViT-Large (24 layers) so per-chip time is longer.
-# Walltime tiers are calibrated accordingly.
+# Submit Clay v1.5 embedding inference for all states with a complete
+# composite, split into per-state tiles sized to a target chip count so
+# every tile finishes within the sbatch script's fixed walltime. Safe to
+# re-run — states/tiles with existing output are skipped.
 #
 # Usage:
 #   bash submit_clay_embed_all_states.sh
@@ -21,23 +19,20 @@ COMPOSITE_DIR="${COMPOSITE_DIR:-$SCRATCH/embeddings-health/olmoearth_composites}
 FINAL_OUT_DIR="${FINAL_OUT_DIR:-$SCRATCH/embeddings-health/clay_embeddings}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
 LOG_DIR="${LOG_DIR:-$SCRATCH/embeddings-health/logs}"
-SCRIPT="$SCRIPT_DIR/run_clay_embed_state_array.sbatch"
-SBATCH_MEM="${SBATCH_MEM:-128G}"
+CKPT_ROOT="$SCRATCH/embeddings-health/checkpoints/clay"
+TILE_SCRIPT="$SCRIPT_DIR/run_clay_embed_state_array.sbatch"
+MERGE_SCRIPT="$SCRIPT_DIR/run_clay_embed_merge.sbatch"
 
-# Clay chip size: 256×256 px.  Chip count is roughly (W/256)*(H/256).
+# Clay chip size: 256×256 px.
 CHIP_SIZE=256
 
-# Walltime tiers calibrated for Clay ViT-Large at 256-px chip size.
-# ~4× fewer chips than OlmoEarth Base, but per-chip latency is higher.
-chips_to_walltime() {
-  local chips="$1"
-  if   (( chips == 0 ));       then echo "04:00:00"  # gdalinfo unavailable — be safe
-  elif (( chips <= 1250 ));    then echo "01:00:00"  # tiny states (DC, RI, DE)
-  elif (( chips <= 12500 ));   then echo "02:00:00"  # small-medium states
-  elif (( chips <= 50000 ));   then echo "04:00:00"  # large states
-  else                              echo "06:00:00"  # very large (TX, CA, MT)
-  fi
-}
+# Target chip count per tile — placeholder pending real measurement (Clay's
+# throughput hasn't been benchmarked the way Base/Nano have; validate via
+# srun per Task 9 Step 7 of the embed-tiling plan and adjust if a tile runs
+# close to the 4-hour walltime).
+TARGET_CHIPS_PER_TILE="${TARGET_CHIPS_PER_TILE:-20000}"
+
+TASK_FILE="$SCRATCH/embeddings-health/cache/clay_tile_tasks_${YEAR}.txt"
 
 LOADED_GDAL=0
 if command -v module >/dev/null 2>&1 && ! command -v gdalinfo >/dev/null 2>&1; then
@@ -60,7 +55,18 @@ get_chips() {
   echo $(( w_chips * h_chips ))
 }
 
-# Discover states with a composite but without a complete Clay embedding.
+get_h_chips() {
+  local tif="$1"
+  if ! command -v gdalinfo >/dev/null 2>&1; then
+    echo "1"; return
+  fi
+  local size_line height
+  size_line=$(gdalinfo "$tif" 2>/dev/null | grep "^Size is" || true)
+  if [[ -z "$size_line" ]]; then echo "1"; return; fi
+  height=$(echo "$size_line" | sed 's/Size is //' | cut -d',' -f2 | tr -d ' ')
+  echo $(( (height + CHIP_SIZE - 1) / CHIP_SIZE ))
+}
+
 STATES=()
 while IFS= read -r state; do
   STATES+=("$state")
@@ -77,85 +83,137 @@ if (( ${#STATES[@]} == 0 )); then
   exit 1
 fi
 
-declare -A TIER_TASKS
-declare -A TIER_STATES
+MERGE_STATES=()
+MERGE_NUM_TILES=()
+> "$TASK_FILE"
 
-for i in "${!STATES[@]}"; do
-  STATE="${STATES[$i]}"
+total_tiles=0
+skipped_states=0
+
+for STATE in "${STATES[@]}"; do
   FINAL_TIF="$FINAL_OUT_DIR/$STATE/clay_v1.5_${STATE}_${YEAR}.tif"
   if [[ -s "$FINAL_TIF" ]]; then
-    continue  # already done
+    (( skipped_states++ )) || true
+    continue
   fi
+
   COMPOSITE="$COMPOSITE_DIR/s2_annual_${STATE}_${YEAR}_olmoearth.tif"
   CHIPS=$(get_chips "$COMPOSITE")
-  WALLTIME=$(chips_to_walltime "$CHIPS")
-  TIER_TASKS["$WALLTIME"]+=" $i"
-  TIER_STATES["$WALLTIME"]+=" $STATE"
+  H_CHIPS=$(get_h_chips "$COMPOSITE")
+
+  if (( CHIPS == 0 )); then
+    NUM_TILES=1
+  else
+    NUM_TILES=$(( (CHIPS + TARGET_CHIPS_PER_TILE - 1) / TARGET_CHIPS_PER_TILE ))
+    (( NUM_TILES < 1 )) && NUM_TILES=1
+    (( NUM_TILES > H_CHIPS )) && NUM_TILES=$H_CHIPS
+  fi
+
+  if (( NUM_TILES > 1 )); then
+    MERGE_STATES+=("$STATE")
+    MERGE_NUM_TILES+=("$NUM_TILES")
+  fi
+
+  CKPT_DIR="$CKPT_ROOT/$STATE"
+  OUTPUT_BASENAME="clay_v1.5_${STATE}_${YEAR}"
+
+  for (( idx=0; idx<NUM_TILES; idx++ )); do
+    if (( NUM_TILES > 1 )); then
+      tile_path="$CKPT_DIR/${OUTPUT_BASENAME}_tile$(printf '%03d' "$idx").tif"
+      [[ -s "$tile_path" ]] && continue
+    fi
+    echo "$STATE $idx $NUM_TILES" >> "$TASK_FILE"
+    (( total_tiles++ )) || true
+  done
 done
 
 if (( LOADED_GDAL )); then
   module unload gdal/3.10.2 2>/dev/null || true
 fi
 
-NUM_STATES="${#STATES[@]}"
-NUM_INCOMPLETE=0
-for wt in "${!TIER_TASKS[@]}"; do
-  read -ra _ids <<< "${TIER_TASKS[$wt]}"
-  NUM_INCOMPLETE=$(( NUM_INCOMPLETE + ${#_ids[@]} ))
-done
-NUM_COMPLETE=$(( NUM_STATES - NUM_INCOMPLETE ))
-
-STATE_LIST=$(IFS=:; echo "${STATES[*]}")
-
-echo "Repo:        $REPO_DIR"
-echo "Composites:  $COMPOSITE_DIR"
-echo "Outputs:     $FINAL_OUT_DIR"
-echo "Year:        $YEAR"
-echo "Mem:         $SBATCH_MEM"
-echo "Complete:    $NUM_COMPLETE / $NUM_STATES"
+echo "Repo:          $REPO_DIR"
+echo "Composites:    $COMPOSITE_DIR"
+echo "Outputs:       $FINAL_OUT_DIR"
+echo "Year:          $YEAR"
+echo "Target chips/tile: $TARGET_CHIPS_PER_TILE"
+echo ""
+echo "States skipped (embedding exists): $skipped_states / ${#STATES[@]}"
+echo "States needing a merge job:        ${#MERGE_STATES[@]}"
+echo "Tile tasks to submit:              $total_tiles"
 echo ""
 
-if (( NUM_INCOMPLETE == 0 )); then
+if (( total_tiles == 0 && ${#MERGE_STATES[@]} == 0 )); then
   echo "All Clay v1.5 embeddings complete. Nothing to submit."
   exit 0
 fi
 
-echo "Walltime tiers:"
-for wt in $(echo "${!TIER_TASKS[@]}" | tr ' ' '\n' | sort); do
-  read -ra _ids <<< "${TIER_TASKS[$wt]}"
-  printf "  %-12s  %3d tasks   states:%s\n" "$wt" "${#_ids[@]}" "${TIER_STATES[$wt]:-}"
-done
-
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
-  echo ""
   echo "DRY_RUN=1; not submitting."
+  echo ""
+  echo "First 10 tasks in $TASK_FILE:"
+  head -10 "$TASK_FILE"
   exit 0
 fi
 
 mkdir -p "$LOG_DIR" "$FINAL_OUT_DIR"
-export REPO_DIR COMPOSITE_DIR FINAL_OUT_DIR CACHE_ROOT YEAR STATE_LIST
+export REPO_DIR COMPOSITE_DIR FINAL_OUT_DIR CACHE_ROOT YEAR
 
-JOB_IDS=()
-for wt in "${!TIER_TASKS[@]}"; do
-  read -ra _ids <<< "${TIER_TASKS[$wt]}"
-  TASK_ARRAY=$(IFS=,; echo "${_ids[*]}")
-  JOB_ID=$(cd "$REPO_DIR" && sbatch \
+MAX_ARRAY=1000
+TILE_JOB_IDS=()
+if (( total_tiles > 0 )); then
+  batch=0
+  offset=0
+  while (( offset < total_tiles )); do
+    end=$(( offset + MAX_ARRAY - 1 ))
+    (( end >= total_tiles )) && end=$(( total_tiles - 1 ))
+    count=$(( end - offset + 1 ))
+
+    batch_file="${TASK_FILE%.txt}_batch${batch}.txt"
+    sed -n "$((offset + 1)),$((end + 1))p" "$TASK_FILE" > "$batch_file"
+
+    export TILE_TASK_FILE="$batch_file"
+    JOB_ID=$(cd "$REPO_DIR" && sbatch \
+      --export=ALL \
+      --array="0-$(( count - 1 ))%200" \
+      --output="$LOG_DIR/clay_embed_%A_%a.out" \
+      --error="$LOG_DIR/clay_embed_%A_%a.err" \
+      --parsable \
+      "$TILE_SCRIPT" | cut -d';' -f1)
+    echo "Submitted tile batch $batch: job $JOB_ID  ($count tasks, ≤200 concurrent)"
+    TILE_JOB_IDS+=("$JOB_ID")
+    (( batch++ )) || true
+    (( offset += MAX_ARRAY )) || true
+  done
+fi
+TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]}")
+
+if (( ${#MERGE_STATES[@]} > 0 )); then
+  MERGE_STATE_LIST=$(IFS=:; echo "${MERGE_STATES[*]}")
+  MERGE_NUM_TILES_LIST=$(IFS=:; echo "${MERGE_NUM_TILES[*]}")
+  MERGE_LAST_IDX=$(( ${#MERGE_STATES[@]} - 1 ))
+
+  MERGE_DEP=""
+  [[ -n "$TILE_JOB_ID" ]] && MERGE_DEP="--dependency=afterany:${TILE_JOB_ID}"
+
+  export STATE_LIST="$MERGE_STATE_LIST"
+  export NUM_TILES_LIST="$MERGE_NUM_TILES_LIST"
+  MERGE_JOB_ID=$(cd "$REPO_DIR" && sbatch \
     --export=ALL \
-    --time="$wt" \
-    --mem="$SBATCH_MEM" \
-    --array="$TASK_ARRAY" \
-    --output="$LOG_DIR/clay_embed_%A_%a.out" \
-    --error="$LOG_DIR/clay_embed_%A_%a.err" \
+    $MERGE_DEP \
+    --array="0-${MERGE_LAST_IDX}" \
+    --output="$LOG_DIR/clay_merge_%A_%a.out" \
+    --error="$LOG_DIR/clay_merge_%A_%a.err" \
     --parsable \
-    "$SCRIPT" | cut -d';' -f1)
-  echo "Submitted job $JOB_ID  time=$wt  ${#_ids[@]} tasks"
-  JOB_IDS+=("$JOB_ID")
-done
+    "$MERGE_SCRIPT" | cut -d';' -f1)
+  echo "Submitted merge array job  $MERGE_JOB_ID  (${#MERGE_STATES[@]} states)"
+  [[ -n "$TILE_JOB_ID" ]] && echo "  → depends on tile job $TILE_JOB_ID"
+fi
 
-DEPENDENCY="afterany:$(IFS=:; echo "${JOB_IDS[*]}")"
+ALL_DEPS="${TILE_JOB_ID}"
+[[ -n "${MERGE_JOB_ID:-}" ]] && ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
 SELF="$(realpath "${BASH_SOURCE[0]}")"
 RESUBMIT_ID=$(sbatch \
-  --dependency="$DEPENDENCY" \
+  --dependency="afterany:${ALL_DEPS}" \
   --job-name=clay-embed-resubmit \
   --partition=normal \
   --time=00:10:00 \
@@ -166,4 +224,4 @@ RESUBMIT_ID=$(sbatch \
   --export=ALL \
   --parsable \
   --wrap="bash '$SELF'" | cut -d';' -f1)
-echo "Resubmit job $RESUBMIT_ID scheduled after all tiers (cancel with: scancel $RESUBMIT_ID)"
+echo "Resubmit job $RESUBMIT_ID scheduled after tiles+merge (cancel with: scancel $RESUBMIT_ID)"
