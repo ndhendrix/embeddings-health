@@ -119,6 +119,15 @@ STATE_BBOXES: dict[str, tuple[float, float, float, float]] = {
 }
 
 
+def resolve_state_bbox(state: str, bbox_override: list[float] | None) -> tuple[float, float, float, float]:
+    """Resolve the WGS84 bbox for a --state/--bbox pair of CLI args."""
+    if bbox_override:
+        return tuple(bbox_override)
+    if state in STATE_BBOXES:
+        return STATE_BBOXES[state]
+    raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
+
+
 def bbox_to_utm_epsg(bbox: tuple[float, float, float, float]) -> str:
     """Return the UTM EPSG code for the bbox midpoint (northern hemisphere)."""
     lon_mid = (bbox[0] + bbox[2]) / 2
@@ -520,15 +529,28 @@ def main() -> None:
     parser.add_argument("--merge-only", action="store_true",
                         help="Skip downloading; merge existing tile TIFs into the final "
                              "output. Exits with a warning if any tiles are still missing.")
+    parser.add_argument("--print-tile-count", action="store_true",
+                        help="Print the true tile count for --state/--bbox at --max-tile-km "
+                             "and exit — no network access, no output written. Lets callers "
+                             "(e.g. job-submission scripts) plan the exact number of tile "
+                             "tasks without re-deriving it from an area estimate or by "
+                             "scraping prior run logs, both of which drift out of sync with "
+                             "split_bbox_into_tiles() whenever the tiling logic changes.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/composites"))
     args = parser.parse_args()
-
-    # --merge-only reads only from disk; skip the network round-trip to Element84.
-    client = None if args.merge_only else pystac_client.Client.open(STAC_ENDPOINT)
 
     # Per-model resolution defaults: OlmoEarth=10m (native S2), Prithvi=30m (S2 resampled)
     resolution = args.resolution or (10 if args.model == "olmoearth" else 30)
     max_scenes = None if args.max_scenes_per_month == 0 else args.max_scenes_per_month
+
+    if args.print_tile_count:
+        bbox = resolve_state_bbox(args.state or "RI", args.bbox)
+        crs = bbox_to_utm_epsg(bbox)
+        print(len(split_bbox_into_tiles(bbox, crs, args.max_tile_km)))
+        return
+
+    # --merge-only reads only from disk; skip the network round-trip to Element84.
+    client = None if args.merge_only else pystac_client.Client.open(STAC_ENDPOINT)
 
     if args.all_states:
         states = list(STATE_BBOXES.items())
@@ -544,12 +566,7 @@ def main() -> None:
         print("\nAll states complete.")
     else:
         state = args.state or "RI"
-        if args.bbox:
-            bbox = tuple(args.bbox)
-        elif state in STATE_BBOXES:
-            bbox = STATE_BBOXES[state]
-        else:
-            raise SystemExit(f"State '{state}' not in STATE_BBOXES. Use --bbox W S E N.")
+        bbox = resolve_state_bbox(state, args.bbox)
         process_state(client, state, bbox, args.model, args.year,
                       resolution, args.output_dir,
                       args.max_cloud_cover, args.max_tile_km, max_scenes, args.force,

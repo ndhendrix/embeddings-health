@@ -29,20 +29,6 @@ MERGE_SCRIPT="$SCRIPT_DIR/run_olmoearth_composite_merge.sbatch"
 # Task list file written to SCRATCH so compute nodes can read it.
 TASK_FILE="$SCRATCH/embeddings-health/cache/oe_tile_tasks_${YEAR}.txt"
 
-# Land area for tile-count estimation (needed to enumerate expected tiles)
-declare -A STATE_AREA_KM2=(
-  [AL]=131426 [AZ]=294207 [AR]=134771 [CA]=403466 [CO]=268431
-  [CT]=12542  [DC]=159    [DE]=5047   [FL]=138887 [GA]=148959
-  [ID]=214045 [IL]=143793 [IN]=92789  [IA]=144701 [KS]=211754
-  [KY]=102269 [LA]=111898 [ME]=79884  [MD]=25142  [MA]=20202
-  [MI]=146435 [MN]=206232 [MS]=121531 [MO]=178040 [MT]=376962
-  [NE]=198974 [NV]=284332 [NH]=23187  [NJ]=19047  [NM]=314161
-  [NY]=122057 [NC]=125920 [ND]=178711 [OH]=105829 [OK]=177847
-  [OR]=248608 [PA]=115883 [RI]=2678   [SC]=77857  [SD]=196350
-  [TN]=106798 [TX]=676587 [UT]=212818 [VT]=23871  [VA]=102279
-  [WA]=172119 [WV]=62259  [WI]=140268 [WY]=251470
-)
-
 ALL_STATES=(
   AL AR AZ CA CO CT DC DE FL GA IA ID IL IN KS KY LA MA MD ME
   MI MN MO MS MT NC ND NE NH NJ NM NV NY OH OK OR PA RI SC SD
@@ -51,26 +37,36 @@ ALL_STATES=(
 
 mkdir -p "$OUT_DIR" "$LOG_DIR" "$(dirname "$TASK_FILE")"
 
+# This script also runs at the tail of the resubmit chain via
+# `sbatch --wrap="bash $SELF"` (see below), which starts in a clean batch
+# environment — unlike an interactive login shell, `devel`/`uv` are not
+# pre-loaded there (see slurm/README.md, "Login shell vs. batch job
+# environment"). get_tile_count() below needs `uv` either way, so set up the
+# same bootstrapping the tile/merge jobs use.
+export UV_CACHE_DIR="$CACHE_ROOT/uv"
+export UV_DATA_DIR="$CACHE_ROOT/uv-data"
+export UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-$(hostname -s)"
+if command -v module >/dev/null 2>&1; then
+  module load devel
+  module load gcc/14.2.0
+fi
+export CC="$(command -v gcc || true)" CXX="$(command -v g++ || true)"
+if ! command -v uv >/dev/null 2>&1; then
+  UV_INSTALL_DIR="${UV_INSTALL_DIR:-$CACHE_ROOT/uv-bin}"
+  [[ -x "$UV_INSTALL_DIR/uv" ]] && export PATH="$UV_INSTALL_DIR:$PATH" || { echo "ERROR: uv not found." >&2; exit 1; }
+fi
+
 # ------------------------------------------------------------------
-# Load GDAL to read tile counts from existing log files, or fall back
-# to a Python-based tile count.  We use composite.py itself to report
-# the tile count (dry parse of bbox + split_bbox_into_tiles).
+# Ask composite.py for the true tile count directly (--print-tile-count runs
+# split_bbox_into_tiles() with no network access and exits immediately). This
+# is the same tiling logic the tile and merge jobs use, so the submit script
+# can never drift out of sync with it — no area-based estimate, no scraping
+# prior run logs for a banner line whose format can change independently.
 # ------------------------------------------------------------------
 get_tile_count() {
   local state="$1"
-  # Read the tile count from the most recent composite log for this state.
-  # Logs print: "State: XX  Year: 2022  ...  N tiles"
-  local logfile
-  logfile=$(ls -t "$LOG_DIR"/oe_composite_*_*.out "$LOG_DIR"/oe_tile_*_*.out 2>/dev/null \
-    | xargs grep -l "^State:      $state$" 2>/dev/null | head -1 || true)
-  if [[ -n "$logfile" ]]; then
-    local count
-    count=$(grep "tiles$" "$logfile" 2>/dev/null | grep -oE "[0-9]+ tiles$" | awk '{print $1}' | tail -1)
-    [[ -n "$count" ]] && echo "$count" && return
-  fi
-  # Fallback: single tile for small states, rough estimate otherwise
-  local area="${STATE_AREA_KM2[$state]:-100000}"
-  python3 -c "import math; print(max(1, math.ceil($area / 10000 * 1.3)))"
+  (cd "$REPO_DIR/code/embedding_generation" && uv run --python 3.11 python composite.py \
+    --state "$state" --max-tile-km 100 --print-tile-count)
 }
 
 # ------------------------------------------------------------------
