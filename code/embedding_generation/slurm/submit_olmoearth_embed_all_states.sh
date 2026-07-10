@@ -174,7 +174,12 @@ MAX_ARRAY=1000
 # ceiling on its own. Cap how many tiles this invocation actually submits;
 # the resubmit chain re-scans real $SCRATCH state on its next run and picks
 # up whatever tiles are still missing, converging over several waves.
-MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-60}"
+#
+# Base is furthest behind (16% complete vs. Nano's 69% as of 2026-07-10), so
+# it gets a larger share of the shared ~100-job quota than Nano. See the
+# matching comment in submit_olmoearth_nano_embed_all_states.sh — the three
+# pipelines' caps (Base 40 / Clay 40 / Nano 15) are sized together.
+MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-40}"
 SUBMIT_COUNT=$(( total_tiles < MAX_SUBMIT_PER_RUN ? total_tiles : MAX_SUBMIT_PER_RUN ))
 if (( SUBMIT_COUNT < total_tiles )); then
   echo "NOTE: only submitting $SUBMIT_COUNT/$total_tiles tile tasks this run" \
