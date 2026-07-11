@@ -222,7 +222,11 @@ if (( SUBMIT_COUNT > 0 )); then
     (( offset += MAX_ARRAY )) || true
   done
 fi
-TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]}")
+# ${arr[*]:-} (not ${arr[*]}) — Sherlock's default bash predates 4.4 and
+# treats a zero-element array as unset under `set -u`, so an unguarded
+# expansion here crashes with "unbound variable" whenever a cycle submits
+# no new tile tasks (e.g. all tiles done, only a merge still pending).
+TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]:-}")
 
 # ------------------------------------------------------------------
 # Submit merge array — one task per multi-tile state, after tile jobs finish.
@@ -253,8 +257,18 @@ fi
 # Resubmit chain: after tiles+merge complete, re-run this script to pick up
 # any tiles that failed/timed out and need a retry.
 # ------------------------------------------------------------------
+# Built as only-the-non-empty-parts, joined by ':' — TILE_JOB_ID is now
+# legitimately empty when a cycle submits no new tile tasks (see the
+# TILE_JOB_IDS[*]:- fix above), and naively prepending it would leave a
+# leading ':' that sbatch --dependency rejects as malformed.
 ALL_DEPS="${TILE_JOB_ID}"
-[[ -n "${MERGE_JOB_ID:-}" ]] && ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
+if [[ -n "${MERGE_JOB_ID:-}" ]]; then
+  if [[ -n "$ALL_DEPS" ]]; then
+    ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
+  else
+    ALL_DEPS="${MERGE_JOB_ID}"
+  fi
+fi
 SELF="$(realpath "${BASH_SOURCE[0]}")"
 RESUBMIT_ID=$(sbatch \
   --dependency="afterany:${ALL_DEPS}" \
