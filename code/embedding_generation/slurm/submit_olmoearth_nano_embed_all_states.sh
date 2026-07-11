@@ -184,11 +184,13 @@ MAX_ARRAY=1000
 # the resubmit chain re-scans real $SCRATCH state on its next run and picks
 # up whatever tiles are still missing, converging over several waves.
 #
-# Nano is already furthest along (69% complete vs. Base's 16% and Clay's 27%
-# as of 2026-07-10), so it gets a smaller share of the shared ~100-job quota
-# — just enough to keep trickling its remaining states forward while Base
-# and Clay (40 each) get the bulk of the throughput to catch up. Rebalance
-# all three together if these percentages change materially.
+# Nano is already furthest along (71% complete vs. Base's 16% and Clay's 27%
+# as of 2026-07-11), so it gets the smallest share of the shared ~100-job
+# quota — just enough to keep trickling its remaining states forward while
+# Base (45) and Clay (40) get the bulk of the throughput to catch up, sized
+# proportional to each pipeline's remaining state count (41/36/14 of 49
+# total; sums to the full ~100-job quota now that composite work is nearly
+# done). Rebalance all three together if these percentages change materially.
 MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-15}"
 SUBMIT_COUNT=$(( total_tiles < MAX_SUBMIT_PER_RUN ? total_tiles : MAX_SUBMIT_PER_RUN ))
 if (( SUBMIT_COUNT < total_tiles )); then

@@ -168,10 +168,14 @@ MAX_ARRAY=1000
 # the resubmit chain re-scans real $SCRATCH state on its next run and picks
 # up whatever tiles are still missing, converging over several waves.
 #
-# Clay is well behind (27% complete vs. Nano's 69% as of 2026-07-10), so it
-# gets a larger share of the shared ~100-job quota than Nano. See the
-# matching comment in submit_olmoearth_nano_embed_all_states.sh — the three
-# pipelines' caps (Base 40 / Clay 40 / Nano 15) are sized together.
+# Clay is well behind (27% complete vs. Base's 16% and Nano's 71% as of
+# 2026-07-11), so it gets a larger share of the shared ~100-job quota than
+# Nano, sized proportional to each pipeline's remaining state count
+# (41/36/14 of 49 total). See the matching comment in
+# submit_olmoearth_nano_embed_all_states.sh — the three pipelines' caps
+# (Base 45 / Clay 40 / Nano 15) are sized together and sum to the full
+# ~100-job quota (composite work is nearly done, so it no longer needs a
+# meaningful share).
 MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-40}"
 SUBMIT_COUNT=$(( total_tiles < MAX_SUBMIT_PER_RUN ? total_tiles : MAX_SUBMIT_PER_RUN ))
 if (( SUBMIT_COUNT < total_tiles )); then
