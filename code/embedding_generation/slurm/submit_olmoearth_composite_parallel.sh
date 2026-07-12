@@ -168,7 +168,11 @@ if (( total_tiles > 0 )); then
     (( offset += MAX_ARRAY )) || true
   done
 fi
-TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]}")
+# ${arr[*]:-} (not ${arr[*]}) — Sherlock's default bash predates 4.4 and
+# treats a zero-element array as unset under `set -u`, so an unguarded
+# expansion here crashes with "unbound variable" whenever a cycle submits
+# no new tile tasks (e.g. all tiles done, only a merge still pending).
+TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]:-}")
 
 # ------------------------------------------------------------------
 # Submit merge array — one task per state, after all tile jobs finish

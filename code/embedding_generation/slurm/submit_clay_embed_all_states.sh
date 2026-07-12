@@ -167,7 +167,16 @@ MAX_ARRAY=1000
 # ceiling on its own. Cap how many tiles this invocation actually submits;
 # the resubmit chain re-scans real $SCRATCH state on its next run and picks
 # up whatever tiles are still missing, converging over several waves.
-MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-60}"
+#
+# Clay is well behind (27% complete vs. Base's 16% and Nano's 71% as of
+# 2026-07-11), so it gets a larger share of the shared ~100-job quota than
+# Nano, sized proportional to each pipeline's remaining state count
+# (41/36/14 of 49 total). See the matching comment in
+# submit_olmoearth_nano_embed_all_states.sh — the three pipelines' caps
+# (Base 45 / Clay 40 / Nano 15) are sized together and sum to the full
+# ~100-job quota (composite work is nearly done, so it no longer needs a
+# meaningful share).
+MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-40}"
 SUBMIT_COUNT=$(( total_tiles < MAX_SUBMIT_PER_RUN ? total_tiles : MAX_SUBMIT_PER_RUN ))
 if (( SUBMIT_COUNT < total_tiles )); then
   echo "NOTE: only submitting $SUBMIT_COUNT/$total_tiles tile tasks this run" \
@@ -200,7 +209,11 @@ if (( SUBMIT_COUNT > 0 )); then
     (( offset += MAX_ARRAY )) || true
   done
 fi
-TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]}")
+# ${arr[*]:-} (not ${arr[*]}) — Sherlock's default bash predates 4.4 and
+# treats a zero-element array as unset under `set -u`, so an unguarded
+# expansion here crashes with "unbound variable" whenever a cycle submits
+# no new tile tasks (e.g. all tiles done, only a merge still pending).
+TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]:-}")
 
 if (( ${#MERGE_STATES[@]} > 0 )); then
   MERGE_STATE_LIST=$(IFS=:; echo "${MERGE_STATES[*]}")
@@ -224,8 +237,18 @@ if (( ${#MERGE_STATES[@]} > 0 )); then
   [[ -n "$TILE_JOB_ID" ]] && echo "  → depends on tile job $TILE_JOB_ID"
 fi
 
+# Built as only-the-non-empty-parts, joined by ':' — TILE_JOB_ID is now
+# legitimately empty when a cycle submits no new tile tasks (see the
+# TILE_JOB_IDS[*]:- fix above), and naively prepending it would leave a
+# leading ':' that sbatch --dependency rejects as malformed.
 ALL_DEPS="${TILE_JOB_ID}"
-[[ -n "${MERGE_JOB_ID:-}" ]] && ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
+if [[ -n "${MERGE_JOB_ID:-}" ]]; then
+  if [[ -n "$ALL_DEPS" ]]; then
+    ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
+  else
+    ALL_DEPS="${MERGE_JOB_ID}"
+  fi
+fi
 SELF="$(realpath "${BASH_SOURCE[0]}")"
 RESUBMIT_ID=$(sbatch \
   --dependency="afterany:${ALL_DEPS}" \
