@@ -184,14 +184,12 @@ MAX_ARRAY=1000
 # the resubmit chain re-scans real $SCRATCH state on its next run and picks
 # up whatever tiles are still missing, converging over several waves.
 #
-# Nano is already furthest along (71% complete vs. Base's 16% and Clay's 27%
-# as of 2026-07-11), so it gets the smallest share of the shared ~100-job
-# quota — just enough to keep trickling its remaining states forward while
-# Base (45) and Clay (40) get the bulk of the throughput to catch up, sized
-# proportional to each pipeline's remaining state count (41/36/14 of 49
-# total; sums to the full ~100-job quota now that composite work is nearly
-# done). Rebalance all three together if these percentages change materially.
-MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-15}"
+# Nano has only 12 states left (Clay is done with tiles/merge-only, Base
+# still has the bulk of the raw inference work as of 2026-07-13), so it gets
+# a minimal share of the shared ~100-job quota — just 6, enough to keep its
+# last states trickling forward while Base (90) gets the rest. Rebalance
+# again once Nano finishes entirely.
+MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-6}"
 SUBMIT_COUNT=$(( total_tiles < MAX_SUBMIT_PER_RUN ? total_tiles : MAX_SUBMIT_PER_RUN ))
 if (( SUBMIT_COUNT < total_tiles )); then
   echo "NOTE: only submitting $SUBMIT_COUNT/$total_tiles tile tasks this run" \
