@@ -4,7 +4,9 @@ Run: uv run --python 3.11 python tests/test_tile_merge.py
 """
 import shutil
 import tempfile
+import threading
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import rasterio
@@ -93,7 +95,73 @@ def test_merge_resumes_from_checkpoint():
         shutil.rmtree(tmp)
 
 
+def test_merge_checkpoint_is_appended_not_rewritten():
+    """Checkpoint updates should be O(1) appends, not full sorted rewrites per tile."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        tiles = []
+        for i in range(5):
+            t = tmp / f"emb_tile{i:03d}.tif"
+            make_tile(t, value=float(i + 1), top=100.0 - i * 40, left=0.0, width=4, height=4)
+            tiles.append(t)
+        out_path = tmp / "emb.tif"
+
+        full_rewrites = []
+        original_write_text = Path.write_text
+
+        def spying_write_text(self, *a, **kw):
+            if self.suffix == ".merge_ckpt":
+                full_rewrites.append(a[0] if a else kw.get("data"))
+            return original_write_text(self, *a, **kw)
+
+        with patch.object(Path, "write_text", spying_write_text):
+            merge_tiles(tiles, ["B01", "B02"], out_path)
+
+        assert len(full_rewrites) == 0, (
+            f"expected checkpoint to be appended incrementally (no Path.write_text calls), "
+            f"got {len(full_rewrites)} full rewrites: {full_rewrites}"
+        )
+
+        print("test_merge_checkpoint_is_appended_not_rewritten: PASS")
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_merge_reads_tiles_concurrently():
+    """Tile reads should happen via a thread pool, not one tile at a time."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        n = 3
+        tiles = []
+        for i in range(n):
+            t = tmp / f"emb_tile{i:03d}.tif"
+            make_tile(t, value=float(i + 1), top=100.0 - i * 40, left=0.0, width=4, height=4)
+            tiles.append(t)
+        out_path = tmp / "emb.tif"
+
+        # A Barrier only releases once `n` distinct threads are simultaneously
+        # blocked inside .read() -- sequential (single-threaded) reads can
+        # never satisfy that and will time out.
+        barrier = threading.Barrier(n, timeout=5)
+        original_read = rasterio.io.DatasetReader.read
+
+        def synced_read(self, *a, **kw):
+            barrier.wait()
+            return original_read(self, *a, **kw)
+
+        with patch.object(rasterio.io.DatasetReader, "read", synced_read):
+            merge_tiles(tiles, ["B01", "B02"], out_path)
+
+        assert out_path.exists(), "merged output was not written"
+
+        print("test_merge_reads_tiles_concurrently: PASS")
+    finally:
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     test_merge_reproduces_expected_mosaic()
     test_merge_resumes_from_checkpoint()
+    test_merge_checkpoint_is_appended_not_rewritten()
+    test_merge_reads_tiles_concurrently()
     print("ALL PASSED")
