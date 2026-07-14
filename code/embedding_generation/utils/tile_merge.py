@@ -7,19 +7,11 @@ Slurm timeout on a huge state) resumes instead of restarting.
 
 Used by composite.py (composite tiles) and embed.py (embedding tiles).
 """
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
 import rasterio
 import rasterio.windows
-
-_READ_WORKERS = 8
-
-
-def _read_bands(ds: rasterio.io.DatasetReader) -> list[np.ndarray]:
-    """Read every band of a tile into memory (runs on a worker thread)."""
-    return [ds.read(band_idx) for band_idx in range(1, ds.count + 1)]
 
 
 def merge_tiles(tile_paths: list[Path], band_names: list[str], out_path: Path) -> None:
@@ -62,44 +54,25 @@ def merge_tiles(tile_paths: list[Path], band_names: list[str], out_path: Path) -
         if not resuming:
             for i, band_name in enumerate(band_names, 1):
                 dst.set_band_description(i, band_name)
-        windows = {}
-        pending = []
         for idx, ds in enumerate(datasets):
             tile_key = str(tile_paths[idx])
             if tile_key in already_merged:
                 ds.close()
                 continue
-            windows[idx] = rasterio.windows.from_bounds(
+            window = rasterio.windows.from_bounds(
                 ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
                 transform=out_transform,
             ).round_offsets().round_lengths()
-            pending.append(idx)
-
-        # Reads (I/O-bound, one dataset per thread) run concurrently; writes into
-        # the single shared output dataset stay on this thread, in whatever order
-        # reads complete.
-        with ThreadPoolExecutor(max_workers=_READ_WORKERS) as pool, \
-                ckpt_path.open("a") as ckpt_file:
-            futures = {pool.submit(_read_bands, datasets[idx]): idx for idx in pending}
-            for future in as_completed(futures):
-                idx = futures[future]
-                ds = datasets[idx]
-                if write_error is not None:
-                    ds.close()
-                    continue
-                try:
-                    arrays = future.result()
-                    for band_idx, arr in enumerate(arrays, 1):
-                        dst.write(arr, indexes=band_idx, window=windows[idx])
-                except Exception as exc:
-                    write_error = exc
-                finally:
-                    ds.close()
-                if write_error is None:
-                    tile_key = str(tile_paths[idx])
-                    already_merged.add(tile_key)
-                    ckpt_file.write(tile_key + "\n")
-                    ckpt_file.flush()
+            try:
+                for band_idx in range(1, ds.count + 1):
+                    dst.write(ds.read(band_idx), indexes=band_idx, window=window)
+            except Exception as exc:
+                ds.close()
+                write_error = exc
+                break
+            ds.close()
+            already_merged.add(tile_key)
+            ckpt_path.write_text("\n".join(sorted(already_merged)))
 
     if write_error is not None:
         # The tmp file is likely corrupted (e.g. a block was partially written when
