@@ -20,6 +20,14 @@ def write_cog(
 ) -> None:
     """Write (C, H, W) float32 array to a tiled GeoTIFF, optionally with COG overviews.
 
+    Resumable via a `.cog_ckpt` sidecar recording the next unwritten row: the
+    strip-write loop has no per-chip checkpoint of its own (unlike inference),
+    so a Slurm walltime kill mid-write previously meant re-writing and
+    re-compressing the entire array from scratch on every retry -- for large,
+    high-band-count states this alone can exceed the walltime, an infinite
+    retry loop that never finishes. Resuming skips straight to the next
+    unwritten strip instead.
+
     Args:
         arr: (C, H, W) numpy array.
         transform: Affine geotransform.
@@ -50,12 +58,50 @@ def write_cog(
     # Materialising the full array at once OOMs on large states (LA: 137 GB,
     # TX: ~1 TB) because arr may be a disk-backed memmap.
     _STRIP_ROWS = 64
+    _BLOCK_ROWS = 512
+
+    # rasterio's DatasetWriter has no public flush() (checked: rasterio 1.3.11
+    # only exposes close()/closed) -- and strips are narrower than the file's
+    # own 512-row tile blocks, so GDAL holds several strips in its dirty block
+    # cache before a block is complete enough to write out. Checkpointing
+    # after every strip without forcing a real flush would let a kill leave
+    # the checkpoint claiming rows are safe when they're still only in GDAL's
+    # cache, silently corrupting the resumed output. Instead, close (which
+    # does force a full flush) and reopen every _BLOCK_ROWS -- infrequent
+    # enough to keep the close/reopen overhead negligible against a
+    # multi-hour write, and block-aligned so each flush lands on a clean
+    # boundary.
+    assert _BLOCK_ROWS % _STRIP_ROWS == 0
 
     # Write to a temporary in-memory file first, then copy as COG.
     # The copy step reorganises internal tiling and adds overviews.
     tmp_path = path.with_suffix(".tmp.tif")
-    try:
-        with rasterio.open(
+    ckpt_path = path.with_suffix(".cog_ckpt")
+
+    resuming = tmp_path.exists() and ckpt_path.exists()
+    resume_row = 0
+    dst = None
+    if resuming:
+        try:
+            resume_row = int(ckpt_path.read_text().strip())
+            reopened = rasterio.open(tmp_path, "r+")
+            if (reopened.height, reopened.width, reopened.count) == (height, width, n_bands):
+                dst = reopened
+            else:
+                reopened.close()
+        except Exception as exc:
+            # A prior run (e.g. killed mid-write) can leave a truncated/corrupt
+            # tmp file or an unparseable checkpoint. Without this, every retry
+            # re-hits the same failure forever instead of starting fresh.
+            print(f"      COG resume checkpoint unreadable ({exc}) — deleting and starting fresh")
+
+    if dst is not None:
+        print(f"      Resuming COG write: {resume_row}/{height} rows already written")
+    else:
+        tmp_path.unlink(missing_ok=True)
+        ckpt_path.unlink(missing_ok=True)
+        resume_row = 0
+        dst = rasterio.open(
             tmp_path,
             "w",
             driver="GTiff",
@@ -69,19 +115,47 @@ def write_cog(
             nodata=nodata,
             tiled=True,
             blockxsize=512,
-            blockysize=512,
+            blockysize=_BLOCK_ROWS,
             BIGTIFF="IF_SAFER",
             **_compression_options(compress),
-        ) as dst:
-            for row_start in range(0, height, _STRIP_ROWS):
-                row_end = min(row_start + _STRIP_ROWS, height)
-                strip = np.array(arr[:, row_start:row_end, :], dtype="float32")
-                win = rasterio.windows.Window(0, row_start, width, row_end - row_start)
-                dst.write(strip, window=win)
-            if band_names:
-                for i, name in enumerate(band_names, 1):
-                    dst.update_tags(i, name=name)
+        )
+        if band_names:
+            for i, name in enumerate(band_names, 1):
+                dst.update_tags(i, name=name)
 
+    write_error: Exception | None = None
+    last_ckpt_row = resume_row
+    try:
+        for row_start in range(resume_row, height, _STRIP_ROWS):
+            row_end = min(row_start + _STRIP_ROWS, height)
+            strip = np.array(arr[:, row_start:row_end, :], dtype="float32")
+            win = rasterio.windows.Window(0, row_start, width, row_end - row_start)
+            dst.write(strip, window=win)
+            if row_end - last_ckpt_row >= _BLOCK_ROWS or row_end == height:
+                dst.close()  # forces GDAL to flush its dirty block cache
+                ckpt_path.write_text(str(row_end))
+                last_ckpt_row = row_end
+                if row_end < height:
+                    dst = rasterio.open(tmp_path, "r+")
+    except Exception as exc:
+        write_error = exc
+    finally:
+        if dst is not None and not dst.closed:
+            dst.close()
+
+    if write_error is not None:
+        # The tmp file is likely corrupted (e.g. a block was partially written
+        # when a previous run was killed mid-write). Delete both so the next
+        # run starts fresh rather than hitting the same corrupt block again.
+        tmp_path.unlink(missing_ok=True)
+        ckpt_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"COG write failed — deleted corrupted tmp+checkpoint so next run starts fresh. "
+            f"Cause: {write_error}"
+        )
+
+    ckpt_path.unlink(missing_ok=True)
+    try:
         if overviews:
             _add_overviews_and_copy_as_cog(tmp_path, path, compress)
         else:
