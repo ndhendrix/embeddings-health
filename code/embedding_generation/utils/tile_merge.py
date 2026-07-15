@@ -41,11 +41,23 @@ def merge_tiles(tile_paths: list[Path], band_names: list[str], out_path: Path) -
     # Resume an interrupted merge if both tmp file and checkpoint exist.
     resuming = tmp_path.exists() and ckpt_path.exists()
     already_merged: set[str] = set()
+    dst_ctx = None
     if resuming:
-        already_merged = set(ckpt_path.read_text().splitlines())
+        try:
+            already_merged = set(ckpt_path.read_text().splitlines())
+            dst_ctx = rasterio.open(tmp_path, "r+")
+        except Exception as exc:
+            # A prior run (e.g. OOM-killed mid-write) can leave a truncated/corrupt
+            # tmp file that will never open. Without this, every retry re-hits the
+            # same open failure forever instead of starting a fresh merge.
+            print(f"      Resume checkpoint unreadable ({exc}) — deleting and starting fresh")
+            resuming = False
+            already_merged = set()
+
+    if dst_ctx is not None:
         print(f"      Resuming merge: {len(already_merged)}/{len(tile_paths)} tiles already written")
-        dst_ctx = rasterio.open(tmp_path, "r+")
     else:
+        tmp_path.unlink(missing_ok=True)
         ckpt_path.unlink(missing_ok=True)
         dst_ctx = rasterio.open(tmp_path, "w", **profile)
 
@@ -59,13 +71,27 @@ def merge_tiles(tile_paths: list[Path], band_names: list[str], out_path: Path) -
             if tile_key in already_merged:
                 ds.close()
                 continue
-            window = rasterio.windows.from_bounds(
+            tile_window = rasterio.windows.from_bounds(
                 ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top,
                 transform=out_transform,
             ).round_offsets().round_lengths()
             try:
-                for band_idx in range(1, ds.count + 1):
-                    dst.write(ds.read(band_idx), indexes=band_idx, window=window)
+                # Read one native block at a time (all bands together), not
+                # band-by-band. These embeddings run to hundreds of bands and
+                # are stored pixel-interleaved, so a block's bands are only
+                # ever decompressed together — reading band-by-band forces
+                # GDAL to re-decompress the same blocks once per band (its
+                # cache is far smaller than a tile's full decompressed size),
+                # which is what was driving merges past the 8h walltime.
+                for _, block_window in ds.block_windows(1):
+                    data = ds.read(window=block_window)
+                    dest_window = rasterio.windows.Window(
+                        col_off=tile_window.col_off + block_window.col_off,
+                        row_off=tile_window.row_off + block_window.row_off,
+                        width=block_window.width,
+                        height=block_window.height,
+                    )
+                    dst.write(data, window=dest_window)
             except Exception as exc:
                 ds.close()
                 write_error = exc

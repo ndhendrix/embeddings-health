@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=oe-merge
 #SBATCH -p normal
-#SBATCH -c 4
-#SBATCH --mem=64G
+#SBATCH -c 1
+#SBATCH --mem=8G
 #SBATCH --time=08:00:00
 #SBATCH --output=code/embedding_generation/slurm/logs/oe_merge_%A_%a.out
 #SBATCH --error=code/embedding_generation/slurm/logs/oe_merge_%A_%a.err

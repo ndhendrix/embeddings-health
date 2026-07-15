@@ -23,6 +23,39 @@ CKPT_ROOT="$SCRATCH/embeddings-health/checkpoints/clay"
 TILE_SCRIPT="$SCRIPT_DIR/run_clay_embed_state_array.sbatch"
 MERGE_SCRIPT="$SCRIPT_DIR/run_clay_embed_merge.sbatch"
 
+# Merge resource escalation: the merge sbatch defaults to a small --mem and
+# the standard 8h --time so most states (observed <1GB actual usage, and fast
+# once tile_merge.py reads whole blocks instead of band-by-band) don't force
+# Sherlock's normal-partition MaxMemPerCPU=8000 ratio into allocating far more
+# CPUs than the merge code needs. A handful of states may still OOM (a few
+# physically enormous ones, e.g. GA, CA) or still run past 8h even after the
+# block-read fix. Detect states whose merge task OOM'd or timed out in the
+# array this script submitted last cycle and force them onto a high-mem +
+# long-time tier from now on, persisted across resubmits in $CACHE_ROOT.
+mkdir -p "$CACHE_ROOT"
+HIGHMEM_STATES_FILE="$CACHE_ROOT/clay_merge_highmem_states.txt"
+LAST_MERGE_JOB_FILE="$CACHE_ROOT/clay_merge_last_job.txt"
+touch "$HIGHMEM_STATES_FILE"
+
+if [[ -s "$LAST_MERGE_JOB_FILE" ]]; then
+  IFS=: read -ra LAST_MERGE_JOB_IDS < "$LAST_MERGE_JOB_FILE"
+  for JOB_ID in "${LAST_MERGE_JOB_IDS[@]}"; do
+    [[ -z "$JOB_ID" ]] && continue
+    while IFS='|' read -r FULL_JOBID STATE_OUT; do
+      [[ -z "$FULL_JOBID" ]] && continue
+      LOG_OUT="$LOG_DIR/clay_merge_${FULL_JOBID}.out"
+      [[ -f "$LOG_OUT" ]] || continue
+      ESCALATE_STATE=$(grep -m1 "^State: " "$LOG_OUT" | awk '{print $2}')
+      [[ -z "$ESCALATE_STATE" ]] && continue
+      if ! grep -qxF "$ESCALATE_STATE" "$HIGHMEM_STATES_FILE"; then
+        echo "$ESCALATE_STATE" >> "$HIGHMEM_STATES_FILE"
+        echo "Merge $STATE_OUT detected for $ESCALATE_STATE (job $FULL_JOBID) -- escalating to high-mem/long-time tier for future merges"
+      fi
+    done < <(sacct -j "$JOB_ID" -X --noheader --parsable2 -o JobID,State,ExitCode 2>/dev/null | \
+      awk -F'|' '$2 ~ /^OUT_OF_ME/ || $2 == "TIMEOUT" || ($2 == "FAILED" && $3 ~ /:9$/) {print $1"|"$2}')
+  done
+fi
+
 # Clay chip size: 256×256 px.
 CHIP_SIZE=256
 
@@ -212,17 +245,35 @@ fi
 # no new tile tasks (e.g. all tiles done, only a merge still pending).
 TILE_JOB_ID=$(IFS=:; echo "${TILE_JOB_IDS[*]:-}")
 
-if (( ${#MERGE_STATES[@]} > 0 )); then
-  MERGE_STATE_LIST=$(IFS=:; echo "${MERGE_STATES[*]}")
-  MERGE_NUM_TILES_LIST=$(IFS=:; echo "${MERGE_NUM_TILES[*]}")
-  MERGE_LAST_IDX=$(( ${#MERGE_STATES[@]} - 1 ))
+# Split states needing a merge into the default tier and the escalated
+# tier (states that previously OOM'd or timed out — see detection block above).
+NORMAL_MERGE_STATES=()
+NORMAL_MERGE_NUM_TILES=()
+HIGH_MERGE_STATES=()
+HIGH_MERGE_NUM_TILES=()
+for i in "${!MERGE_STATES[@]}"; do
+  if grep -qxF "${MERGE_STATES[$i]}" "$HIGHMEM_STATES_FILE"; then
+    HIGH_MERGE_STATES+=("${MERGE_STATES[$i]}")
+    HIGH_MERGE_NUM_TILES+=("${MERGE_NUM_TILES[$i]}")
+  else
+    NORMAL_MERGE_STATES+=("${MERGE_STATES[$i]}")
+    NORMAL_MERGE_NUM_TILES+=("${MERGE_NUM_TILES[$i]}")
+  fi
+done
+
+MERGE_JOB_IDS=()
+
+if (( ${#NORMAL_MERGE_STATES[@]} > 0 )); then
+  MERGE_STATE_LIST=$(IFS=:; echo "${NORMAL_MERGE_STATES[*]}")
+  MERGE_NUM_TILES_LIST=$(IFS=:; echo "${NORMAL_MERGE_NUM_TILES[*]}")
+  MERGE_LAST_IDX=$(( ${#NORMAL_MERGE_STATES[@]} - 1 ))
 
   MERGE_DEP=""
   [[ -n "$TILE_JOB_ID" ]] && MERGE_DEP="--dependency=afterany:${TILE_JOB_ID}"
 
   export STATE_LIST="$MERGE_STATE_LIST"
   export NUM_TILES_LIST="$MERGE_NUM_TILES_LIST"
-  MERGE_JOB_ID=$(cd "$REPO_DIR" && sbatch \
+  JOB_ID=$(cd "$REPO_DIR" && sbatch \
     --export=ALL \
     $MERGE_DEP \
     --array="0-${MERGE_LAST_IDX}" \
@@ -230,22 +281,54 @@ if (( ${#MERGE_STATES[@]} > 0 )); then
     --error="$LOG_DIR/clay_merge_%A_%a.err" \
     --parsable \
     "$MERGE_SCRIPT" | cut -d';' -f1)
-  echo "Submitted merge array job  $MERGE_JOB_ID  (${#MERGE_STATES[@]} states)"
+  echo "Submitted merge array job  $JOB_ID  (${#NORMAL_MERGE_STATES[@]} states, default mem tier)"
   [[ -n "$TILE_JOB_ID" ]] && echo "  → depends on tile job $TILE_JOB_ID"
+  MERGE_JOB_IDS+=("$JOB_ID")
 fi
+
+if (( ${#HIGH_MERGE_STATES[@]} > 0 )); then
+  MERGE_STATE_LIST=$(IFS=:; echo "${HIGH_MERGE_STATES[*]}")
+  MERGE_NUM_TILES_LIST=$(IFS=:; echo "${HIGH_MERGE_NUM_TILES[*]}")
+  MERGE_LAST_IDX=$(( ${#HIGH_MERGE_STATES[@]} - 1 ))
+
+  MERGE_DEP=""
+  [[ -n "$TILE_JOB_ID" ]] && MERGE_DEP="--dependency=afterany:${TILE_JOB_ID}"
+
+  export STATE_LIST="$MERGE_STATE_LIST"
+  export NUM_TILES_LIST="$MERGE_NUM_TILES_LIST"
+  JOB_ID=$(cd "$REPO_DIR" && sbatch \
+    --export=ALL \
+    $MERGE_DEP \
+    --array="0-${MERGE_LAST_IDX}" \
+    --mem=64G \
+    --cpus-per-task=9 \
+    --time=1-00:00:00 \
+    --output="$LOG_DIR/clay_merge_%A_%a.out" \
+    --error="$LOG_DIR/clay_merge_%A_%a.err" \
+    --parsable \
+    "$MERGE_SCRIPT" | cut -d';' -f1)
+  echo "Submitted merge array job  $JOB_ID  (${#HIGH_MERGE_STATES[@]} states: ${HIGH_MERGE_STATES[*]} — high-mem/long-time tier)"
+  [[ -n "$TILE_JOB_ID" ]] && echo "  → depends on tile job $TILE_JOB_ID"
+  MERGE_JOB_IDS+=("$JOB_ID")
+fi
+
+# Persist this cycle's merge job IDs so the next resubmit can check their
+# outcomes and grow the high-mem list before it rebuilds MERGE_STATES.
+(IFS=:; echo "${MERGE_JOB_IDS[*]:-}") > "$LAST_MERGE_JOB_FILE"
 
 # Built as only-the-non-empty-parts, joined by ':' — TILE_JOB_ID is now
 # legitimately empty when a cycle submits no new tile tasks (see the
 # TILE_JOB_IDS[*]:- fix above), and naively prepending it would leave a
 # leading ':' that sbatch --dependency rejects as malformed.
 ALL_DEPS="${TILE_JOB_ID}"
-if [[ -n "${MERGE_JOB_ID:-}" ]]; then
+for MERGE_JOB_ID in "${MERGE_JOB_IDS[@]:-}"; do
+  [[ -z "$MERGE_JOB_ID" ]] && continue
   if [[ -n "$ALL_DEPS" ]]; then
     ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
   else
     ALL_DEPS="${MERGE_JOB_ID}"
   fi
-fi
+done
 SELF="$(realpath "${BASH_SOURCE[0]}")"
 RESUBMIT_ID=$(sbatch \
   --dependency="afterany:${ALL_DEPS}" \
