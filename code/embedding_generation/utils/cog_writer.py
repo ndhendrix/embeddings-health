@@ -1,4 +1,6 @@
 """Write multi-band numpy arrays as Cloud-Optimized GeoTIFFs."""
+import time
+
 import numpy as np
 import rasterio
 import rasterio.windows
@@ -6,6 +8,21 @@ from rasterio.transform import Affine
 from rasterio.crs import CRS
 from rasterio.enums import Resampling
 from pathlib import Path
+
+# Resuming a partially-written file has been observed to intermittently hit a
+# GDAL/libtiff read failure the moment a *different* process writes into a
+# block the original session never touched (not reliably reproducible in
+# isolation -- looks like a transient close-to-open consistency hiccup rather
+# than a hard incompatibility). Module level (not function-local) so tests
+# can shrink the delay instead of actually sleeping.
+_WRITE_RETRIES = 3
+_WRITE_RETRY_DELAY_S = 5
+
+# Minimum real time between checkpoints (close + reopen), regardless of how
+# many block boundaries have passed. Module level so tests can force it to 0
+# to exercise the intermediate-checkpoint path deterministically instead of
+# waiting on a wall-clock timer.
+_MIN_CHECKPOINT_INTERVAL_S = 300
 
 
 def write_cog(
@@ -67,10 +84,15 @@ def write_cog(
     # after every strip without forcing a real flush would let a kill leave
     # the checkpoint claiming rows are safe when they're still only in GDAL's
     # cache, silently corrupting the resumed output. Instead, close (which
-    # does force a full flush) and reopen every _BLOCK_ROWS -- infrequent
-    # enough to keep the close/reopen overhead negligible against a
-    # multi-hour write, and block-aligned so each flush lands on a clean
-    # boundary.
+    # does force a full flush) and reopen -- but only at a block boundary
+    # (for a clean flush) *and* only after _MIN_CHECKPOINT_INTERVAL_S has
+    # elapsed since the last one. A fixed row-count interval doesn't scale:
+    # 512 rows is instant for a small/fast state (measured close+reopen
+    # overhead alone was enough to erase zstd's speed edge over lzw on a
+    # 2048-row test array) but is a small fraction of a multi-hour write for
+    # a huge one. Gating on elapsed time means fast writes get ~0 extra
+    # close/reopen cycles while slow ones still get checkpointed often enough
+    # to bound how much a kill has to redo.
     assert _BLOCK_ROWS % _STRIP_ROWS == 0
 
     # Write to a temporary in-memory file first, then copy as COG.
@@ -125,18 +147,38 @@ def write_cog(
 
     write_error: Exception | None = None
     last_ckpt_row = resume_row
+    last_ckpt_time = time.monotonic()
+    row_start = resume_row
     try:
-        for row_start in range(resume_row, height, _STRIP_ROWS):
+        while row_start < height:
             row_end = min(row_start + _STRIP_ROWS, height)
             strip = np.array(arr[:, row_start:row_end, :], dtype="float32")
             win = rasterio.windows.Window(0, row_start, width, row_end - row_start)
-            dst.write(strip, window=win)
-            if row_end - last_ckpt_row >= _BLOCK_ROWS or row_end == height:
+
+            for attempt in range(1, _WRITE_RETRIES + 2):
+                try:
+                    dst.write(strip, window=win)
+                    break
+                except Exception as exc:
+                    if attempt > _WRITE_RETRIES:
+                        raise
+                    print(f"      COG strip write failed ({exc}) — retrying "
+                          f"({attempt}/{_WRITE_RETRIES}) after reopening")
+                    if not dst.closed:
+                        dst.close()
+                    time.sleep(_WRITE_RETRY_DELAY_S)
+                    dst = rasterio.open(tmp_path, "r+")
+
+            at_block_boundary = row_end - last_ckpt_row >= _BLOCK_ROWS
+            due_for_checkpoint = time.monotonic() - last_ckpt_time >= _MIN_CHECKPOINT_INTERVAL_S
+            if row_end == height or (at_block_boundary and due_for_checkpoint):
                 dst.close()  # forces GDAL to flush its dirty block cache
                 ckpt_path.write_text(str(row_end))
                 last_ckpt_row = row_end
+                last_ckpt_time = time.monotonic()
                 if row_end < height:
                     dst = rasterio.open(tmp_path, "r+")
+            row_start = row_end
     except Exception as exc:
         write_error = exc
     finally:
