@@ -40,6 +40,17 @@ HIGHMEM_STATES_FILE="$CACHE_ROOT/oe_nano_merge_highmem_states.txt"
 LAST_MERGE_JOB_FILE="$CACHE_ROOT/oe_nano_merge_last_job.txt"
 touch "$HIGHMEM_STATES_FILE"
 
+# States whose merge from the *last* cycle is still RUNNING/PENDING right
+# now. Rebuilt fresh every invocation (unlike HIGHMEM_STATES_FILE, this is a
+# point-in-time fact, not a durable classification) and used below to skip
+# re-submitting a merge for a state that already has one in flight -- this
+# is what makes it safe to decouple the resubmit chain from waiting on
+# merge completion (see ALL_DEPS below): tile-inference can resubmit as
+# soon as tiles finish without accidentally double-submitting a merge for a
+# state whose merge from the previous cycle is still going.
+INFLIGHT_STATES_FILE="$CACHE_ROOT/oe_nano_merge_inflight_states.txt"
+> "$INFLIGHT_STATES_FILE"
+
 if [[ -s "$LAST_MERGE_JOB_FILE" ]]; then
   IFS=: read -ra LAST_MERGE_JOB_IDS < "$LAST_MERGE_JOB_FILE"
   for JOB_ID in "${LAST_MERGE_JOB_IDS[@]}"; do
@@ -48,14 +59,16 @@ if [[ -s "$LAST_MERGE_JOB_FILE" ]]; then
       [[ -z "$FULL_JOBID" ]] && continue
       LOG_OUT="$LOG_DIR/oe_nano_merge_${FULL_JOBID}.out"
       [[ -f "$LOG_OUT" ]] || continue
-      ESCALATE_STATE=$(grep -m1 "^State: " "$LOG_OUT" | awk '{print $2}')
-      [[ -z "$ESCALATE_STATE" ]] && continue
-      if ! grep -qxF "$ESCALATE_STATE" "$HIGHMEM_STATES_FILE"; then
-        echo "$ESCALATE_STATE" >> "$HIGHMEM_STATES_FILE"
-        echo "Merge $STATE_OUT detected for $ESCALATE_STATE (job $FULL_JOBID) -- escalating to high-mem/long-time tier for future merges"
+      THIS_STATE=$(grep -m1 "^State: " "$LOG_OUT" | awk '{print $2}')
+      [[ -z "$THIS_STATE" ]] && continue
+      if [[ "$STATE_OUT" == "RUNNING" || "$STATE_OUT" == "PENDING" ]]; then
+        echo "$THIS_STATE" >> "$INFLIGHT_STATES_FILE"
+      elif ! grep -qxF "$THIS_STATE" "$HIGHMEM_STATES_FILE"; then
+        echo "$THIS_STATE" >> "$HIGHMEM_STATES_FILE"
+        echo "Merge $STATE_OUT detected for $THIS_STATE (job $FULL_JOBID) -- escalating to high-mem/long-time tier for future merges"
       fi
     done < <(sacct -j "$JOB_ID" -X --noheader --parsable2 -o JobID,State,ExitCode 2>/dev/null | \
-      awk -F'|' '$2 ~ /^OUT_OF_ME/ || $2 == "TIMEOUT" || ($2 == "FAILED" && $3 ~ /:9$/) {print $1"|"$2}')
+      awk -F'|' '$2 ~ /^RUNNING$/ || $2 ~ /^PENDING$/ || $2 ~ /^OUT_OF_ME/ || $2 == "TIMEOUT" || ($2 == "FAILED" && $3 ~ /:9$/) {print $1"|"$2}')
   done
 fi
 
@@ -154,7 +167,7 @@ for STATE in "${STATES[@]}"; do
     (( NUM_TILES > H_CHIPS )) && NUM_TILES=$H_CHIPS
   fi
 
-  if (( NUM_TILES > 1 )); then
+  if (( NUM_TILES > 1 )) && ! grep -qxF "$STATE" "$INFLIGHT_STATES_FILE"; then
     MERGE_STATES+=("$STATE")
     MERGE_NUM_TILES+=("$NUM_TILES")
   fi
@@ -339,19 +352,22 @@ fi
 # Resubmit chain: after tiles+merge complete, re-run this script to pick up
 # any tiles that failed/timed out and need a retry.
 # ------------------------------------------------------------------
-# Built as only-the-non-empty-parts, joined by ':' — TILE_JOB_ID is now
-# legitimately empty when a cycle submits no new tile tasks (see the
-# TILE_JOB_IDS[*]:- fix above), and naively prepending it would leave a
-# leading ':' that sbatch --dependency rejects as malformed.
-ALL_DEPS="${TILE_JOB_ID}"
-for MERGE_JOB_ID in "${MERGE_JOB_IDS[@]:-}"; do
-  [[ -z "$MERGE_JOB_ID" ]] && continue
-  if [[ -n "$ALL_DEPS" ]]; then
-    ALL_DEPS="${ALL_DEPS}:${MERGE_JOB_ID}"
-  else
-    ALL_DEPS="${MERGE_JOB_ID}"
-  fi
-done
+# Deliberately depend on tiles only, NOT on merge completion: merges (esp.
+# the high-mem/long-time tier) can run for up to 24h, and GPU tile-inference
+# has nothing to do with whether a merge has finished. Waiting on merges here
+# would leave the whole GPU pipeline idle for as long as the slowest merge in
+# flight -- confirmed happening in production (Base sat with zero new tile
+# jobs for hours while 24h-tier merges ran). INFLIGHT_STATES_FILE above is
+# what makes this safe: a state whose merge is still running won't be
+# resubmitted by the next cycle just because this resubmit didn't wait for it.
+# Only fall back to depending on this cycle's merges if there were no new
+# tile tasks to depend on instead, so the resubmit doesn't tight-loop with
+# nothing new to wait on.
+if [[ -n "$TILE_JOB_ID" ]]; then
+  ALL_DEPS="$TILE_JOB_ID"
+else
+  ALL_DEPS=$(IFS=:; echo "${MERGE_JOB_IDS[*]:-}")
+fi
 SELF="$(realpath "${BASH_SOURCE[0]}")"
 RESUBMIT_ID=$(sbatch \
   --dependency="afterany:${ALL_DEPS}" \
@@ -365,4 +381,4 @@ RESUBMIT_ID=$(sbatch \
   --export=ALL \
   --parsable \
   --wrap="bash '$SELF'" | cut -d';' -f1)
-echo "Resubmit job $RESUBMIT_ID scheduled after tiles+merge (cancel with: scancel $RESUBMIT_ID)"
+echo "Resubmit job $RESUBMIT_ID scheduled after tiles (not merges — see ALL_DEPS above) (cancel with: scancel $RESUBMIT_ID)"
