@@ -5,11 +5,13 @@ Run: uv run --python 3.11 python tests/test_tile_merge.py
 import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import rasterio
 from rasterio.transform import from_origin
 
+import utils.tile_merge as tile_merge
 from utils.tile_merge import merge_tiles
 
 
@@ -171,9 +173,78 @@ def test_merge_handles_multiblock_multiband_tiles():
         shutil.rmtree(tmp)
 
 
+def test_merge_retries_transient_tile_write_failures():
+    """A transient write failure mid-tile (the intermittent GDAL/Lustre
+    hiccup) should be retried rather than giving up and discarding the
+    whole merge on the first hiccup."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        tile0 = tmp / "emb_tile000.tif"
+        tile1 = tmp / "emb_tile001.tif"
+        make_tile(tile0, value=1.0, top=100.0, left=0.0, width=4, height=4)
+        make_tile(tile1, value=2.0, top=60.0,  left=0.0, width=4, height=4)
+        out_path = tmp / "emb.tif"
+
+        calls = {"n": 0}
+        original_write = rasterio.io.DatasetWriter.write
+
+        def flaky_write(self, *a, **kw):
+            calls["n"] += 1
+            if calls["n"] == 2:  # fail once, on the second block write only
+                raise RuntimeError("simulated transient GDAL/Lustre failure")
+            return original_write(self, *a, **kw)
+
+        with patch.object(rasterio.io.DatasetWriter, "write", flaky_write), \
+             patch.object(tile_merge, "_WRITE_RETRY_DELAY_S", 0):
+            merge_tiles([tile0, tile1], ["B01", "B02"], out_path)
+
+        assert out_path.exists()
+        with rasterio.open(out_path) as merged:
+            band1 = merged.read(1)
+            assert np.allclose(band1[:4, :], 1.0)
+            assert np.allclose(band1[4:, :], 2.0)
+        print("test_merge_retries_transient_tile_write_failures: PASS")
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_merge_retries_vanishing_tmp_file_at_rename():
+    """A tmp file that appears to vanish right before the final rename
+    (observed in production, no other process touching it) should be
+    retried a bounded number of times before giving up."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        tile0 = tmp / "emb_tile000.tif"
+        tile1 = tmp / "emb_tile001.tif"
+        make_tile(tile0, value=1.0, top=100.0, left=0.0, width=4, height=4)
+        make_tile(tile1, value=2.0, top=60.0,  left=0.0, width=4, height=4)
+        out_path = tmp / "emb.tif"
+
+        calls = {"n": 0}
+        original_rename = Path.rename
+
+        def flaky_rename(self, target):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise FileNotFoundError(f"simulated vanished tmp file: {self}")
+            return original_rename(self, target)
+
+        with patch.object(Path, "rename", flaky_rename), \
+             patch.object(tile_merge, "_RENAME_RETRY_DELAY_S", 0):
+            merge_tiles([tile0, tile1], ["B01", "B02"], out_path)
+
+        assert calls["n"] >= 2, "expected at least one retried rename call"
+        assert out_path.exists()
+        print("test_merge_retries_vanishing_tmp_file_at_rename: PASS")
+    finally:
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     test_merge_reproduces_expected_mosaic()
     test_merge_resumes_from_checkpoint()
     test_merge_recovers_from_corrupt_checkpoint()
     test_merge_handles_multiblock_multiband_tiles()
+    test_merge_retries_transient_tile_write_failures()
+    test_merge_retries_vanishing_tmp_file_at_rename()
     print("ALL PASSED")
