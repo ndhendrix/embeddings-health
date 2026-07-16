@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser(description="embeddings-health analysis on Sher
 parser.add_argument(
     "--model",
     required=True,
-    choices=["alphaearth", "prithvi_tiny", "prithvi_300m_tl"],
+    choices=["alphaearth", "prithvi_tiny", "prithvi_300m_tl", "clay"],
 )
 parser.add_argument(
     "--no-cache",
@@ -60,6 +60,7 @@ _EMBEDDINGS_MAP = {
     "alphaearth":      SCRATCH_ROOT / "alphaearth" / "alphaearth_embeddings.csv",
     "prithvi_tiny":    SCRATCH_ROOT / "prithvi_aggregated" / "prithvi_tiny_2022_all_tracts.csv",
     "prithvi_300m_tl": SCRATCH_ROOT / "prithvi_aggregated" / "prithvi_300M-TL_2022_all_tracts.csv",
+    "clay":            SCRATCH_ROOT / "clay_aggregated" / "clay_v1.5_2022_all_tracts.csv",
 }
 EMBEDDINGS_PATH = _EMBEDDINGS_MAP[args.model]
 OUTPUTS_DIR     = SCRATCH_ROOT / "outputs" / args.model

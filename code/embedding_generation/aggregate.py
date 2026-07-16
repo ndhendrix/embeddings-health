@@ -152,11 +152,12 @@ def main() -> None:
                              "PCA space before computing tract statistics, yielding "
                              "nationally comparable PC00–PC63 columns.")
     parser.add_argument("--year", type=int, default=2022)
-    parser.add_argument("--model", choices=["olmoearth", "prithvi"], default="olmoearth",
+    parser.add_argument("--model", choices=["olmoearth", "prithvi", "clay"], default="olmoearth",
                         help="Used to set fallback column prefix when no PCA model is provided.")
     args = parser.parse_args()
 
-    prefix = "OE" if args.model == "olmoearth" else "PR"
+    _PREFIXES = {"olmoearth": "OE", "prithvi": "PR", "clay": "CL"}
+    prefix = _PREFIXES[args.model]
 
     pca = None
     if args.pca_model is not None:

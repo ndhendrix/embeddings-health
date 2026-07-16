@@ -50,10 +50,27 @@ def combine_state_files(
 
     print(f"Reading {len(csv_files)} files from {input_dir} ...")
 
-    frames = [
-        pl.read_csv(f, infer_schema_length=0, schema_overrides={"GEOID": pl.Utf8})
-        for f in csv_files
-    ]
+    frames = []
+    skipped = []
+    for f in csv_files:
+        try:
+            frame = pl.read_csv(f, infer_schema_length=0, schema_overrides={"GEOID": pl.Utf8})
+        except pl.exceptions.NoDataError:
+            skipped.append(f)
+            continue
+        if frame.is_empty():
+            skipped.append(f)
+            continue
+        frames.append(frame)
+
+    if skipped:
+        print(f"Warning: skipped {len(skipped)} empty file(s) (0 tracts aggregated):")
+        for f in skipped:
+            print(f"  {f.name}")
+
+    if not frames:
+        raise ValueError(f"All {len(csv_files)} CSV files in {input_dir} were empty.")
+
     combined = pl.concat(frames, how="diagonal_relaxed")
 
     # Standardize GEOID to 11-digit zero-padded string
