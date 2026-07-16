@@ -346,7 +346,13 @@ def _run_composite(
         if out_path.exists() and not force:
             print(f"{prefix} Already exists, skipping merge: {out_path.name}")
             return
-        tile_paths = sorted(out_path.parent.glob(f"{out_path.stem}_tile*.tif"))
+        # Excludes write_cog()'s "*.tmp.tif" intermediate files -- the glob
+        # below would otherwise also match a leftover tile###.tmp.tif from a
+        # prior run killed mid-write, over-counting tiles as present.
+        tile_paths = sorted(
+            p for p in out_path.parent.glob(f"{out_path.stem}_tile*.tif")
+            if not p.name.endswith(".tmp.tif")
+        )
         max_missing = max(0, n // 20)  # tolerate up to 5% missing (ocean / no-coverage tiles)
         if len(tile_paths) < n - max_missing:
             print(f"{prefix} SKIP merge: expected {n} tiles, found {len(tile_paths)} "

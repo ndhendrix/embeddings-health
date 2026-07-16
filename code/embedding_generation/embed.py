@@ -1023,8 +1023,14 @@ def main() -> None:
         if args.output.exists() and not args.force:
             print(f"Already exists, skipping merge: {args.output}")
             return
+        # Excludes write_cog()'s "*.tmp<suffix>" intermediate files -- the glob
+        # below would otherwise also match a leftover tile###.tmp.tif from a
+        # prior run killed mid-write, over-counting tiles as present (observed
+        # on TX: 7 real tiles + 1 stray tile000.tmp.tif counted as 8).
+        tmp_suffix = f".tmp{args.output.suffix}"
         tile_paths = sorted(
-            args.output.parent.glob(f"{args.output.stem}_tile*{args.output.suffix}")
+            p for p in args.output.parent.glob(f"{args.output.stem}_tile*{args.output.suffix}")
+            if not p.name.endswith(tmp_suffix)
         )
         if len(tile_paths) != args.num_tiles:
             print(f"SKIP merge: expected {args.num_tiles} tiles, found {len(tile_paths)} "
