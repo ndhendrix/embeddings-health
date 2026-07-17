@@ -2,8 +2,8 @@
 #SBATCH --job-name=overlap-embed
 #SBATCH -p gpu
 #SBATCH -G 1
-#SBATCH -c 8
-#SBATCH --mem=128G
+#SBATCH -c 4
+#SBATCH --mem=32G
 #SBATCH --time=03:00:00
 #SBATCH --signal=B:TERM@600
 set -euo pipefail
