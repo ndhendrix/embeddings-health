@@ -1,4 +1,5 @@
 """Write multi-band numpy arrays as Cloud-Optimized GeoTIFFs."""
+import os
 import time
 
 import numpy as np
@@ -34,6 +35,7 @@ def write_cog(
     compress: str = "zstd",
     nodata: float | None = np.nan,
     overviews: bool = True,
+    interleave: str | None = None,
 ) -> None:
     """Write (C, H, W) float32 array to a tiled GeoTIFF, optionally with COG overviews.
 
@@ -63,6 +65,9 @@ def write_cog(
             generation across hundreds of bands would take hours.
     """
     path = Path(path)
+    interleave = interleave or os.environ.get("EMBEDDING_COG_INTERLEAVE", "pixel")
+    if interleave not in {"pixel", "band"}:
+        raise ValueError(f"interleave must be 'pixel' or 'band', got {interleave!r}")
     path.parent.mkdir(parents=True, exist_ok=True)
 
     if isinstance(crs, str):
@@ -138,6 +143,7 @@ def write_cog(
             tiled=True,
             blockxsize=512,
             blockysize=_BLOCK_ROWS,
+            interleave=interleave,
             BIGTIFF="IF_SAFER",
             **_compression_options(compress),
         )

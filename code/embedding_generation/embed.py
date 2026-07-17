@@ -86,6 +86,12 @@ OLMOEARTH_REPO = {
     "v1_1-Base":  "OlmoEarth-v1_1-Base",
     "v1_1-Large": "OlmoEarth-v1_1-Large",
     "Nano":       "OlmoEarth-v1_1-Nano",
+    "v1_2-Nano":  "OlmoEarth-v1_2-Nano",
+    "v1_2-Base":  "OlmoEarth-v1_2-Base",
+}
+OLMOEARTH_REVISIONS = {
+    "v1_2-Nano": "e1f693ae2a7d5b57871a978e9d09e22d05206747",
+    "v1_2-Base": "581aa9baaa7aed4348c0903617eb92ee9f89e2ec",
 }
 # Switch the output accumulation array to a disk-backed memmap when the array
 # would exceed this size — prevents OOM on large states at 80m/768-dim output.
@@ -119,6 +125,8 @@ OLMOEARTH_EMBED_DIMS = {
     "v1_1-Base":  768,
     "v1_1-Large": 1024,
     "Nano":       128,
+    "v1_2-Nano":  128,
+    "v1_2-Base":  768,
 }
 
 # ---------------------------------------------------------------------------
@@ -198,8 +206,9 @@ def load_olmoearth(variant: str = "Base"):
     repo_id = f"allenai/{model_name}"
     print(f"Loading OlmoEarth {variant} ({repo_id}) from HuggingFace…")
     # Download config and weights; both land in the same snapshot directory.
-    config_local = hf_hub_download(repo_id=repo_id, filename="config.json")
-    hf_hub_download(repo_id=repo_id, filename="weights.pth")
+    revision = OLMOEARTH_REVISIONS.get(variant)
+    config_local = hf_hub_download(repo_id=repo_id, filename="config.json", revision=revision)
+    hf_hub_download(repo_id=repo_id, filename="weights.pth", revision=revision)
     model = load_model_from_path(Path(config_local).parent)
     model.eval()
     return model
@@ -302,6 +311,7 @@ def load_clay():
     ckpt_path = hf_hub_download(
         repo_id="made-with-clay/Clay",
         filename="v1.5/clay-v1.5.ckpt",
+        revision="70200ebcccdf67bf2a0cb9984c77ddee26c10ed2",
     )
     print(f"Loading Clay v1.5 checkpoint from {ckpt_path}…")
     # weights_only=False: Lightning checkpoints store Python dicts/scalars in
