@@ -4,7 +4,7 @@
 #SBATCH -G 1
 #SBATCH -c 8
 #SBATCH --mem=128G
-#SBATCH --time=06:00:00
+#SBATCH --time=03:00:00
 #SBATCH --signal=B:TERM@600
 set -euo pipefail
 REPO_DIR="${REPO_DIR:-$HOME/embeddings-health}"; : "${SCRATCH:?}"; : "${MODEL:?}"
