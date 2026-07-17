@@ -2,6 +2,12 @@
 import argparse
 import os
 from pathlib import Path
+
+# GDAL otherwise derives its cache from host memory, which can make a
+# block-streaming merge approach the Slurm memory limit on large nodes.
+# Users can override this value with GDAL_CACHEMAX when appropriate.
+os.environ.setdefault("GDAL_CACHEMAX", "512")
+
 import rasterio
 from rasterio.windows import from_bounds
 

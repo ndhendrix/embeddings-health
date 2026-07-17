@@ -2,7 +2,7 @@
 #SBATCH --job-name=embed-merge
 #SBATCH -p normal
 #SBATCH -c 2
-#SBATCH --mem=16G
+#SBATCH --mem=24G
 #SBATCH --time=08:00:00
 set -euo pipefail
 REPO_DIR="${REPO_DIR:-$HOME/embeddings-health}"
@@ -16,6 +16,7 @@ OUTPUT="$OUTPUT_ROOT/$MODEL/$STATE/${MODEL}_${STATE}_${YEAR}.tif"
 module load devel
 module load gcc/14.2.0
 export UV_CACHE_DIR="$CACHE_ROOT/uv" UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-cpu"
+export GDAL_CACHEMAX="${GDAL_CACHEMAX:-512}"
 cd "$REPO_DIR/code/embedding_generation"; uv sync --python 3.11
 tiles=()
 for ((i=0;i<NUM_TILES;i++)); do
