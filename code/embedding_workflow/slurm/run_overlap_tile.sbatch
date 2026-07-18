@@ -27,8 +27,15 @@ if [[ "$MODEL" == olmoearth-* ]] && ! "$UV_PROJECT_ENVIRONMENT/bin/python" -c "i
  VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT" uv pip install --no-deps git+https://github.com/allenai/olmoearth_pretrain
  VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT" uv pip install "einops>=0.7" huggingface_hub universal-pathlib
 fi
+validation_args=(); (( NUM_TILES > 1 )) && validation_args+=(--allow-empty)
+if [[ -s "$TILE_OUTPUT" ]]; then
+ if uv run --python 3.11 python ../embedding_workflow/validate_overlap.py --raster "$TILE_OUTPUT" --model "$MODEL" "${validation_args[@]}"; then
+  echo "validated existing output: $TILE_OUTPUT"; exit 0
+ fi
+ echo "existing output did not validate; regenerating: $TILE_OUTPUT" >&2
+fi
 extra=(); [[ -n "${TEST_BLOCKS:-}" ]] && extra+=(--test-blocks "$TEST_BLOCKS"); [[ -n "${GRID_ROWS:-}" ]] && extra+=(--grid-rows "$GRID_ROWS" --grid-cols "${GRID_COLS:-1}")
 export CODE_GIT_SHA="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
 uv run --python 3.11 python ../embedding_workflow/generate_overlap.py --model "$MODEL" --input "$INPUT" --output "$OUTPUT" --tile-index "$INDEX" --num-tiles "$NUM_TILES" --year "$YEAR" ${extra[@]:-}
-partial=(); [[ -n "${TEST_BLOCKS:-}" ]] && partial+=(--allow-partial)
-uv run --python 3.11 python ../embedding_workflow/validate_overlap.py --raster "$TILE_OUTPUT" --model "$MODEL" ${partial[@]:-}
+[[ -n "${TEST_BLOCKS:-}" ]] && validation_args+=(--allow-partial)
+uv run --python 3.11 python ../embedding_workflow/validate_overlap.py --raster "$TILE_OUTPUT" --model "$MODEL" "${validation_args[@]}"

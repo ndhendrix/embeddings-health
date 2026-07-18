@@ -7,7 +7,7 @@ import rasterio
 from models import get_model
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument("--raster",type=Path,required=True); p.add_argument("--model",required=True); p.add_argument("--allow-partial",action="store_true"); p.add_argument("--min-finite-fraction",type=float,default=0.001); p.add_argument("--json",type=Path)
+    p=argparse.ArgumentParser(); p.add_argument("--raster",type=Path,required=True); p.add_argument("--model",required=True); p.add_argument("--allow-partial",action="store_true"); p.add_argument("--allow-empty",action="store_true"); p.add_argument("--min-finite-fraction",type=float,default=0.001); p.add_argument("--json",type=Path)
     a=p.parse_args(); spec=get_model(a.model)
     with rasterio.open(a.raster) as src:
         if src.count!=spec.dimensions: raise ValueError(f"expected {spec.dimensions} bands, got {src.count}")
@@ -21,8 +21,11 @@ def main():
             data=src.read(1,window=window); mask=np.isfinite(data); finite+=int(mask.sum()); total+=data.size
             if mask.any(): minimum=min(minimum,float(data[mask].min())); maximum=max(maximum,float(data[mask].max()))
         fraction=finite/total
-        if finite==0 or not maximum>minimum: raise ValueError("no finite, varying embedding values")
-        if not a.allow_partial and fraction<a.min_finite_fraction: raise ValueError(f"finite fraction too low: {fraction:.3%}")
+        if finite==0:
+            if not a.allow_empty: raise ValueError("no finite embedding values")
+            minimum=None; maximum=None
+        elif not maximum>minimum: raise ValueError("no varying embedding values")
+        if finite and not a.allow_partial and fraction<a.min_finite_fraction: raise ValueError(f"finite fraction too low: {fraction:.3%}")
         result={"path":str(a.raster),"model":a.model,"shape":[src.count,src.height,src.width],"resolution":list(src.res),"finite_fraction_band1":fraction,"min_band1":minimum,"max_band1":maximum,"tags":tags}
     target=a.json or a.raster.with_suffix(".validation.json"); target.write_text(json.dumps(result,indent=2,sort_keys=True)); print(target)
 if __name__=="__main__": main()
