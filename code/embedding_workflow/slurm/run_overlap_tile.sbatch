@@ -20,6 +20,12 @@ ROOT="${OVERLAP_OUTPUT_ROOT:-$SCRATCH/embeddings-health/embedding_workflow_overl
 mkdir -p "$(dirname "$OUTPUT")" "$CACHE_ROOT"
 TILE_OUTPUT="$OUTPUT"; (( NUM_TILES > 1 )) && TILE_OUTPUT="${OUTPUT%.tif}_tile$(printf '%03d' "$INDEX").tif"
 if [[ -s "$TILE_OUTPUT" && -s "${TILE_OUTPUT%.tif}.validation.json" ]]; then echo "validated output exists: $TILE_OUTPUT"; exit 0; fi
+LOCK_FILE="${TILE_OUTPUT}.worker.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+ echo "tile is already being processed: $TILE_OUTPUT"
+ exit 0
+fi
 module load devel; module load gcc/14.2.0; module load rust/1.90.0; module load cuda/12.6.1 || true
 export UV_CACHE_DIR="$CACHE_ROOT/uv" UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-${SLURMD_NODENAME:-$(hostname -s)}" HF_HOME="$CACHE_ROOT/huggingface" EMBEDDING_COG_INTERLEAVE=band
 cd "$REPO_DIR/code/embedding_generation"; uv sync --python 3.11

@@ -29,8 +29,26 @@ mkdir -p "$CACHE" "$LOG_DIR"
 TARGET_BLOCKS_PER_TILE="${TARGET_BLOCKS_PER_TILE:-4000}"
 MAX_SUBMIT_PER_RUN="${MAX_SUBMIT_PER_RUN:-100}"
 MAX_CONCURRENT="${MAX_CONCURRENT:-30}"
+GPU_REQUEST_LIMIT="${GPU_REQUEST_LIMIT:-100}"
+REFILL_THRESHOLD="${REFILL_THRESHOLD:-10}"
+REFILL_POLL_SECONDS="${REFILL_POLL_SECONDS:-60}"
 TILING="${TILING:-rectangular}"
 PY="${PY:-$SCRATCH/embeddings-health/cache/venv-3.11-cpu/bin/python}"
+
+if [[ -n "${WATCH_JOB_ID:-}" ]]; then
+  echo "Watching GPU work after wave $WATCH_JOB_ID; refill threshold=$REFILL_THRESHOLD"
+  while true; do
+    ACTIVE=$(squeue --array --noheader --user="$USER" --name=overlap-embed --states=PENDING,RUNNING --format='%i' | wc -l)
+    if (( ACTIVE <= REFILL_THRESHOLD )); then break; fi
+    echo "Active overlap tasks: $ACTIVE; checking again in ${REFILL_POLL_SECONDS}s"
+    sleep "$REFILL_POLL_SECONDS"
+  done
+  AVAILABLE=$((GPU_REQUEST_LIMIT - ACTIVE))
+  if (( AVAILABLE < 1 )); then AVAILABLE=1; fi
+  if (( MAX_SUBMIT_PER_RUN > AVAILABLE )); then MAX_SUBMIT_PER_RUN=$AVAILABLE; fi
+  echo "Refilling with up to $MAX_SUBMIT_PER_RUN tasks; $ACTIVE older tasks remain active"
+  unset WATCH_JOB_ID
+fi
 
 LABEL="$STATE_SET"
 if [[ -n "${STATES:-}" ]]; then LABEL="${LABEL}_$(tr ' ' '_' <<< "$STATES" | cut -c1-80)"; fi
@@ -77,12 +95,11 @@ INFER="${INFER%%;*}"
 echo "Submitted Clay inference wave: job=$INFER tasks=$COUNT concurrent=$MAX_CONCURRENT"
 
 SELF="$(realpath "${BASH_SOURCE[0]}")"
-RESUBMIT=$(sbatch \
+RESUBMIT=$(WATCH_JOB_ID="$INFER" sbatch \
   --parsable \
-  --dependency="afterany:$INFER" \
   --job-name=clay-overlap-resubmit \
   --partition=normal \
-  --time=00:10:00 \
+  --time=08:00:00 \
   --mem=4G \
   --cpus-per-task=1 \
   --output="$LOG_DIR/clay_overlap_resubmit_%j.out" \
@@ -90,4 +107,4 @@ RESUBMIT=$(sbatch \
   --export=ALL \
   --wrap="bash '$SELF'")
 RESUBMIT="${RESUBMIT%%;*}"
-echo "Scheduled resubmit job: $RESUBMIT afterany:$INFER"
+echo "Scheduled rolling refill controller: $RESUBMIT watching $INFER"
