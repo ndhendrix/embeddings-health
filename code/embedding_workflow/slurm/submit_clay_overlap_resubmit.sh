@@ -38,7 +38,7 @@ PY="${PY:-$SCRATCH/embeddings-health/cache/venv-3.11-cpu/bin/python}"
 if [[ -n "${WATCH_JOB_ID:-}" ]]; then
   echo "Watching GPU work after wave $WATCH_JOB_ID; refill threshold=$REFILL_THRESHOLD"
   while true; do
-    ACTIVE=$(squeue --array --noheader --user="$USER" --name=overlap-embed --states=PENDING,RUNNING --format='%i' | wc -l)
+    ACTIVE=$(squeue -r --noheader --user="$USER" --name=overlap-embed --states=PENDING,RUNNING --format='%i' | wc -l)
     if (( ACTIVE <= REFILL_THRESHOLD )); then break; fi
     echo "Active overlap tasks: $ACTIVE; checking again in ${REFILL_POLL_SECONDS}s"
     sleep "$REFILL_POLL_SECONDS"
