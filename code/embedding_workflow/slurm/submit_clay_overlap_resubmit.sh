@@ -99,7 +99,7 @@ RESUBMIT=$(WATCH_JOB_ID="$INFER" sbatch \
   --parsable \
   --job-name=clay-overlap-resubmit \
   --partition=normal \
-  --time=08:00:00 \
+  --time=12:00:00 \
   --mem=4G \
   --cpus-per-task=1 \
   --output="$LOG_DIR/clay_overlap_resubmit_%j.out" \
