@@ -94,7 +94,7 @@ INFER=$(cd "$REPO_DIR" && sbatch \
 INFER="${INFER%%;*}"
 echo "Submitted Clay inference wave: job=$INFER tasks=$COUNT concurrent=$MAX_CONCURRENT"
 
-SELF="$(realpath "${BASH_SOURCE[0]}")"
+SELF="$SCRIPT_DIR/submit_clay_overlap_resubmit.sh"
 RESUBMIT=$(WATCH_JOB_ID="$INFER" sbatch \
   --parsable \
   --job-name=clay-overlap-resubmit \
