@@ -12,7 +12,13 @@ REPO_DIR="${REPO_DIR:-$HOME/embeddings-health}"
 : "${NUM_TILES:?NUM_TILES is required}"
 YEAR="${YEAR:-2022}"; OUTPUT_ROOT="${OUTPUT_ROOT:-$SCRATCH/embeddings-health/embedding_workflow}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
-OUTPUT="$OUTPUT_ROOT/$MODEL/$STATE/${MODEL}_${STATE}_${YEAR}.tif"
+PRODUCT_STEM="${PRODUCT_STEM:-${MODEL}_${STATE}_${YEAR}}"
+OUTPUT="$OUTPUT_ROOT/$MODEL/$STATE/${PRODUCT_STEM}.tif"
+VALIDATION="${OUTPUT%.tif}.validation.json"
+if [[ -s "$OUTPUT" && -s "$VALIDATION" ]]; then
+  echo "validated merged output exists: $OUTPUT"
+  exit 0
+fi
 module load devel
 module load gcc/14.2.0
 export UV_CACHE_DIR="$CACHE_ROOT/uv" UV_PROJECT_ENVIRONMENT="$CACHE_ROOT/venv-3.11-cpu"
@@ -24,3 +30,4 @@ for ((i=0;i<NUM_TILES;i++)); do
   [[ -s "$tile" ]] || { echo "missing tile: $tile" >&2; exit 1; }; tiles+=("$tile")
 done
 uv run --python 3.11 python ../embedding_workflow/merge.py --tiles "${tiles[@]}" --output "$OUTPUT"
+uv run --python 3.11 python ../embedding_workflow/validate_overlap.py --raster "$OUTPUT" --model "$MODEL" --json "$VALIDATION"
