@@ -32,23 +32,31 @@ MAX_CONCURRENT="${MAX_CONCURRENT:-30}"
 GPU_REQUEST_LIMIT="${GPU_REQUEST_LIMIT:-100}"
 REFILL_THRESHOLD="${REFILL_THRESHOLD:-10}"
 REFILL_POLL_SECONDS="${REFILL_POLL_SECONDS:-60}"
+CONTROLLER_RESERVE="${CONTROLLER_RESERVE:-1}"
 TILING="${TILING:-rectangular}"
 PY="${PY:-$SCRATCH/embeddings-health/cache/venv-3.11-cpu/bin/python}"
 
 if [[ -n "${WATCH_JOB_ID:-}" ]]; then
   echo "Watching GPU work after wave $WATCH_JOB_ID; refill threshold=$REFILL_THRESHOLD"
   while true; do
-    ACTIVE=$(squeue -r --noheader --user="$USER" --name=overlap-embed --states=PENDING,RUNNING --format='%i' | wc -l)
-    if (( ACTIVE <= REFILL_THRESHOLD )); then break; fi
-    echo "Active overlap tasks: $ACTIVE; checking again in ${REFILL_POLL_SECONDS}s"
+    ACTIVE=$(squeue -r --noheader --user="$USER" --name=overlap-embed --format='%i' | wc -l)
+    TOTAL_SUBMITTED=$(squeue -r --noheader --user="$USER" --format='%i' | wc -l)
+    AVAILABLE=$((GPU_REQUEST_LIMIT - TOTAL_SUBMITTED - CONTROLLER_RESERVE))
+    if (( ACTIVE <= REFILL_THRESHOLD && AVAILABLE >= 1 )); then break; fi
+    echo "Active overlap tasks: $ACTIVE; total submitted jobs: $TOTAL_SUBMITTED; refill capacity: $AVAILABLE; checking again in ${REFILL_POLL_SECONDS}s"
     sleep "$REFILL_POLL_SECONDS"
   done
-  AVAILABLE=$((GPU_REQUEST_LIMIT - ACTIVE))
-  if (( AVAILABLE < 1 )); then AVAILABLE=1; fi
-  if (( MAX_SUBMIT_PER_RUN > AVAILABLE )); then MAX_SUBMIT_PER_RUN=$AVAILABLE; fi
-  echo "Refilling with up to $MAX_SUBMIT_PER_RUN tasks; $ACTIVE older tasks remain active"
+  echo "Refilling with up to $AVAILABLE tasks; $ACTIVE older overlap tasks and $TOTAL_SUBMITTED total jobs remain active"
   unset WATCH_JOB_ID
+else
+  TOTAL_SUBMITTED=$(squeue -r --noheader --user="$USER" --format='%i' | wc -l)
+  AVAILABLE=$((GPU_REQUEST_LIMIT - TOTAL_SUBMITTED - CONTROLLER_RESERVE))
+  if (( AVAILABLE < 1 )); then
+    echo "No submission capacity: $TOTAL_SUBMITTED jobs are active and $CONTROLLER_RESERVE slot is reserved for the controller." >&2
+    exit 1
+  fi
 fi
+if (( MAX_SUBMIT_PER_RUN > AVAILABLE )); then MAX_SUBMIT_PER_RUN=$AVAILABLE; fi
 
 LABEL="$STATE_SET"
 if [[ -n "${STATES:-}" ]]; then LABEL="${LABEL}_$(tr ' ' '_' <<< "$STATES" | cut -c1-80)"; fi
