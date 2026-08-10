@@ -22,12 +22,12 @@ MODEL_SOURCES <- list(
   "AlphaEarth"         = file.path(OUTPUTS, "alphaearth_foundations", "places_residual_by_index.csv"),
   "Prithvi Tiny-TL"    = file.path(OUTPUTS, "prithvi_tiny",           "prithvi_tiny_places_residual_by_index.csv"),
   "Prithvi 300M-TL"    = file.path(OUTPUTS, "prithvi_300M-TL",        "places_residual_by_index.csv"),
-  "OlmoEarth-1.1 Nano" = NULL,
+  "OlmoEarth-1.1 Nano" = file.path(OUTPUTS, "olmoearth_nano_pca64",   "places_residual_by_index.csv"),
   "OlmoEarth-1.1 Base" = NULL,
-  "Clay v1.5"          = NULL
+  "Clay v1.5"          = file.path(OUTPUTS, "clay_pca64",             "places_residual_by_index.csv")
 )
 
-MOCK_SEEDS <- c("OlmoEarth-1.1 Nano" = 101L, "OlmoEarth-1.1 Base" = 202L, "Clay v1.5" = 303L)
+MOCK_SEEDS <- c("OlmoEarth-1.1 Base" = 202L)
 
 MODEL_LABELS <- c(
   "AlphaEarth"         = "AlphaEarth\nFoundations",
