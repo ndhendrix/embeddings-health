@@ -22,19 +22,19 @@ MODEL_SOURCES <- list(
   "AlphaEarth"         = file.path(OUTPUTS, "alphaearth_foundations", "places_residual_by_index.csv"),
   "Prithvi Tiny-TL"    = file.path(OUTPUTS, "prithvi_tiny",           "prithvi_tiny_places_residual_by_index.csv"),
   "Prithvi 300M-TL"    = file.path(OUTPUTS, "prithvi_300M-TL",        "places_residual_by_index.csv"),
-  "OlmoEarth-1.1 Nano" = file.path(OUTPUTS, "olmoearth_nano_pca64",   "places_residual_by_index.csv"),
-  "OlmoEarth-1.1 Base" = NULL,
+  "OlmoEarth-1.2 Nano" = file.path(OUTPUTS, "olmoearth_nano_pca64",   "places_residual_by_index.csv"),
+  "OlmoEarth-1.2 Base" = NULL,
   "Clay v1.5"          = file.path(OUTPUTS, "clay_pca64",             "places_residual_by_index.csv")
 )
 
-MOCK_SEEDS <- c("OlmoEarth-1.1 Base" = 202L)
+MOCK_SEEDS <- c("OlmoEarth-1.2 Base" = 202L)
 
 MODEL_LABELS <- c(
   "AlphaEarth"         = "AlphaEarth\nFoundations",
   "Prithvi Tiny-TL"    = "Prithvi-EO-2.0\nTiny-TL",
   "Prithvi 300M-TL"    = "Prithvi-EO-2.0\n300M-TL",
-  "OlmoEarth-1.1 Nano" = "OlmoEarth-1.1\nNano",
-  "OlmoEarth-1.1 Base" = "OlmoEarth-1.1\nBase",
+  "OlmoEarth-1.2 Nano" = "OlmoEarth-1.2\nNano",
+  "OlmoEarth-1.2 Base" = "OlmoEarth-1.2\nBase",
   "Clay v1.5"          = "Clay-v1.5"
 )
 
@@ -42,8 +42,8 @@ MODEL_ORDER <- c(
   "AlphaEarth\nFoundations",
   "Prithvi-EO-2.0\nTiny-TL",
   "Prithvi-EO-2.0\n300M-TL",
-  "OlmoEarth-1.1\nNano",
-  "OlmoEarth-1.1\nBase",
+  "OlmoEarth-1.2\nNano",
+  "OlmoEarth-1.2\nBase",
   "Clay-v1.5"
 )
 
@@ -52,10 +52,16 @@ MODEL_COLORS <- c(
   "AlphaEarth\nFoundations" = "#0072B2",
   "Prithvi-EO-2.0\nTiny-TL" = "#009E73",
   "Prithvi-EO-2.0\n300M-TL" = "#D55E00",
-  "OlmoEarth-1.1\nNano"     = "#E69F00",
-  "OlmoEarth-1.1\nBase"     = "#CC79A7",
+  "OlmoEarth-1.2\nNano"     = "#E69F00",
+  "OlmoEarth-1.2\nBase"     = "#CC79A7",
   "Clay-v1.5"               = "#56B4E9"
 )
+
+# Legend swatch alpha: 0.88 for real models, 0.38 for still-mocked models.
+# Derived from MODEL_SOURCES so the legend never drifts out of sync with the
+# bars themselves as models move from placeholder to real data.
+MOCKED_LABELS  <- unname(MODEL_LABELS[names(Filter(is.null, MODEL_SOURCES))])
+LEGEND_ALPHAS  <- if_else(MODEL_ORDER %in% MOCKED_LABELS, 0.38, 0.88)
 
 # ── Outcome labels ─────────────────────────────────────────────────────────────
 OUTCOME_LABELS <- c(
@@ -220,7 +226,7 @@ make_panel <- function(
         title        = NULL,
         ncol         = 3,
         byrow        = TRUE,
-        override.aes = list(alpha = c(0.88, 0.88, 0.88, 0.38, 0.38, 0.38))
+        override.aes = list(alpha = LEGEND_ALPHAS)
       )
     ) +
     scale_alpha_manual(
@@ -247,7 +253,7 @@ make_panel <- function(
     theme(
       plot.title          = element_text(face = "bold", size = ttl_s, hjust = 0.5,
                                          margin = margin(b = 8)),
-      plot.title.position = "plot",
+      plot.title.position = "panel",
       legend.text         = element_text(size = lgd_s, lineheight = 0.85),
       legend.key.size     = unit(if (compact) 0.45 else 0.55, "cm"),
       legend.margin       = margin(t = 4),
