@@ -1,0 +1,75 @@
+[project]
+name = "olmoearth-activations"
+version = "0.1.0"
+description = "Embedding and intermediate-activation extraction for OlmoEarth pretrained models"
+requires-python = ">=3.11"
+dependencies = [
+    # Inference. olmoearth_pretrain's own metadata pins torch>=2.7; we do not
+    # re-pin it here so the two can be resolved together by the caller.
+    "torch>=2.1",
+    "numpy>=1.26",
+    # Imagery. rasterio 1.3 is the last line with manylinux_2_17 wheels, which
+    # is what the Sherlock baseline can install; keep the floor low.
+    "rasterio>=1.3",
+    # Tabular analysis output.
+    "pandas>=2.0",
+    # Figures.
+    "matplotlib>=3.7",
+    # Config files.
+    "pyyaml>=6.0",
+    # CLI.
+    "typer>=0.9",
+]
+
+[project.optional-dependencies]
+# olmoearth_pretrain is not on PyPI. Install it separately, and PIN THE COMMIT:
+#   uv pip install --no-deps \
+#     "git+https://github.com/allenai/olmoearth_pretrain@<COMMIT_SHA>"
+#   uv pip install "einops>=0.7" huggingface_hub "universal-pathlib>=0.2.5"
+# The commit SHA belongs in ModelConfig.package_commit so the run manifest
+# records which version produced the numbers.
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.4",
+    "mypy>=1.8",
+]
+# Scene fetching. Kept optional because it is only needed to *acquire* imagery,
+# not to encode it -- an already-populated data/scenes needs none of this, which
+# matters on a cluster node with no outbound network.
+# Verified against 4.7.1. The floor is 4.0 because the destination kwarg was
+# named outputs_prefix before 3.0, and fetch_scene.py passes output_dir.
+download = [
+    "eodag>=4.0",
+]
+
+[project.scripts]
+oea = "olmoearth_activations.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["olmoearth_activations"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires a real checkpoint download or a .SAFE scene on disk",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "D"]
+ignore = ["D107", "D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

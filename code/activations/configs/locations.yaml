@@ -1,0 +1,112 @@
+# Named locations. Referenced as `--location <name>` by scripts/encode_location.py
+# and scripts/fetch_scene.py, and readable as-is by scripts/compare_locations.py.
+#
+# Each location gets its own scene directory, data/scenes/<name>, holding exactly
+# one *.SAFE. That is not tidiness: SafeSceneSource globs each band across every
+# *.SAFE in the directory it is given and takes the first sorted match, so two
+# scenes in one directory means one shadows the other in alphabetical order.
+#
+# Adding a location:
+#   1. Add the entry here.
+#   2. python scripts/fetch_scene.py --location <name>
+#   3. python scripts/encode_location.py --location <name>
+#
+# VERIFIED means the coordinate has actually been encoded successfully.
+# APPROXIMATE means it was placed from a map and has not been run -- check it
+# lands where you intend before drawing conclusions from its embeddings.
+
+# ---------------------------------------------------------------- urban core
+
+- name: dc
+  lat: 38.90324
+  lon: -77.036964
+  stratum: urban
+  note: >-
+    VERIFIED. Lafayette Square / White House. Encoded successfully from
+    S2A_MSIL2A_20220619T154821_..._T18SUJ. At chip_px 256 the chip spans the
+    Ellipse and Monument grounds, which show up as a coherent low region in
+    dims 63 and 92 -- the first evidence the encoder tracks land cover here.
+
+- name: dc_medical
+  lat: 38.9275
+  lon: -77.0125
+  stratum: urban_institutional
+  note: >-
+    APPROXIMATE. The Irving St NW hospital campus -- MedStar Washington Hospital
+    Center, Children's National, the VA Medical Center and National Rehab, all
+    adjacent, ringed by dense rowhouse blocks. The densest concentration of
+    large hospital footprints in DC, so it is the best single chip for asking
+    whether any dimension responds to institutional-scale buildings.
+
+    Inside T18SUJ, so data/scenes/dc_medical symlinks the dc scene rather than
+    duplicating a gigabyte. Any location in this tile can do the same.
+
+# ------------------------------------------------- gradient: park to farmland
+#
+# The point of these is class coverage, not geography. A vegetation dimension
+# cannot be identified from urban core alone, and "fields" has zero positive
+# examples anywhere in downtown DC. These four walk from park to crops.
+
+- name: rock_creek
+  lat: 38.9500
+  lon: -77.0450
+  stratum: urban_green
+  note: >-
+    APPROXIMATE. Rock Creek Park. Same tile as dc, so it separates "vegetation"
+    from "city" without a second download.
+
+- name: silver_spring
+  lat: 38.9907
+  lon: -77.0261
+  stratum: suburban
+  note: APPROXIMATE. Inner Montgomery County, denser suburban.
+
+- name: gaithersburg
+  lat: 39.1434
+  lon: -77.2014
+  stratum: suburban
+  note: APPROXIMATE. Outer Montgomery County, lower-density residential.
+
+- name: westminster
+  lat: 39.5750
+  lon: -76.9960
+  stratum: rural_institutional
+  note: >-
+    APPROXIMATE. Carroll Hospital Center, Westminster MD -- an acute-care
+    hospital in a small town surrounded by working farmland. The rural half of
+    the hospital pair, and the entry that makes the design work: a dimension
+    firing on both dc_medical and westminster but not on dc or carroll_farmland
+    is tracking institutional buildings, not population density. Without a rural
+    hospital those two explanations are inseparable.
+
+    Inside T18SUJ (lat 39.575 < 39.745, lon -76.996), so it symlinks the dc
+    scene.
+
+- name: carroll_farmland
+  lat: 39.4500
+  lon: -77.1000
+  stratum: rural
+  note: >-
+    APPROXIMATE. Open farmland between Westminster and Frederick. The
+    rural-without-a-hospital cell, and the only place in this set with crops --
+    which is the land cover OlmoEarth was most directly pretrained on, via CDL
+    and worldcereal. Inside T18SUJ, so it symlinks too.
+
+- name: poolesville
+  lat: 39.1457
+  lon: -77.4180
+  stratum: rural
+  note: >-
+    APPROXIMATE. Agricultural western Montgomery County -- the farmland end of
+    the gradient. NOTE: lon -77.42 is WEST of tile T18SUJ, whose footprint stops
+    at -77.3336, so this point needs its own scene (expect T18STJ). That is
+    handled automatically: fetch_scene.py searches by coordinate, and each
+    location downloads into its own directory.
+
+- name: richmond
+  lat: 37.5407
+  lon: -77.4360
+  stratum: urban
+  note: >-
+    TEST. Downtown Richmond VA. Chosen to exercise a fresh Sentinel-2 download,
+    OSM extract auto-selection against virginia, and WorldCover tile reuse.

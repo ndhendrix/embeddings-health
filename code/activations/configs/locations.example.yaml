@@ -1,0 +1,33 @@
+# Example probe locations for scripts/compare_locations.py.
+#
+# Chosen by stratum rather than by eye: the point of the first look is an
+# urban/rural contrast, so pick pairs that differ on that axis and little else
+# where possible. Every point must fall inside a *.SAFE scene you have
+# downloaded, and at least chip_px/2 pixels from its edge.
+#
+# Replace these with real coordinates for the scenes you actually have. The
+# DC point is the one the prototype used, so it is a known-good starting value.
+
+- name: dc_downtown
+  lat: 38.90324
+  lon: -77.036964
+  stratum: urban
+  note: dense built-up core, the prototype's default location
+
+- name: dc_rock_creek
+  lat: 38.9500
+  lon: -77.0450
+  stratum: urban_green
+  note: urban park inside the same scene, to separate "city" from "impervious"
+
+- name: dc_suburban
+  lat: 38.9800
+  lon: -77.1000
+  stratum: suburban
+  note: lower-density residential, same scene
+
+- name: rural_farmland
+  lat: 38.7000
+  lon: -77.4500
+  stratum: rural
+  note: agricultural, low population density

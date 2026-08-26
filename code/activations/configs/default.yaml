@@ -1,0 +1,90 @@
+# Default run configuration for the OlmoEarth activation toolkit.
+#
+# Every setting here can change token values, so this file is the thing to cite
+# when reporting numbers. Copy it, edit the copy, and keep it alongside outputs.
+
+model:
+  # A ModelID *value* string. Whether it loads depends on the installed
+  # olmoearth_pretrain version, not on what exists on HuggingFace -- older
+  # installs carry only the v1 members and will refuse this one with a message
+  # telling you what they do have.
+  model_id: OlmoEarth-v1_2-Nano
+
+  # Pin the weights. Without this, `main` moves and the numbers move with it.
+  # This is the revision the repo's embedding pipeline pins for v1.2 Nano.
+  hf_revision: e1f693ae2a7d5b57871a978e9d09e22d05206747
+
+  # The installed olmoearth_pretrain commit. Not used for loading -- recorded in
+  # the manifest so a result can be traced to a package version.
+  # This is what is installed in the repo's root .venv (olmoearth_pretrain
+  # 0.1.1), read from its dist-info direct_url.json. Update it if you reinstall.
+  package_commit: af0b0b21570eda99c721eca4982f89b55b327ce6
+
+  device: auto
+  local_path: null
+
+tile:
+  # 256 px at 10 m is a 2.56 km chip: 64x64 = 4096 tokens at patch_px 4. Chosen
+  # over the original 640 m because 640 m of dense urban core is too uniform to
+  # tell a working encoder from a broken one -- at 2.56 km the chip spans water,
+  # parkland and built-up ground, so real land cover has to show up in the
+  # dimension maps if the model is responding to the ground at all.
+  #
+  # Two costs. Attention is quadratic in token count, so raising this or
+  # lowering patch_px gets expensive fast: 512/4 would be 16384 tokens. And
+  # production uses 128 px, so 256 is off-distribution -- token values depend on
+  # chip context, and edge tokens see less of it than interior ones. Set 128 to
+  # reproduce production numerically; neither 64 nor 256 will.
+  chip_px: 256
+
+  # 4 px at 10 m gives 40 m tokens. The checkpoint's max_patch_size bounds this.
+  patch_px: 4
+
+  # (day, month, year). The production pipeline passes (15, 6, 2022), where the
+  # month is documented as zero-indexed. Match it when comparing against
+  # production embeddings; the month encoding is additive, so this is a constant
+  # offset on every token either way.
+  date: [15, 6, 2022]
+
+  # "computed" matches what the pretraining dataset pipeline applies and is the
+  # right default. "none" reproduces the production embedding pipeline, which
+  # applies no normalization at all -- deliberately available, but
+  # off-distribution for the model.
+  normalize: computed
+
+  input_resolution_m: 10
+
+tap:
+  # "token_exit" gives consistently LayerNorm'd representations at each depth,
+  # one forward pass each. "hooks" gets every depth from one pass but captures
+  # the residual stream before the final LayerNorm, so the taps are not on a
+  # common scale and depth 0 is unavailable.
+  method: token_exit
+
+  # null would be every achievable depth -- for Nano with token_exit that is
+  # [0,1,2,3,4], where 0 is the patch projection before positional/month/
+  # modality encodings.
+  #
+  # Pinned to the deepest tap only, because intermediate depths are unreachable
+  # with olmoearth_pretrain 0.1.1. Any depth below the model's own is fetched
+  # via token_exit_cfg, and the encoder rejects that alongside fast_pass; drop
+  # fast_pass and it instead mismatches token and mask shapes inside
+  # project_and_aggregate (256 tokens vs 16, at chip_px 64 / patch_px 4). The
+  # deepest tap needs no token_exit_cfg at all -- encode.py reuses the plain
+  # full-depth pass for it -- so it is the one depth that works. Set
+  # tap.method: hooks if you need every depth, and read the LayerNorm caveat in
+  # the README before comparing across them.
+  #
+  # NOTE: 4 is the deepest tap for *Nano* only. Change this alongside model_id
+  # -- on Base or Large, 4 is an intermediate depth and hits the broken path.
+  depths: [4]
+
+  # Performance switch only, in eval mode with an all-ONLINE_ENCODER mask.
+  fast_pass: true
+
+  # "squeeze" requires the time and band-set axes to be singleton and refuses to
+  # average them silently. "mean" averages them, matching production.
+  extra_dims: squeeze
+
+# float16 halves output files; in-memory arrays stay float32 regardless.
+save_dtype: float32
