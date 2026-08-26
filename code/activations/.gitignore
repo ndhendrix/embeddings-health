@@ -1,0 +1,11 @@
+# Encoder outputs: embeddings, chips, label grids, figures, manifests. All
+# regenerable from the scripts given the same config, and large enough to bloat
+# history (49 MB across eight locations, and it churns on every run).
+artifacts/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# A virtualenv created inside this subproject
+.venv/
