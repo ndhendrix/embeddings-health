@@ -17,10 +17,9 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import numpy as np
-import rasterio
-from rasterio.merge import merge as rasterio_merge
 from dotenv import load_dotenv
+
+from mosaic_utils import is_readable_tif, write_cog_from_tifs
 
 HERE = Path(__file__).parent
 load_dotenv(HERE / ".env")
@@ -77,10 +76,12 @@ for zip_path in zip_files:
 
     out_path = OUT_DIR / f"{name}.tif"
     if out_path.exists():
-        print(f"  {name}: COG already exists — skipping")
-        if name in manifest_by_name:
-            manifest_by_name[name]["status"] = "done"
-        continue
+        if is_readable_tif(out_path):
+            print(f"  {name}: COG already exists — skipping")
+            if name in manifest_by_name:
+                manifest_by_name[name]["status"] = "done"
+            continue
+        print(f"  {name}: existing COG is unreadable — rebuilding")
 
     print(f"  {name}: processing {zip_path.name}...")
 
@@ -96,30 +97,8 @@ for zip_path in zip_files:
             print(f"    WARNING: no TIF files found in {zip_path.name}")
             continue
 
-        if len(tif_paths) == 1:
-            with rasterio.open(tif_paths[0]) as src:
-                profile = src.profile.copy()
-                data = src.read()
-        else:
-            datasets = [rasterio.open(p) for p in tif_paths]
-            data, transform = rasterio_merge(datasets)
-            profile = datasets[0].profile.copy()
-            profile.update(height=data.shape[1], width=data.shape[2], transform=transform)
-            for ds in datasets:
-                ds.close()
-
-    profile.update(
-        driver="GTiff",
-        compress="deflate",
-        predictor=2,
-        tiled=True,
-        blockxsize=256,
-        blockysize=256,
-        bigtiff="IF_SAFER",
-    )
-    with rasterio.open(out_path, "w", **profile) as dst:
-        dst.write(data)
-    print(f"    → {out_path.name}  shape={data.shape}")
+        data_shape = write_cog_from_tifs(tif_paths, out_path)
+    print(f"    → {out_path.name}  shape={data_shape}")
 
     # Update or insert manifest row
     if name in manifest_by_name:

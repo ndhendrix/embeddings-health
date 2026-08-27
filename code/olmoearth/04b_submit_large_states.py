@@ -4,7 +4,7 @@ Submit split jobs for all CONUS states that exceed the server download size limi
 The OlmoEarth download endpoint closes connections after ~5 minutes, limiting
 each download to ~5 GB at the server's ~17 MB/s outbound rate.  States with
 land area > 100 000 km² typically exceed this and must be submitted as multiple
-smaller pieces via 01b_submit_split_state.py.
+smaller county-group pieces via 01b_submit_split_state.py.
 
 Skips any state where:
   - state_{fips}_{year}.tif already exists on disk (downloaded successfully)
@@ -25,6 +25,7 @@ HERE = Path(__file__).parent
 PROJECT_ROOT = HERE.parent.parent
 OUT_DIR = PROJECT_ROOT / "data" / "olmoearth"
 MANIFEST = HERE / "manifest.csv"
+MANIFEST_FIELDS = ["name", "prediction_id", "status"]
 
 # Census 2020 land area (km²) for CONUS states + DC
 STATE_AREA_KM2 = {
@@ -53,6 +54,8 @@ THRESHOLD_KM2 = 100_000
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--year", type=int, default=2022)
+parser.add_argument("--split-mode", choices=["county", "grid"], default="county",
+                    help="Split large states by county groups (default) or regular grid cells")
 args = parser.parse_args()
 
 # Load the full manifest so we can mark superseded whole-state jobs as "split"
@@ -61,9 +64,15 @@ rows: list[dict] = []
 manifest_by_name: dict[str, dict] = {}
 pieces_submitted: set[str] = set()
 
+
+def _clean_manifest_rows(raw_rows) -> list[dict]:
+    """Drop stray CSV overflow fields before re-writing manifest rows."""
+    return [{field: row.get(field, "") for field in MANIFEST_FIELDS} for row in raw_rows]
+
+
 if MANIFEST.exists():
     with open(MANIFEST) as fh:
-        rows = list(csv.DictReader(fh))
+        rows = _clean_manifest_rows(csv.DictReader(fh))
     manifest_by_name = {r["name"]: r for r in rows}
     for r in rows:
         m = piece_re.match(r["name"])
@@ -73,9 +82,9 @@ if MANIFEST.exists():
 
 def save_manifest():
     with open(MANIFEST, "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["name", "prediction_id", "status"])
+        writer = csv.DictWriter(fh, fieldnames=MANIFEST_FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(_clean_manifest_rows(rows))
 
 
 submit_script = HERE / "01b_submit_split_state.py"
@@ -93,6 +102,9 @@ for fips in CONUS_FIPS:
 
     if state_name in pieces_submitted:
         print(f"  {state_name}: piece jobs already in manifest — skip")
+        if state_name in manifest_by_name and manifest_by_name[state_name]["status"] == "submitted":
+            manifest_by_name[state_name]["status"] = "split"
+            save_manifest()
         skipped += 1
         continue
 
@@ -104,7 +116,8 @@ for fips in CONUS_FIPS:
     needs_split += 1
     result = subprocess.run(
         [sys.executable, str(submit_script),
-         "--state", fips, "--year", str(args.year)],
+         "--state", fips, "--year", str(args.year),
+         "--split-mode", args.split_mode],
         capture_output=True, text=True,
     )
     out = (result.stdout.strip() + result.stderr.strip()).replace("\n", " | ")

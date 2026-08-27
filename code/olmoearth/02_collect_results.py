@@ -20,13 +20,12 @@ import time
 import zipfile
 from pathlib import Path
 
-import numpy as np
-import rasterio
 import requests
-from rasterio.merge import merge as rasterio_merge
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
+
+from mosaic_utils import is_readable_tif, write_cog_from_tifs
 
 HERE = Path(__file__).parent
 load_dotenv(HERE / ".env")
@@ -64,7 +63,11 @@ if not pending:
 
 def save_manifest():
     with open(MANIFEST, "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["name", "prediction_id", "status"])
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=["name", "prediction_id", "status"],
+            extrasaction="ignore",
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -188,7 +191,9 @@ for r in rows:
 for base_name, piece_rows in sorted(piece_groups.items()):
     state_cog = OUT_DIR / f"{base_name}.tif"
     if state_cog.exists():
-        continue
+        if is_readable_tif(state_cog):
+            continue
+        print(f"  {state_cog.name} exists but is unreadable — rebuilding")
     done = [r for r in piece_rows if r["status"] == "done"]
     if len(done) < len(piece_rows):
         print(f"  {base_name}: {len(done)}/{len(piece_rows)} pieces done — mosaic pending")
@@ -196,25 +201,13 @@ for base_name, piece_rows in sorted(piece_groups.items()):
 
     print(f"\nMosaicking {len(piece_rows)} piece(s) → {base_name}.tif")
     piece_tifs = [OUT_DIR / f"{r['name']}.tif" for r in piece_rows]
-    missing_tifs = [p for p in piece_tifs if not p.exists()]
+    missing_tifs = [p for p in piece_tifs if not p.exists() or not is_readable_tif(p)]
     if missing_tifs:
         print(f"  WARNING: piece TIFs missing: {[p.name for p in missing_tifs]}")
         continue
 
-    datasets = [rasterio.open(p) for p in piece_tifs]
-    data, transform = rasterio_merge(datasets)
-    profile = datasets[0].profile.copy()
-    profile.update(height=data.shape[1], width=data.shape[2], transform=transform)
-    for ds in datasets:
-        ds.close()
-
-    profile.update(
-        driver="GTiff", compress="deflate", predictor=2,
-        tiled=True, blockxsize=256, blockysize=256, bigtiff="IF_SAFER",
-    )
-    with rasterio.open(state_cog, "w", **profile) as dst:
-        dst.write(data)
-    print(f"  → {state_cog.name}  shape={data.shape}")
+    data_shape = write_cog_from_tifs(piece_tifs, state_cog)
+    print(f"  → {state_cog.name}  shape={data_shape}")
 
 pieces_pending = any(
     r["status"] != "done"

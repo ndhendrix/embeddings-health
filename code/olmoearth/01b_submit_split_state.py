@@ -2,13 +2,15 @@
 Submit OlmoEarth Studio jobs for one state split into N downloadable pieces.
 
 Large states (> ~100 000 km²) produce ZIPs that exceed the server's ~5-minute
-streaming timeout; this script splits the state boundary into a regular grid and
-submits one job per cell.  02_collect_results.py will mosaic the pieces into a
-single state COG automatically once all pieces are downloaded.
+streaming timeout; this script groups whole counties into downloadable pieces
+and submits one job per county group.  02_collect_results.py will mosaic the
+pieces into a single state COG automatically once all pieces are downloaded.
 
 Usage:
-    uv run python 01b_submit_split_state.py --state 01           # Alabama, auto-split
-    uv run python 01b_submit_split_state.py --state 48 --pieces 8  # Texas, 8 pieces
+    uv run python 01b_submit_split_state.py --state 01             # Alabama, auto-split
+    uv run python 01b_submit_split_state.py --state 48 --pieces 8  # Texas, 8 county groups
+    uv run python 01b_submit_split_state.py --state 48 --dry-run   # preview groups only
+    uv run python 01b_submit_split_state.py --state 48 --split-mode grid  # old grid mode
 """
 import argparse
 import csv
@@ -20,6 +22,7 @@ from pathlib import Path
 import geopandas as gpd
 import requests
 from shapely.geometry import box
+from shapely.ops import unary_union
 from dotenv import load_dotenv
 
 HERE = Path(__file__).parent
@@ -40,7 +43,7 @@ HEADERS = {
 KM2_PER_PIECE = 100_000
 
 
-def split_geometry(geom, n_pieces):
+def split_geometry_grid(geom, n_pieces):
     """Split geom into n_pieces using a regular grid that matches its aspect ratio."""
     minx, miny, maxx, maxy = geom.bounds
     aspect = (maxx - minx) / max(maxy - miny, 1e-10)
@@ -69,11 +72,74 @@ def split_geometry(geom, n_pieces):
     return pieces
 
 
+def split_tracts_into_county_groups(
+    tracts: gpd.GeoDataFrame,
+    n_pieces: int | None,
+    km2_per_piece: float,
+) -> list[dict]:
+    """Group whole counties into pieces sized for reliable downloads."""
+    county_cols = ["STATEFP", "COUNTYFP"]
+    counties = tracts.dissolve(by=county_cols, as_index=False)
+    county_areas = (
+        tracts.to_crs("EPSG:5070")
+        .dissolve(by=county_cols, as_index=False)
+        .assign(area_km2=lambda df: df.geometry.area / 1e6)
+    )[county_cols + ["area_km2"]]
+    counties = counties.merge(county_areas, on=county_cols, how="left")
+    counties["county_geoid"] = counties["STATEFP"] + counties["COUNTYFP"]
+
+    county_records = sorted(
+        counties[["county_geoid", "area_km2", "geometry"]].to_dict("records"),
+        key=lambda r: r["area_km2"],
+        reverse=True,
+    )
+
+    if n_pieces is not None:
+        bins = [{"area_km2": 0.0, "counties": [], "geometries": []} for _ in range(n_pieces)]
+        for county in county_records:
+            target = min(bins, key=lambda b: b["area_km2"])
+            _add_county_to_group(target, county)
+    else:
+        bins = []
+        for county in county_records:
+            fitting = [
+                b for b in bins
+                if b["area_km2"] + county["area_km2"] <= km2_per_piece
+            ]
+            if fitting:
+                target = min(fitting, key=lambda b: b["area_km2"])
+            else:
+                target = {"area_km2": 0.0, "counties": [], "geometries": []}
+                bins.append(target)
+            _add_county_to_group(target, county)
+
+    groups = []
+    for group in bins:
+        if not group["counties"]:
+            continue
+        groups.append({
+            "geometry": unary_union(group["geometries"]),
+            "area_km2": group["area_km2"],
+            "counties": sorted(group["counties"]),
+        })
+    return groups
+
+
+def _add_county_to_group(group: dict, county: dict) -> None:
+    group["area_km2"] += float(county["area_km2"])
+    group["counties"].append(county["county_geoid"])
+    group["geometries"].append(county["geometry"])
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--state", required=True, help="State FIPS code, e.g. 01")
 parser.add_argument("--year", type=int, default=2022)
 parser.add_argument("--pieces", type=int, default=None,
                     help="Number of pieces (default: auto from land area)")
+parser.add_argument("--split-mode", choices=["county", "grid"], default="county",
+                    help="Split large states by county groups (default) or regular grid cells")
+parser.add_argument("--dry-run", action="store_true",
+                    help="Print planned pieces without submitting jobs or updating the manifest")
 args = parser.parse_args()
 
 state_fips = args.state.zfill(2)
@@ -100,7 +166,7 @@ area_km2 = (
     tracts.to_crs("EPSG:5070").dissolve().geometry.iloc[0].area / 1e6
 )
 n_pieces = args.pieces or max(2, math.ceil(area_km2 / KM2_PER_PIECE))
-print(f"{base_name}: land area ≈ {area_km2:,.0f} km² → {n_pieces} piece(s)")
+print(f"{base_name}: land area ≈ {area_km2:,.0f} km² → {n_pieces} piece(s)  mode={args.split_mode}")
 
 # Load manifest to check for already-submitted pieces
 if MANIFEST.exists():
@@ -111,14 +177,30 @@ else:
 manifest_names = {r["name"] for r in rows}
 
 # Split state boundary and submit one job per piece
-pieces = split_geometry(state_geom, n_pieces)
-print(f"Grid produced {len(pieces)} non-empty cell(s)")
+if args.split_mode == "county":
+    pieces = split_tracts_into_county_groups(
+        tracts,
+        n_pieces=args.pieces,
+        km2_per_piece=KM2_PER_PIECE,
+    )
+    print(f"County grouping produced {len(pieces)} group(s)")
+else:
+    pieces = [
+        {"geometry": geom, "area_km2": None, "counties": []}
+        for geom in split_geometry_grid(state_geom, n_pieces)
+    ]
+    print(f"Grid produced {len(pieces)} non-empty cell(s)")
 
 new_rows = []
 for i, piece in enumerate(pieces, 1):
     piece_name = f"{base_name}_p{i:02d}"
-    if piece_name in manifest_names:
+    if piece_name in manifest_names and not args.dry_run:
         print(f"  {piece_name} already in manifest — skipping")
+        continue
+    if piece["counties"]:
+        area = piece["area_km2"]
+        print(f"  {piece_name}: {len(piece['counties'])} counties, {area:,.0f} km²")
+    if args.dry_run:
         continue
 
     resp = requests.post(
@@ -134,8 +216,10 @@ for i, piece in enumerate(pieces, 1):
                     "properties": {
                         "start_time": f"{year}-01-01T00:00:00Z",
                         "end_time": f"{year}-12-31T23:59:59Z",
+                        "split_mode": args.split_mode,
+                        "counties": ",".join(piece["counties"]),
                     },
-                    "geometry": piece.__geo_interface__,
+                    "geometry": piece["geometry"].__geo_interface__,
                 }],
             },
         },
@@ -154,5 +238,7 @@ if new_rows:
             writer.writeheader()
         writer.writerows(new_rows)
     print(f"Submitted {len(new_rows)} piece job(s). Run 02_collect_results.py to collect.")
+elif args.dry_run:
+    print("Dry run complete — no jobs submitted and manifest unchanged.")
 else:
     print("All pieces already in manifest — nothing submitted.")
