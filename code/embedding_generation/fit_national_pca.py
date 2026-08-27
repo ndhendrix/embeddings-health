@@ -55,13 +55,44 @@ def find_raw_tif(variant_dir: Path, state: str, safe_var: str, year: int, min_ba
     return None
 
 
-def find_clay_tif(embed_dir: Path, state: str, year: int) -> Path | None:
-    """Return the (only, always-raw) Clay embedding TIF for this state, or None."""
-    tif = embed_dir / state / f"clay_v1.5_{state}_{year}.tif"
-    return tif if tif.is_file() and tif.stat().st_size > 0 else None
+def find_clay_tifs(embed_dir: Path, state: str, year: int) -> list[Path]:
+    """Return raw Clay embedding TIFs for this state.
+
+    Supports both the older one-state-one-TIF layout and the newer overlap tile
+    layout. Overlap tiles are non-overlapping retained-center products, so they
+    are valid sampling units for the national PCA fit.
+    """
+    state_dir = embed_dir / state
+    legacy = state_dir / f"clay_v1.5_{state}_{year}.tif"
+    if legacy.is_file() and legacy.stat().st_size > 0:
+        return [legacy]
+
+    overlap_tiles = sorted(
+        p for p in state_dir.glob(f"clay-1.5_overlap-center50_{state}_{year}_tile*.tif")
+        if p.is_file() and p.stat().st_size > 0
+        and p.with_suffix(".validation.json").is_file()
+        and p.with_suffix(".validation.json").stat().st_size > 0
+    )
+    if overlap_tiles:
+        return overlap_tiles
+
+    overlap_plain = state_dir / f"clay-1.5_overlap-center50_{state}_{year}.tif"
+    overlap_plain_validation = overlap_plain.with_suffix(".validation.json")
+    if (
+        overlap_plain.is_file()
+        and overlap_plain.stat().st_size > 0
+        and overlap_plain_validation.is_file()
+        and overlap_plain_validation.stat().st_size > 0
+    ):
+        return [overlap_plain]
+
+    return sorted(
+        p for p in state_dir.glob(f"clay-1.5_overlap-center50_{state}_{year}_tile*.tif")
+        if p.is_file() and p.stat().st_size > 0
+    )
 
 
-def sample_state(tif_path: Path, n_samples: int, rng, block_size: int = 256) -> np.ndarray:
+def sample_raster(tif_path: Path, n_samples: int, rng, block_size: int = 256) -> np.ndarray:
     """Sample up to n_samples valid pixels via random block reads (memory-efficient)."""
     samples = []
     remaining = n_samples
@@ -91,6 +122,53 @@ def sample_state(tif_path: Path, n_samples: int, rng, block_size: int = 256) -> 
     return np.vstack(samples)
 
 
+def sample_state(
+    tif_paths: list[Path],
+    n_samples: int,
+    rng,
+    block_size: int = 256,
+    max_rasters: int | None = None,
+) -> np.ndarray:
+    """Sample a state represented by one or more raw embedding TIFs.
+
+    For overlap products, visiting every tile in large states is slow and adds
+    little to a national PCA sample. Select a bounded, area-weighted subset of
+    tiles per state, then allocate that state's sample quota across those tiles.
+    """
+    if not tif_paths:
+        return np.empty((0,), dtype=np.float32)
+
+    areas = []
+    for tif_path in tif_paths:
+        with rasterio.open(tif_path) as src:
+            areas.append(src.height * src.width)
+    areas = np.asarray(areas, dtype=np.float64)
+
+    if max_rasters is not None and len(tif_paths) > max_rasters:
+        probabilities = areas / areas.sum()
+        chosen = np.sort(rng.choice(len(tif_paths), size=max_rasters, replace=False, p=probabilities))
+        tif_paths = [tif_paths[int(i)] for i in chosen]
+        areas = areas[chosen]
+
+    total_area = float(areas.sum())
+    raw_allocations = [n_samples * float(area) / total_area for area in areas]
+    allocations = [int(value) for value in raw_allocations]
+    remainder = n_samples - sum(allocations)
+    order = np.argsort([value - int(value) for value in raw_allocations])[::-1]
+    for idx in order[:remainder]:
+        allocations[int(idx)] += 1
+
+    samples = [
+        sample_raster(tif_path, n, rng, block_size=block_size)
+        for tif_path, n in zip(tif_paths, allocations)
+        if n > 0
+    ]
+    samples = [sample for sample in samples if sample.ndim == 2 and len(sample) > 0]
+    if not samples:
+        return np.empty((0,), dtype=np.float32)
+    return np.vstack(samples)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -112,6 +190,8 @@ def main() -> None:
                         help="Target total pixels across all states (default 500000)")
     parser.add_argument("--min-samples-per-state", type=int, default=500,
                         help="Floor on per-state sample count (default 500)")
+    parser.add_argument("--max-rasters-per-state", type=int, default=16,
+                        help="For tiled Clay overlap inputs, sample at most this many GeoTIFFs per state (default 16)")
     args = parser.parse_args()
 
     if args.model == "prithvi" and not args.variant:
@@ -127,7 +207,7 @@ def main() -> None:
         sys.exit(f"ERROR: directory not found: {scan_dir}")
 
     # Discover states with a valid raw TIF
-    tif_paths: dict[str, Path] = {}
+    tif_paths: dict[str, list[Path]] = {}
     tif_areas: dict[str, int] = {}  # H×W as proxy for state size
     for state_dir in sorted(scan_dir.iterdir()):
         if not state_dir.is_dir():
@@ -135,13 +215,17 @@ def main() -> None:
         state = state_dir.name
         if args.model == "prithvi":
             tif = find_raw_tif(scan_dir, state, safe_var, args.year)
+            tifs = [tif] if tif is not None else []
         else:
-            tif = find_clay_tif(scan_dir, state, args.year)
-        if tif is None:
+            tifs = find_clay_tifs(scan_dir, state, args.year)
+        if not tifs:
             continue
-        with rasterio.open(tif) as src:
-            tif_paths[state] = tif
-            tif_areas[state] = src.height * src.width
+        area = 0
+        for tif in tifs:
+            with rasterio.open(tif) as src:
+                area += src.height * src.width
+        tif_paths[state] = tifs
+        tif_areas[state] = area
 
     if not tif_paths:
         sys.exit("ERROR: no suitable raw embedding TIFs found. "
@@ -152,6 +236,8 @@ def main() -> None:
     print(f"States found:   {len(tif_paths)}")
     print(f"Target samples: {args.total_samples:,}")
     print(f"Components:     {args.n_components}")
+    if args.model == "clay":
+        print(f"Max rasters/state: {args.max_rasters_per_state}")
     print()
 
     # Allocate samples proportionally by TIF area, with a per-state floor
@@ -170,13 +256,19 @@ def main() -> None:
     rng = np.random.default_rng(42)
     all_samples: list[np.ndarray] = []
     for state in tqdm(sorted(tif_paths), desc="Sampling states", unit="state"):
-        pixels = sample_state(tif_paths[state], samples_per_state[state], rng)
+        max_rasters = args.max_rasters_per_state if args.model == "clay" else None
+        pixels = sample_state(tif_paths[state], samples_per_state[state], rng, max_rasters=max_rasters)
         if pixels.ndim < 2 or len(pixels) == 0:
             print(f"  WARNING: no valid pixels in {state} — skipping")
             continue
         all_samples.append(pixels)
+        source_desc = (
+            tif_paths[state][0].name
+            if len(tif_paths[state]) == 1
+            else f"{len(tif_paths[state])} tiled GeoTIFFs"
+        )
         tqdm.write(f"  {state}: {len(pixels):,} px  (target {samples_per_state[state]:,})  "
-                   f"from {tif_paths[state].name}")
+                   f"from {source_desc}")
 
     if not all_samples:
         sys.exit("ERROR: no valid pixels collected — cannot fit PCA.")
@@ -184,8 +276,8 @@ def main() -> None:
     X = np.vstack(all_samples)
     print(f"\nTotal pixels for PCA fit: {X.shape[0]:,} × {X.shape[1]} dims")
 
-    print(f"Fitting PCA({args.n_components})…")
-    pca = PCA(n_components=args.n_components, random_state=42)
+    print(f"Fitting PCA({args.n_components}, randomized SVD)…")
+    pca = PCA(n_components=args.n_components, random_state=42, svd_solver="randomized")
     pca.fit(X)
 
     cum_var = pca.explained_variance_ratio_.cumsum()

@@ -18,6 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 YEAR="${YEAR:-2022}"
+RUN_ID="${RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 
 : "${SCRATCH:?Set SCRATCH before submitting.}"
 OUT_DIR="${OUT_DIR:-$SCRATCH/embeddings-health/olmoearth_composites}"
@@ -27,13 +28,19 @@ TILE_SCRIPT="$SCRIPT_DIR/run_olmoearth_composite_tile.sbatch"
 MERGE_SCRIPT="$SCRIPT_DIR/run_olmoearth_composite_merge.sbatch"
 
 # Task list file written to SCRATCH so compute nodes can read it.
-TASK_FILE="$SCRATCH/embeddings-health/cache/oe_tile_tasks_${YEAR}.txt"
+TASK_FILE="$SCRATCH/embeddings-health/cache/oe_tile_tasks_${YEAR}_${RUN_ID}.txt"
 
-ALL_STATES=(
+DEFAULT_STATES=(
   AL AR AZ CA CO CT DC DE FL GA IA ID IL IN KS KY LA MA MD ME
   MI MN MO MS MT NC ND NE NH NJ NM NV NY OH OK OR PA RI SC SD
   TN TX UT VA VT WA WI WV WY
 )
+if [[ -n "${STATES:-}" ]]; then
+  read -r -a ALL_STATES <<< "$STATES"
+else
+  ALL_STATES=("${DEFAULT_STATES[@]}")
+fi
+MAX_CONCURRENT="${MAX_CONCURRENT:-200}"
 
 mkdir -p "$OUT_DIR" "$LOG_DIR" "$(dirname "$TASK_FILE")"
 
@@ -134,7 +141,7 @@ if [[ "${DRY_RUN:-0}" == "1" ]]; then
   exit 0
 fi
 
-export REPO_DIR OUT_DIR CACHE_ROOT YEAR
+export REPO_DIR OUT_DIR CACHE_ROOT YEAR RUN_ID
 
 # ------------------------------------------------------------------
 # Submit tile arrays in batches of 1000 (Sherlock max_array_tasks=1000)
@@ -157,12 +164,12 @@ if (( total_tiles > 0 )); then
     export TILE_TASK_FILE="$batch_file"
     JOB_ID=$(cd "$REPO_DIR" && sbatch \
       --export=ALL \
-      --array="0-$(( count - 1 ))%200" \
+      --array="0-$(( count - 1 ))%$MAX_CONCURRENT" \
       --output="$LOG_DIR/oe_tile_%A_%a.out" \
       --error="$LOG_DIR/oe_tile_%A_%a.err" \
       --parsable \
       "$TILE_SCRIPT" | cut -d';' -f1)
-    echo "Submitted tile batch $batch: job $JOB_ID  ($count tasks, ≤200 concurrent)"
+    echo "Submitted tile batch $batch: job $JOB_ID  ($count tasks, <=$MAX_CONCURRENT concurrent)"
     TILE_JOB_IDS+=("$JOB_ID")
     (( batch++ )) || true
     (( offset += MAX_ARRAY )) || true

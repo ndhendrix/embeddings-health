@@ -13,7 +13,8 @@ def main():
         if src.count!=spec.dimensions: raise ValueError(f"expected {spec.dimensions} bands, got {src.count}")
         expected_res=spec.patch_pixels*10
         if not np.allclose(src.res,(expected_res,expected_res)): raise ValueError(f"unexpected resolution {src.res}")
-        tags=src.tags(); required=("model","model_revision","chip_pixels","stride_pixels","retained_center_pixels","source_composite","workflow")
+        tags=src.tags(); required=["model","model_revision","chip_pixels","stride_pixels","retained_center_pixels","source_composite","workflow"]
+        if spec.family == "olmoearth": required.append("input_normalization")
         missing=[k for k in required if not tags.get(k)]
         if missing: raise ValueError(f"missing provenance tags: {missing}")
         finite=0; total=0; minimum=np.inf; maximum=-np.inf

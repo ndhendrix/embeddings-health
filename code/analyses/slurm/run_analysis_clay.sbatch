@@ -15,8 +15,9 @@ set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-$HOME/embeddings-health}"
 CACHE_ROOT="${CACHE_ROOT:-$SCRATCH/embeddings-health/cache}"
-AGG_DIR="$SCRATCH/embeddings-health/clay_aggregated"
-COMBINED="$AGG_DIR/clay_v1.5_2022_all_tracts.csv"
+ANALYSIS_MODEL="${ANALYSIS_MODEL:-clay}"
+AGG_DIR="${AGG_DIR:-$SCRATCH/embeddings-health/clay_aggregated}"
+COMBINED="${COMBINED:-$AGG_DIR/clay_v1.5_2022_all_tracts.csv}"
 AREA_SOURCE="$SCRATCH/embeddings-health/alphaearth/alphaearth_embeddings.csv"
 
 : "${SCRATCH:?SCRATCH env var is not set}"
@@ -47,7 +48,9 @@ fi
 echo "=== Clay analysis ==="
 echo "REPO_DIR    : $REPO_DIR"
 echo "SCRATCH     : $SCRATCH"
-echo "OUTPUTS     : $SCRATCH/embeddings-health/outputs/clay"
+echo "MODEL       : $ANALYSIS_MODEL"
+echo "AGG_DIR     : $AGG_DIR"
+echo "OUTPUTS     : $SCRATCH/embeddings-health/outputs/$ANALYSIS_MODEL"
 echo "venv        : $UV_PROJECT_ENVIRONMENT"
 echo ""
 
@@ -59,7 +62,7 @@ if [[ ! -s "$COMBINED" ]]; then
   uv run --python 3.11 python prepare_embeddings.py \
     --input-dir  "$AGG_DIR" \
     --output     "$COMBINED" \
-    --area-source "$AREA_SOURCE"
+    --no-area
   echo "Combined file: $COMBINED"
 else
   echo "Combined file already exists: $COMBINED"
@@ -67,7 +70,7 @@ fi
 
 echo ""
 echo "--- Running analysis ---"
-uv run --python 3.11 python analyses_sherlock.py --model clay
+uv run --python 3.11 python analyses_sherlock.py --model "$ANALYSIS_MODEL"
 
 echo ""
 echo "=== Done ==="

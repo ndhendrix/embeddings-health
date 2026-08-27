@@ -49,7 +49,7 @@ echo ""
 
 cd "$REPO_DIR/code/analyses"
 
-uv run --python 3.11 python analyses_sherlock.py --model alphaearth
+uv run --python 3.11 python analyses_sherlock.py --model alphaearth --no-cache --exclude-states AK HI
 
 echo ""
 echo "=== Done ==="

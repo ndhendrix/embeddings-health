@@ -6,6 +6,7 @@ Usage (submit via sbatch or run interactively on a compute node):
     python code/analyses/analyses_sherlock.py --model alphaearth
     python code/analyses/analyses_sherlock.py --model prithvi_tiny
     python code/analyses/analyses_sherlock.py --model prithvi_300m_tl --no-cache
+    python code/analyses/analyses_sherlock.py --model prithvi_tiny --stage acs --no-cache
 
 Reads embeddings and social-risk data from $SCRATCH/embeddings-health/.
 ACS data lives at $REPO_DIR/data/acs.csv (auto-generated via get_data.py if absent).
@@ -36,14 +37,53 @@ parser = argparse.ArgumentParser(description="embeddings-health analysis on Sher
 parser.add_argument(
     "--model",
     required=True,
-    choices=["alphaearth", "prithvi_tiny", "prithvi_300m_tl", "clay"],
+    choices=[
+        "alphaearth",
+        "prithvi_tiny",
+        "prithvi_300m_tl",
+        "clay",
+        "clay_pca64",
+        "olmoearth_nano_pca64",
+        "olmoearth_base",
+        "olmoearth_base_pca64",
+    ],
 )
 parser.add_argument(
     "--no-cache",
     action="store_true",
     help="Refit all LightGBM models from scratch (ignore cached CSVs)",
 )
+parser.add_argument(
+    "--stage",
+    choices=["all", "acs"],
+    default="all",
+    help="Run the full analysis or stop after the ACS/Q1 correlations stage",
+)
+parser.add_argument(
+    "--exclude-states",
+    nargs="+",
+    default=[],
+    metavar="STATE",
+    help="Exclude one or more USPS state abbreviations from every analysis stage",
+)
 args = parser.parse_args()
+
+_STATE_ABBR_TO_FIPS = {
+    "AL":"01", "AK":"02", "AZ":"04", "AR":"05", "CA":"06", "CO":"08",
+    "CT":"09", "DE":"10", "DC":"11", "FL":"12", "GA":"13", "HI":"15",
+    "ID":"16", "IL":"17", "IN":"18", "IA":"19", "KS":"20", "KY":"21",
+    "LA":"22", "ME":"23", "MD":"24", "MA":"25", "MI":"26", "MN":"27",
+    "MS":"28", "MO":"29", "MT":"30", "NE":"31", "NV":"32", "NH":"33",
+    "NJ":"34", "NM":"35", "NY":"36", "NC":"37", "ND":"38", "OH":"39",
+    "OK":"40", "OR":"41", "PA":"42", "RI":"44", "SC":"45", "SD":"46",
+    "TN":"47", "TX":"48", "UT":"49", "VT":"50", "VA":"51", "WA":"53",
+    "WV":"54", "WI":"55", "WY":"56",
+}
+_exclude_abbrs = {state.upper() for state in args.exclude_states}
+_unknown_excludes = _exclude_abbrs - set(_STATE_ABBR_TO_FIPS)
+if _unknown_excludes:
+    parser.error(f"unknown state abbreviation(s) in --exclude-states: {sorted(_unknown_excludes)}")
+_exclude_fips = {_STATE_ABBR_TO_FIPS[state] for state in _exclude_abbrs}
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRATCH_ROOT = Path(os.environ["SCRATCH"]) / "embeddings-health"
@@ -61,19 +101,42 @@ _EMBEDDINGS_MAP = {
     "prithvi_tiny":    SCRATCH_ROOT / "prithvi_aggregated" / "prithvi_tiny_2022_all_tracts.csv",
     "prithvi_300m_tl": SCRATCH_ROOT / "prithvi_aggregated" / "prithvi_300M-TL_2022_all_tracts.csv",
     "clay":            SCRATCH_ROOT / "clay_aggregated" / "clay_v1.5_2022_all_tracts.csv",
+    "clay_pca64":      SCRATCH_ROOT / "clay_aggregated_pca64" / "clay_v1.5_pca64_2022_all_tracts.csv",
+    "olmoearth_nano_pca64": (
+        SCRATCH_ROOT
+        / "olmoearth_nano_aggregated_pca64"
+        / "olmoearth_v1.2_nano_pca64_2022_all_tracts.csv"
+    ),
+    "olmoearth_base": (
+        SCRATCH_ROOT
+        / "olmoearth_base_aggregated"
+        / "olmoearth_v1.2_base_2022_all_tracts.csv"
+    ),
+    "olmoearth_base_pca64": (
+        SCRATCH_ROOT
+        / "olmoearth_base_aggregated_pca64"
+        / "olmoearth_v1.2_base_pca64_2022_all_tracts.csv"
+    ),
 }
 EMBEDDINGS_PATH = _EMBEDDINGS_MAP[args.model]
+AREA_SOURCE     = SCRATCH_ROOT / "alphaearth" / "alphaearth_embeddings.csv"
 OUTPUTS_DIR     = SCRATCH_ROOT / "outputs" / args.model
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 USE_CACHED    = not args.no_cache
-STAT_SUFFIXES = ["MEAN", "MEDIAN", "MINIMUM", "MAXIMUM", "STD"]
+# Keep the tract summaries comparable across embedding models. The current
+# overlap aggregation pipeline emits these four exactly reducible statistics;
+# AlphaEarth also contains MEDIAN columns, but they are intentionally excluded.
+STAT_SUFFIXES = ["MEAN", "MINIMUM", "MAXIMUM", "STD"]
 
 print(f"=== embeddings-health analysis ===")
 print(f"Model      : {args.model}")
 print(f"Embeddings : {EMBEDDINGS_PATH}")
 print(f"Outputs    : {OUTPUTS_DIR}")
 print(f"Use cached : {USE_CACHED}")
+print(f"Stage      : {args.stage}")
+print(f"Statistics : {', '.join(STAT_SUFFIXES)}")
+print(f"Excluded   : {', '.join(sorted(_exclude_abbrs)) if _exclude_abbrs else 'none'}")
 print()
 
 # ── ACS data (auto-generate if absent) ────────────────────────────────────────
@@ -113,6 +176,26 @@ emb_tract = (
     .pipe(lambda df: df.filter(pl.col(_null_col).is_not_null()) if _null_col else df)
     .with_columns(pl.col("GEOID").str.zfill(11).alias("tract_fips"))
 )
+
+if not {"ALAND", "AWATER"}.issubset(set(emb_tract.columns)):
+    if AREA_SOURCE.exists():
+        print(f"Joining ALAND/AWATER from {AREA_SOURCE}")
+        area = (
+            pl.scan_csv(AREA_SOURCE, schema_overrides={"GEOID": pl.Utf8})
+            .select(["GEOID", "ALAND", "AWATER"])
+            .with_columns(pl.col("GEOID").str.zfill(11).alias("tract_fips"))
+            .drop("GEOID")
+            .unique(subset=["tract_fips"])
+            .collect()
+        )
+        emb_tract = emb_tract.join(area, on="tract_fips", how="left")
+        n_missing_area = emb_tract["ALAND"].is_null().sum()
+        if n_missing_area:
+            print(f"Warning: {n_missing_area:,} embedding tracts had no ALAND/AWATER match.")
+        else:
+            print("ALAND/AWATER joined successfully for all embedding tracts.")
+    else:
+        print(f"Warning: area source not found at {AREA_SOURCE}; running without ALAND/AWATER.")
 
 EMB_COLS     = [c for c in emb_tract.columns
                 if any(c.endswith(f"_{s}") for s in _stat_set) and c not in _meta]
@@ -576,6 +659,14 @@ _readi_extras = (
 df = df.join(_readi_extras, on="tract_fips", how="left")
 ACS_VARS = ACS_VARS + ["median_owner_cost_mortgage", "pct_no_telephone"]
 
+if _exclude_fips:
+    n_before = len(df)
+    df = df.filter(~pl.col("tract_fips").str.slice(0, 2).is_in(_exclude_fips))
+    print(
+        f"Excluded states: {', '.join(sorted(_exclude_abbrs))} "
+        f"({n_before - len(df):,} tracts removed)"
+    )
+
 print(f"Merged dataset: {len(df):,} tracts × {df.shape[1]} columns")
 
 # ── Q1: ACS correlations ───────────────────────────────────────────────────────
@@ -669,6 +760,13 @@ if n_acs > 0:
     plt.close()
     print(f"Q1 plot saved — {n_acs} ACS variables")
 
+if args.stage == "acs":
+    print()
+    print(f"=== Complete: {args.model} ACS correlations ===")
+    print(f"Elapsed : {(time.time() - _t0) / 60:.1f} min")
+    print(f"Outputs : {OUTPUTS_DIR}")
+    raise SystemExit(0)
+
 # ── Q2: Embeddings vs. indices for PLACES ─────────────────────────────────────
 FIPS_TO_ABBR = {
     "01":"AL","02":"AK","04":"AZ","05":"AR","06":"CA","08":"CO","09":"CT",
@@ -707,8 +805,18 @@ df2 = (
 )
 
 all_states = sorted(df2["state_fips"].unique().to_list())
-rng = np.random.default_rng(42)
-holdout_states = set(rng.choice(all_states, size=max(1, round(0.2 * len(all_states))), replace=False).tolist())
+
+# Fixed across models so held-out performance is directly comparable. These
+# are the seed-42 20% holdout selected from the 48-state CONUS model universe.
+# Deriving the split from each model's available states changes the selected
+# states when a source (such as AlphaEarth) covers a different state universe.
+SHARED_HOLDOUT_STATES = {"06", "08", "16", "25", "33", "37", "39", "45", "50", "53"}
+missing_holdout_states = SHARED_HOLDOUT_STATES - set(all_states)
+if missing_holdout_states:
+    missing_abbrs = sorted(FIPS_TO_ABBR.get(s, s) for s in missing_holdout_states)
+    raise ValueError(f"Embedding data are missing shared held-out states: {missing_abbrs}")
+
+holdout_states = SHARED_HOLDOUT_STATES
 train_states   = set(all_states) - holdout_states
 
 df2_pd     = df2.to_pandas()

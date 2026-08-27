@@ -63,6 +63,7 @@ uv run --python 3.11 python composite.py \
   --output-dir     "$OUT_DIR" \
   --max-tile-km    100 \
   --max-cloud-cover "${MAX_CLOUD_COVER:-30}" \
+  --max-scenes-per-month "${MAX_SCENES_PER_MONTH:-2}" \
   --tile-index     "$TILE_IDX"
 
 echo ""

@@ -36,6 +36,8 @@ def main() -> None:
         mmap=a.output.with_name(a.output.name+f".tile{a.tile_index:03d}.mmap"); ckpt=mmap.with_suffix(".checkpoint.json")
         shape=(spec.dimensions,out_h,out_w); stat=a.input.stat()
         config={"schema":1,"model":a.model,"repository":spec.repository,"revision":spec.revision,"year":a.year,"chip":grid.chip,"stride":grid.stride,"patch":grid.patch,"crop":"center50","tile_index":a.tile_index,"num_tiles":a.num_tiles,"grid":[grid_rows,grid_cols],"block_rows":[br0,br1],"block_cols":[bc0,bc1],"shape":list(shape),"input":str(a.input.resolve()),"input_size":stat.st_size,"input_mtime_ns":stat.st_mtime_ns,"test_blocks":a.test_blocks}
+        if spec.family == "olmoearth":
+            config["input_normalization"] = engine.OLMOEARTH_NORMALIZATION
         if a.force: mmap.unlink(missing_ok=True); ckpt.unlink(missing_ok=True)
         done=0
         if mmap.exists() or ckpt.exists():
@@ -76,7 +78,10 @@ def main() -> None:
     names=[f"{'OE' if spec.family=='olmoearth' else 'CL'}{i:04d}" for i in range(spec.dimensions)]
     os.environ.setdefault("EMBEDDING_COG_INTERLEAVE","band"); write_cog(out,transform,crs,output,band_names=names,overviews=False,interleave="band")
     with rasterio.open(output,"r+") as dst:
-        dst.update_tags(model=a.model,model_repository=spec.repository,model_revision=spec.revision,year=str(a.year),chip_pixels=str(grid.chip),stride_pixels=str(grid.stride),retained_center_pixels=str(grid.stride),patch_pixels=str(grid.patch),ownership="half-open",tile_grid=f"{grid_rows}x{grid_cols}",nodata_policy="empty_source_patches_preserved",state_edge_context="boundless_nan_imputed",source_composite=str(a.input.resolve()),source_size=str(stat.st_size),code_git_sha=os.environ.get("CODE_GIT_SHA","unknown"),workflow="overlap-center50-v1")
+        tags=dict(model=a.model,model_repository=spec.repository,model_revision=spec.revision,year=str(a.year),chip_pixels=str(grid.chip),stride_pixels=str(grid.stride),retained_center_pixels=str(grid.stride),patch_pixels=str(grid.patch),ownership="half-open",tile_grid=f"{grid_rows}x{grid_cols}",nodata_policy="empty_source_patches_preserved",state_edge_context="boundless_nan_imputed",source_composite=str(a.input.resolve()),source_size=str(stat.st_size),source_mtime_ns=str(stat.st_mtime_ns),code_git_sha=os.environ.get("CODE_GIT_SHA","unknown"),workflow="overlap-center50-v1")
+        if spec.family == "olmoearth":
+            tags.update(input_normalization=engine.OLMOEARTH_NORMALIZATION, workflow="overlap-center50-v2")
+        dst.update_tags(**tags)
     del out; mmap.unlink(missing_ok=True); ckpt.unlink(missing_ok=True)
     print(f"wrote {output}; chip={grid.chip}, stride={grid.stride}, center={grid.stride}")
 if __name__=="__main__": main()

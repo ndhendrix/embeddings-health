@@ -129,6 +129,33 @@ OLMOEARTH_EMBED_DIMS = {
     "v1_2-Base":  768,
 }
 
+# Canonical Sentinel-2 L2A order and computed normalization used by OlmoEarth.
+# The low-level encoder assumes this preprocessing has already happened:
+# x_norm = (x - (mean - 2 * std)) / (4 * std).
+OLMOEARTH_S2_BANDS = (
+    "B02", "B03", "B04", "B08", "B05", "B06",
+    "B07", "B8A", "B11", "B12", "B01", "B09",
+)
+OLMOEARTH_S2_MEANS = np.array(
+    [
+        1188.9412572078477, 1407.7739105458452, 1513.0573882432757,
+        2755.481305028308, 1890.9893042634167, 2483.7812315422448,
+        2722.728248756412, 2885.570263047681, 2562.852607796968,
+        1914.1383249044113, 1115.8494388252218, 3269.812554170875,
+    ],
+    dtype="float32",
+)
+OLMOEARTH_S2_STDS = np.array(
+    [
+        1859.1923971769581, 1727.7387413631088, 1740.7757298757895,
+        1612.2565699990187, 1754.7320388511766, 1622.1172720635755,
+        1621.8226170190276, 1611.3587521042082, 1441.5471830655151,
+        1328.8914382756407, 1955.6991794280914, 2651.088425085525,
+    ],
+    dtype="float32",
+)
+OLMOEARTH_NORMALIZATION = "computed-2std"
+
 # ---------------------------------------------------------------------------
 # Clay v1.5 parameters (verified from clay-foundation.github.io spec page
 # and made-with-clay/Clay v1.5/clay-v1.5.ckpt config)
@@ -344,11 +371,15 @@ def load_clay():
 # NaN imputation
 # ---------------------------------------------------------------------------
 
-def _impute_nan(chips: np.ndarray) -> np.ndarray:
+def _impute_nan(
+    chips: np.ndarray,
+    all_nan_fill: np.ndarray | None = None,
+) -> np.ndarray:
     """Replace NaN pixels with the per-band mean of valid pixels in that chip.
 
     Works for any shape (..., C, H, W). Each chip × band combination is
-    imputed independently. If an entire band is NaN for a chip, fills with 0.
+    imputed independently. If an entire band is NaN for a chip, it is filled
+    from ``all_nan_fill`` when provided, otherwise with 0.
 
     Transformer attention is not NaN-safe — even one NaN pixel in a patch
     corrupts the full chip embedding via the softmax operation.
@@ -362,9 +393,25 @@ def _impute_nan(chips: np.ndarray) -> np.ndarray:
             band = flat[i, c]
             nan_mask = np.isnan(band)
             if nan_mask.any():
-                fill = band[~nan_mask].mean() if not nan_mask.all() else 0.0
+                if nan_mask.all():
+                    fill = 0.0 if all_nan_fill is None else all_nan_fill[c]
+                else:
+                    fill = band[~nan_mask].mean()
                 band[nan_mask] = fill
     return out.reshape(chips.shape)
+
+
+def normalize_olmoearth_s2(chips: np.ndarray) -> np.ndarray:
+    """Impute and normalize canonical 12-band Sentinel-2 L2A chips."""
+    if chips.ndim != 4 or chips.shape[1] != len(OLMOEARTH_S2_BANDS):
+        raise ValueError(
+            "OlmoEarth Sentinel-2 input must have shape "
+            f"(batch, {len(OLMOEARTH_S2_BANDS)}, height, width); got {chips.shape}"
+        )
+    imputed = _impute_nan(chips, all_nan_fill=OLMOEARTH_S2_MEANS)
+    means = OLMOEARTH_S2_MEANS[None, :, None, None]
+    stds = OLMOEARTH_S2_STDS[None, :, None, None]
+    return (imputed - (means - 2 * stds)) / (4 * stds)
 
 
 # ---------------------------------------------------------------------------
@@ -384,14 +431,15 @@ def run_olmoearth_batch(
     device: torch.device,
     year: int = 2022,
 ) -> np.ndarray:
-    """Return (B, P_H, P_W, 768) float32 spatial patch embeddings.
+    """Return (B, P_H, P_W, D) float32 spatial patch embeddings.
 
     P_H = P_W = chip_px / OLMOEARTH_PATCH_SIZE = 128/4 = 32.
+    D is model-dependent (128 for Nano and 768 for Base).
     Effective spatial resolution: 40m.
     """
     from olmoearth_pretrain.datatypes import OlmoEarthSample, MaskedOlmoEarthSample
 
-    chips = _impute_nan(chips)             # fill NaN before model sees them
+    chips = normalize_olmoearth_s2(chips)
     B, C, H, W = chips.shape
     # Permute (B, C, H, W) → (B, H, W, T=1, C)
     chip_t = torch.from_numpy(chips).permute(0, 2, 3, 1).unsqueeze(3).to(device)

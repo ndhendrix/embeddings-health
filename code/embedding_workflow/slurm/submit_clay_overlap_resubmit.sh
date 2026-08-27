@@ -35,6 +35,7 @@ REFILL_POLL_SECONDS="${REFILL_POLL_SECONDS:-60}"
 CONTROLLER_RESERVE="${CONTROLLER_RESERVE:-1}"
 TILING="${TILING:-rectangular}"
 PY="${PY:-$SCRATCH/embeddings-health/cache/venv-3.11-cpu/bin/python}"
+CONTROLLER_TIME="${CONTROLLER_TIME:-24:00:00}"
 
 if [[ -n "${WATCH_JOB_ID:-}" ]]; then
   echo "Watching GPU work after wave $WATCH_JOB_ID; refill threshold=$REFILL_THRESHOLD"
@@ -107,7 +108,7 @@ RESUBMIT=$(WATCH_JOB_ID="$INFER" sbatch \
   --parsable \
   --job-name=clay-overlap-resubmit \
   --partition=normal \
-  --time=12:00:00 \
+  --time="$CONTROLLER_TIME" \
   --mem=4G \
   --cpus-per-task=1 \
   --output="$LOG_DIR/clay_overlap_resubmit_%j.out" \

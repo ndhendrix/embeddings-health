@@ -11,5 +11,6 @@ REPO_DIR="${REPO_DIR:-$HOME/embeddings-health}"; : "${REFERENCE:?}"; : "${CANDID
 module load devel; module load gcc/14.2.0
 export UV_PROJECT_ENVIRONMENT="$SCRATCH/embeddings-health/cache/venv-3.11-cpu" UV_CACHE_DIR="$SCRATCH/embeddings-health/cache/uv" GDAL_CACHEMAX=512
 cd "$REPO_DIR/code/embedding_generation"; uv sync --python 3.11
-extra=(); [[ -n "${REFERENCE_CSV:-}" ]] && extra+=(--reference-csv "$REFERENCE_CSV" --candidate-csv "$CANDIDATE_CSV")
+extra=(--rtol "${RTOL:-2e-5}" --atol "${ATOL:-1e-5}")
+[[ -n "${REFERENCE_CSV:-}" ]] && extra+=(--reference-csv "$REFERENCE_CSV" --candidate-csv "$CANDIDATE_CSV")
 uv run --python 3.11 python ../embedding_workflow/compare_overlap.py --reference "$REFERENCE" --candidate "$CANDIDATE" --output "$COMPARE_JSON" ${extra[@]:-}

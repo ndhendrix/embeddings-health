@@ -19,7 +19,34 @@ INPUT="${INPUT:-${COMPOSITE_DIR:-$SCRATCH/embeddings-health/olmoearth_composites
 ROOT="${OVERLAP_OUTPUT_ROOT:-$SCRATCH/embeddings-health/embedding_workflow_overlap_v1}"; OUTPUT="$ROOT/$MODEL/$STATE/${MODEL}_overlap-center50_${STATE}_${YEAR}.tif"
 mkdir -p "$(dirname "$OUTPUT")" "$CACHE_ROOT"
 TILE_OUTPUT="$OUTPUT"; (( NUM_TILES > 1 )) && TILE_OUTPUT="${OUTPUT%.tif}_tile$(printf '%03d' "$INDEX").tif"
-if [[ -s "$TILE_OUTPUT" && -s "${TILE_OUTPUT%.tif}.validation.json" ]]; then echo "validated output exists: $TILE_OUTPUT"; exit 0; fi
+if [[ -s "$TILE_OUTPUT" && -s "${TILE_OUTPUT%.tif}.validation.json" ]]; then
+ if python3 - "$TILE_OUTPUT" "$INPUT" "$MODEL" <<'PYVALID'
+import json
+import sys
+from pathlib import Path
+
+raster = Path(sys.argv[1])
+source = Path(sys.argv[2])
+model = sys.argv[3]
+report = json.loads(raster.with_suffix(".validation.json").read_text())
+tags = report.get("tags", {})
+source_stat = source.stat()
+checks = [
+    report.get("model") == model,
+    tags.get("model") == model,
+    Path(tags.get("source_composite", "")).resolve() == source.resolve(),
+    tags.get("source_size") == str(source_stat.st_size),
+    tags.get("source_mtime_ns") == str(source_stat.st_mtime_ns),
+]
+if not all(checks):
+    raise SystemExit(1)
+PYVALID
+ then
+  echo "validated output exists: $TILE_OUTPUT"
+  exit 0
+ fi
+ echo "existing output provenance is stale; regenerating: $TILE_OUTPUT" >&2
+fi
 LOCK_FILE="${TILE_OUTPUT}.worker.lock"
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -33,15 +60,12 @@ if [[ "$MODEL" == olmoearth-* ]] && ! "$UV_PROJECT_ENVIRONMENT/bin/python" -c "i
  VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT" uv pip install --no-deps git+https://github.com/allenai/olmoearth_pretrain
  VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT" uv pip install "einops>=0.7" huggingface_hub universal-pathlib
 fi
-validation_args=(); (( NUM_TILES > 1 )) && validation_args+=(--allow-empty)
+validation_args=(--raster "$TILE_OUTPUT" --model "$MODEL"); (( NUM_TILES > 1 )) && validation_args+=(--allow-empty)
 if [[ -s "$TILE_OUTPUT" ]]; then
- if uv run --python 3.11 python ../embedding_workflow/validate_overlap.py --raster "$TILE_OUTPUT" --model "$MODEL" "${validation_args[@]}"; then
-  echo "validated existing output: $TILE_OUTPUT"; exit 0
- fi
- echo "existing output did not validate; regenerating: $TILE_OUTPUT" >&2
+ echo "existing output did not validate or provenance is stale; regenerating: $TILE_OUTPUT" >&2
 fi
-extra=(); [[ -n "${TEST_BLOCKS:-}" ]] && extra+=(--test-blocks "$TEST_BLOCKS"); [[ -n "${GRID_ROWS:-}" ]] && extra+=(--grid-rows "$GRID_ROWS" --grid-cols "${GRID_COLS:-1}")
+extra=(); [[ -n "${TEST_BLOCKS:-}" ]] && extra+=(--test-blocks "$TEST_BLOCKS"); [[ -n "${GRID_ROWS:-}" ]] && extra+=(--grid-rows "$GRID_ROWS" --grid-cols "${GRID_COLS:-1}"); [[ -n "${BATCH_SIZE:-}" ]] && extra+=(--batch-size "$BATCH_SIZE")
 export CODE_GIT_SHA="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
 uv run --python 3.11 python ../embedding_workflow/generate_overlap.py --model "$MODEL" --input "$INPUT" --output "$OUTPUT" --tile-index "$INDEX" --num-tiles "$NUM_TILES" --year "$YEAR" ${extra[@]:-}
 [[ -n "${TEST_BLOCKS:-}" ]] && validation_args+=(--allow-partial)
-uv run --python 3.11 python ../embedding_workflow/validate_overlap.py --raster "$TILE_OUTPUT" --model "$MODEL" "${validation_args[@]}"
+uv run --python 3.11 python ../embedding_workflow/validate_overlap.py "${validation_args[@]}"

@@ -14,7 +14,7 @@ class ModelSpec:
 
 MODELS = {
     "olmoearth-v1.2-nano": ModelSpec("olmoearth", "v1_2-Nano", "allenai/OlmoEarth-v1_2-Nano", "e1f693ae2a7d5b57871a978e9d09e22d05206747", 128, 128, 4, 32),
-    "olmoearth-v1.2-base": ModelSpec("olmoearth", "v1_2-Base", "allenai/OlmoEarth-v1_2-Base", "581aa9baaa7aed4348c0903617eb92ee9f89e2ec", 768, 128, 4, 8),
+    "olmoearth-v1.2-base": ModelSpec("olmoearth", "v1_2-Base", "allenai/OlmoEarth-v1_2-Base", "581aa9baaa7aed4348c0903617eb92ee9f89e2ec", 768, 128, 4, 16),
     "clay-1.5": ModelSpec("clay", None, "made-with-clay/Clay", "70200ebcccdf67bf2a0cb9984c77ddee26c10ed2", 1024, 256, 8, 2),
 }
 

@@ -64,7 +64,8 @@ uv run --python 3.11 python fit_national_pca.py \
   --embed-dir      "$EMBED_OUT_DIR" \
   --output         "$OUTPUT_PKL" \
   --n-components   64 \
-  --total-samples  500000
+  --total-samples  "${TOTAL_SAMPLES:-500000}" \
+  --max-rasters-per-state "${MAX_RASTERS_PER_STATE:-16}"
 
 echo ""
 echo "=== Done ==="
