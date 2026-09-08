@@ -14,6 +14,7 @@ Outputs are written to $SCRATCH/embeddings-health/outputs/<model>/.
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -55,9 +56,24 @@ parser.add_argument(
 )
 parser.add_argument(
     "--stage",
-    choices=["all", "acs"],
+    choices=["all", "acs", "prepare"],
     default="all",
-    help="Run the full analysis or stop after the ACS/Q1 correlations stage",
+    help="Run the full analysis, stop after Q1, or prepare sharded-analysis inputs",
+)
+parser.add_argument(
+    "--embeddings-path",
+    type=Path,
+    help="Override the model's default combined embedding CSV",
+)
+parser.add_argument(
+    "--outputs-dir",
+    type=Path,
+    help="Override the model's default output directory",
+)
+parser.add_argument(
+    "--prepared-dir",
+    type=Path,
+    help="Destination for --stage prepare artifacts",
 )
 parser.add_argument(
     "--exclude-states",
@@ -118,9 +134,9 @@ _EMBEDDINGS_MAP = {
         / "olmoearth_v1.2_base_pca64_2022_all_tracts.csv"
     ),
 }
-EMBEDDINGS_PATH = _EMBEDDINGS_MAP[args.model]
+EMBEDDINGS_PATH = args.embeddings_path or _EMBEDDINGS_MAP[args.model]
 AREA_SOURCE     = SCRATCH_ROOT / "alphaearth" / "alphaearth_embeddings.csv"
-OUTPUTS_DIR     = SCRATCH_ROOT / "outputs" / args.model
+OUTPUTS_DIR     = args.outputs_dir or (SCRATCH_ROOT / "outputs" / args.model)
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 USE_CACHED    = not args.no_cache
@@ -159,11 +175,18 @@ else:
 _meta     = {"GEOID", "year", "ALAND", "AWATER", "tract_fips"}
 _stat_set = set(STAT_SUFFIXES)
 
-_raw = pl.read_csv(
+_embedding_scan = pl.scan_csv(
     EMBEDDINGS_PATH,
     infer_schema_length=10_000,
     schema_overrides={"GEOID": pl.Utf8},
 )
+_embedding_columns = _embedding_scan.collect_schema().names()
+_wanted_embedding_columns = [
+    c for c in _embedding_columns
+    if c in {"GEOID", "year", "ALAND", "AWATER"}
+    or any(c.endswith(f"_{s}") for s in _stat_set)
+]
+_raw = _embedding_scan.select(_wanted_embedding_columns).collect()
 _null_col = next(
     (c for c in _raw.columns
      if any(c.endswith(f"_{s}") for s in _stat_set) and c not in _meta),
@@ -668,6 +691,148 @@ if _exclude_fips:
     )
 
 print(f"Merged dataset: {len(df):,} tracts × {df.shape[1]} columns")
+
+if args.stage == "prepare":
+    if args.prepared_dir is None:
+        parser.error("--prepared-dir is required with --stage prepare")
+
+    readi_prepared = (
+        pl.read_csv(SRI_DIR / "ReADI_CT_2022.csv", infer_schema_length=5_000)
+        .select(["GEOID", "ReADI_CT_NR"])
+        .with_columns(pl.col("GEOID").cast(pl.Utf8).str.zfill(11).alias("tract_fips"))
+        .drop("GEOID")
+    )
+    sdvi_prepared = (
+        pl.read_csv(SRI_DIR / "sdvi_ct_2020.csv", infer_schema_length=5_000, null_values=["NA"])
+        .select(["GEOID", "SVI", "SDI"])
+        .with_columns(pl.col("GEOID").cast(pl.Utf8).str.zfill(11).alias("tract_fips"))
+        .drop("GEOID")
+        .with_columns([
+            (pl.col("SVI").rank(method="average") / pl.col("SVI").count() * 100).alias("SVI_NR"),
+            (pl.col("SDI").rank(method="average") / pl.col("SDI").count() * 100).alias("SDI_NR"),
+        ])
+        .drop(["SVI", "SDI"])
+    )
+    index_prepared = (
+        df.join(readi_prepared, on="tract_fips", how="inner")
+          .join(sdvi_prepared, on="tract_fips", how="left")
+          .with_columns(pl.col("tract_fips").str.slice(0, 2).alias("state_fips"))
+          .with_row_index("index_order")
+    )
+    index_lookup = index_prepared.select(
+        ["tract_fips", "index_order", "ReADI_CT_NR", "SVI_NR", "SDI_NR"]
+    )
+    prepared = (
+        df.with_columns(pl.col("tract_fips").str.slice(0, 2).alias("state_fips"))
+          .join(index_lookup, on="tract_fips", how="left", maintain_order="left")
+          .with_columns(pl.col("index_order").is_not_null().alias("index_eligible"))
+    )
+
+    shared_holdout_states = {"06", "08", "16", "25", "33", "37", "39", "45", "50", "53"}
+    all_states = sorted(index_prepared["state_fips"].unique().to_list())
+    missing_holdouts = shared_holdout_states - set(all_states)
+    if missing_holdouts:
+        raise ValueError(f"Prepared data are missing shared held-out states: {sorted(missing_holdouts)}")
+
+    if "ALAND" not in prepared.columns:
+        raise ValueError("ALAND is required to prepare Q4 tract-size deciles")
+    aland = index_prepared["ALAND"].to_numpy().astype(float, copy=False)
+    area_edges = np.nanpercentile(aland, np.linspace(0, 100, 11))
+    area_edges[0] -= 1
+    area_decile = np.searchsorted(area_edges[1:-1], aland).astype(np.uint8) + 1
+    decile_lookup = index_prepared.select("tract_fips").with_columns(
+        pl.Series("area_decile", area_decile)
+    )
+    prepared = prepared.join(
+        decile_lookup, on="tract_fips", how="left", maintain_order="left"
+    )
+
+    q1_targets = []
+    for group, columns in [("PLACES", PLACES_MEASURES), ("ACS", ACS_VARS)]:
+        for column in columns:
+            if column in prepared.columns and prepared[column].is_not_null().sum() >= 100:
+                q1_targets.append({"group": group, "variable": column})
+
+    train_states = set(all_states) - shared_holdout_states
+    q23_outcomes = []
+    for column in PLACES_MEASURES:
+        if column not in prepared.columns:
+            continue
+        valid = pl.col(column).is_not_null()
+        counts = index_prepared.select([
+            (valid & pl.col("state_fips").is_in(train_states)).sum().alias("train"),
+            (valid & pl.col("state_fips").is_in(shared_holdout_states)).sum().alias("test"),
+        ]).row(0, named=True)
+        if counts["train"] >= 100 and counts["test"] >= 50:
+            q23_outcomes.append(column)
+
+    state_counts = index_prepared.group_by("state_fips").len().sort("state_fips")
+    q4_states = state_counts.filter(pl.col("len") >= 50)["state_fips"].to_list()
+    decile_counts = pl.Series("area_decile", area_decile).value_counts().sort("area_decile")
+    q4_deciles = decile_counts.filter(pl.col("count") >= 50)["area_decile"].to_list()
+
+    index_features = ["ReADI_CT_NR", "SVI_NR", "SDI_NR"]
+    target_columns = [item["variable"] for item in q1_targets]
+    keep_columns = list(dict.fromkeys(
+        ["tract_fips", "state_fips", "index_order", "index_eligible", "area_decile"]
+        + FEATURE_COLS + target_columns + PLACES_MEASURES + index_features
+    ))
+    prepared = prepared.select(keep_columns)
+    float_columns = [column for column in FEATURE_COLS if column in prepared.columns]
+    prepared = prepared.with_columns([
+        pl.col(column).cast(pl.Float32, strict=False) for column in float_columns
+    ])
+
+    prepared_dir = args.prepared_dir
+    prepared_dir.mkdir(parents=True, exist_ok=True)
+    table_path = prepared_dir / "analysis_data.parquet"
+    metadata_path = prepared_dir / "metadata.json"
+    table_tmp = prepared_dir / f".{table_path.name}.{os.getpid()}.tmp"
+    metadata_tmp = prepared_dir / f".{metadata_path.name}.{os.getpid()}.tmp"
+
+    prepared.write_parquet(
+        table_tmp,
+        compression="zstd",
+        statistics=True,
+        row_group_size=4_096,
+    )
+    os.replace(table_tmp, table_path)
+
+    fips_to_abbr = {fips: abbr for abbr, fips in _STATE_ABBR_TO_FIPS.items()}
+    metadata = {
+        "format_version": 1,
+        "model": args.model,
+        "source_embeddings": str(EMBEDDINGS_PATH),
+        "n_rows": len(prepared),
+        "n_index_rows": len(index_prepared),
+        "feature_dtype": "float32",
+        "embedding_columns": EMB_COLS,
+        "feature_columns": FEATURE_COLS,
+        "area_columns": [c for c in ["ALAND", "AWATER"] if c in FEATURE_COLS],
+        "places_measures": PLACES_MEASURES,
+        "places_labels": {c: PLACES_LABELS.get(c, c) for c in PLACES_MEASURES},
+        "q1_targets": q1_targets,
+        "q23_outcomes": q23_outcomes,
+        "q4_outcomes": PLACES_MEASURES,
+        "index_membership": {k: sorted(v) for k, v in INDEX_MEMBERSHIP.items()},
+        "index_features": index_features,
+        "shared_holdout_states": sorted(shared_holdout_states),
+        "states": all_states,
+        "q4_states": q4_states,
+        "q4_deciles": [int(value) for value in q4_deciles],
+        "fips_to_abbr": fips_to_abbr,
+        "area_decile_edges": area_edges.tolist(),
+    }
+    metadata_tmp.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+    os.replace(metadata_tmp, metadata_path)
+
+    print(f"Prepared table   : {table_path}")
+    print(f"Prepared metadata: {metadata_path}")
+    print(f"Prepared shape   : {prepared.shape[0]:,} rows × {prepared.shape[1]:,} columns")
+    print(f"Q1 targets       : {len(q1_targets)}")
+    print(f"Q2/Q3 outcomes   : {len(q23_outcomes)}")
+    print(f"Q4 states/deciles: {len(q4_states)} / {len(q4_deciles)}")
+    raise SystemExit(0)
 
 # ── Q1: ACS correlations ───────────────────────────────────────────────────────
 def lgbm_cv_r2(

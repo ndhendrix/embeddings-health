@@ -20,6 +20,7 @@ loaded into memory.
 """
 
 import argparse
+import os
 from pathlib import Path
 
 import duckdb
@@ -49,11 +50,14 @@ def _count_csv_rows(path: Path) -> int:
 def _combine_csvs_duckdb(nonempty_files: list[Path], output_path: Path) -> int:
     """Concatenate CSVs through DuckDB without materializing rows in Python."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_name(
+        f".{output_path.name}.tmp-{os.getpid()}"
+    )
     def quote(value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
 
     file_list = "[" + ", ".join(quote(str(f)) for f in nonempty_files) + "]"
-    out = quote(str(output_path))
+    out = quote(str(temporary_path))
     con = duckdb.connect(database=":memory:")
     try:
         con.execute("PRAGMA threads=1")
@@ -75,10 +79,11 @@ def _combine_csvs_duckdb(nonempty_files: list[Path], output_path: Path) -> int:
     finally:
         con.close()
 
-    with output_path.open("rb") as f:
+    with temporary_path.open("rb") as f:
         header = f.readline()
     if not header:
-        raise ValueError(f"DuckDB wrote an empty output file: {output_path}")
+        raise ValueError(f"DuckDB wrote an empty output file: {temporary_path}")
+    temporary_path.replace(output_path)
     return len(header.rstrip(b"\r\n").split(b","))
 
 
