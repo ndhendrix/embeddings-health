@@ -74,3 +74,23 @@ prepared numerical checksums provide a second comparison. The diagnostic is
 intentionally coupled to two markers in the original analysis source and fails
 if those markers are removed. It does not alter the reproduction package or the
 paper's validation targets.
+
+## Export the remaining ACS folds
+
+The successful paired diagnostic established that some tied state sizes receive
+platform-dependent GroupKFold assignments. The paper reproduction therefore needs
+explicit assignments for every model and shared ACS target.
+
+On Sherlock, in the same environment as the successful diagnostic:
+
+```bash
+mkdir -p code/analyses/slurm/logs
+sbatch code/analyses/slurm/export_acs_folds.sbatch
+```
+
+Return `$SCRATCH/embeddings-health/diagnostics/acs_folds_<job ID>.json`.
+This runs no models and reads no original embeddings or restricted-index data.
+It uses the provided tract counts by state for 138 model/target combinations.
+GroupKFold's state allocation depends on these counts, not within-state row order.
+A built-in check requires exact agreement with the previously confirmed AlphaEarth
+median-family-income folds. An environment that fails this check cannot export.
