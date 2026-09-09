@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "files": {
+    "acs_source.parquet": {
+      "bytes": 10240223,
+      "sha256": "7f2579f6d7421b47e16d4f1891aaa993e372b9ba332db47375f3b6c4bbc5f7f3"
+    },
+    "tract_area.parquet": {
+      "bytes": 799991,
+      "sha256": "e32a49badd040444ee842fe35fa293e5469f31b4730b61d53c44cbaea20a18d0"
+    },
+    "places_outcomes.parquet": {
+      "bytes": 16722704,
+      "sha256": "d58eaf7e969045bd5c80839c8d70bcecc7c03adb59b7c32bfc1d0133961248cc"
+    },
+    "analysis_samples.parquet": {
+      "bytes": 5492401,
+      "sha256": "8eb362ebd133caf41192ace3a8be4c701347d7e3baddd96958f06f9f134ec1f3"
+    },
+    "embeddings_alphaearth_2022.parquet": {
+      "bytes": 93282551,
+      "sha256": "524d9aef945e43a9b7f5a11df693e9c582a55e49e3641353aec0beaa8c6602f8"
+    },
+    "embeddings_clay_2022.parquet": {
+      "bytes": 1954232225,
+      "sha256": "53927865d3621fdb5f0863b68bcd2dc448119e5df216e534ad4a51643e2bd3fc"
+    },
+    "embeddings_olmoearth_base_2022.parquet": {
+      "bytes": 1534516950,
+      "sha256": "1dfb806ae1f12c31df73c40012d28df7f85ec26b66a1d9c2a84299d969956285"
+    },
+    "embeddings_olmoearth_nano_2022.parquet": {
+      "bytes": 255650662,
+      "sha256": "4eb8d3c044f64471038c538a9b170c3ccae7b6a1fe27cd04f8da2dd84ebd2c40"
+    },
+    "embeddings_prithvi_300m_tl_2022.parquet": {
+      "bytes": 1959749075,
+      "sha256": "274d66d60dcc18246e04ba399dc57d925cdb12397dec377c97e9a9316d509621"
+    },
+    "embeddings_prithvi_tiny_2022.parquet": {
+      "bytes": 444946817,
+      "sha256": "a7a57aca017e0ba7345ae6124b14474ddf681cd5acb7abe84e5aac9a73fa9109"
+    },
+    "residuals_alphaearth.parquet": {
+      "bytes": 94306678,
+      "sha256": "c7e24c3fff5d5d94839112544bca38ac896a132b51ac5c58a8eb38150b93102a"
+    },
+    "residuals_clay.parquet": {
+      "bytes": 87875471,
+      "sha256": "330896539622fc613cc6c7f7ef4adbc8e81e7033022abbe863d3f9096d496a3a"
+    },
+    "residuals_olmoearth_base.parquet": {
+      "bytes": 93230616,
+      "sha256": "3985885a4497d29b1948b86624509f60bfdd49468aedce1d2e6ef77afa26dd26"
+    },
+    "residuals_olmoearth_nano.parquet": {
+      "bytes": 93230616,
+      "sha256": "49fd328e06a343d645b6ca7da164bc5cdbd09862674c9aaccf9ac172d2bc95d8"
+    },
+    "residuals_prithvi_300m_tl.parquet": {
+      "bytes": 85386799,
+      "sha256": "72e1b3ab7d20a75b3fd1ed91e593de3d28719b6f8aad40a0ef52f2ce6078664a"
+    },
+    "residuals_prithvi_tiny.parquet": {
+      "bytes": 85384990,
+      "sha256": "ccb9688cfb67d3faade1f90d333ff79d32eb4ff621bd96a1a3dd8171af88354d"
+    },
+    "acs_folds.json": {
+      "bytes": 282773,
+      "sha256": "10a74cf2d731a4bfb579fbab986cf5f1a971a1bcb4fe94fa8176d005e4e6a97d"
+    }
+  }
+}

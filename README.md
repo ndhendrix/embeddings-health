@@ -170,3 +170,9 @@ For a paired local/Sherlock check of the median-family-income analysis, see
 [the diagnostic instructions](code/analyses/diagnostics/README.md). The diagnostic
 records inputs, feature order, folds, predictions, and environment details without
 overwriting paper results.
+
+## Reproduction package (under validation)
+
+The standalone package is in [reproduction/](reproduction/README.md).
+Follow [the Sherlock transfer and validation guide](reproduction/SHERLOCK.md)
+to obtain the staged data and submit smoke/full Slurm runs.

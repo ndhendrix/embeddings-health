@@ -1,0 +1,1441 @@
+embedding_model,outcome,outcome_label,predictor_type,r2,n_train,n_test
+AlphaEarth Foundations,ACCESS2,Lack of health insurance,ReADI,0.5576,55348,21979
+AlphaEarth Foundations,ACCESS2,Lack of health insurance,SVI,0.1631,55348,21979
+AlphaEarth Foundations,ACCESS2,Lack of health insurance,SDI,0.423,55348,21979
+AlphaEarth Foundations,ACCESS2,Lack of health insurance,All indices,0.5773,55348,21979
+AlphaEarth Foundations,ACCESS2,Lack of health insurance,Embeddings,0.2796,55348,21979
+AlphaEarth Foundations,ACCESS2,Lack of health insurance,All indices + Embeddings,0.7154,55348,21979
+AlphaEarth Foundations,ARTHRITIS,Arthritis,ReADI,0.0419,55348,21979
+AlphaEarth Foundations,ARTHRITIS,Arthritis,SVI,0.112,55348,21979
+AlphaEarth Foundations,ARTHRITIS,Arthritis,SDI,-0.0358,55348,21979
+AlphaEarth Foundations,ARTHRITIS,Arthritis,All indices,0.5702,55348,21979
+AlphaEarth Foundations,ARTHRITIS,Arthritis,Embeddings,0.2787,55348,21979
+AlphaEarth Foundations,ARTHRITIS,Arthritis,All indices + Embeddings,0.5709,55348,21979
+AlphaEarth Foundations,BINGE,Binge drinking,ReADI,0.1262,55348,21979
+AlphaEarth Foundations,BINGE,Binge drinking,SVI,0.0857,55348,21979
+AlphaEarth Foundations,BINGE,Binge drinking,SDI,0.0367,55348,21979
+AlphaEarth Foundations,BINGE,Binge drinking,All indices,0.2932,55348,21979
+AlphaEarth Foundations,BINGE,Binge drinking,Embeddings,0.0118,55348,21979
+AlphaEarth Foundations,BINGE,Binge drinking,All indices + Embeddings,0.2135,55348,21979
+AlphaEarth Foundations,BPHIGH,High blood pressure,ReADI,0.1708,55348,21979
+AlphaEarth Foundations,BPHIGH,High blood pressure,SVI,-0.1262,55348,21979
+AlphaEarth Foundations,BPHIGH,High blood pressure,SDI,-0.183,55348,21979
+AlphaEarth Foundations,BPHIGH,High blood pressure,All indices,0.5434,55348,21979
+AlphaEarth Foundations,BPHIGH,High blood pressure,Embeddings,0.3532,55348,21979
+AlphaEarth Foundations,BPHIGH,High blood pressure,All indices + Embeddings,0.6327,55348,21979
+AlphaEarth Foundations,BPMED,BP medication use,ReADI,-0.1291,55348,21979
+AlphaEarth Foundations,BPMED,BP medication use,SVI,-0.0227,55348,21979
+AlphaEarth Foundations,BPMED,BP medication use,SDI,-0.0313,55348,21979
+AlphaEarth Foundations,BPMED,BP medication use,All indices,0.2807,55348,21979
+AlphaEarth Foundations,BPMED,BP medication use,Embeddings,0.3455,55348,21979
+AlphaEarth Foundations,BPMED,BP medication use,All indices + Embeddings,0.4883,55348,21979
+AlphaEarth Foundations,CANCER,Cancer (excl. skin),ReADI,0.0617,55348,21979
+AlphaEarth Foundations,CANCER,Cancer (excl. skin),SVI,0.3567,55348,21979
+AlphaEarth Foundations,CANCER,Cancer (excl. skin),SDI,0.3225,55348,21979
+AlphaEarth Foundations,CANCER,Cancer (excl. skin),All indices,0.4958,55348,21979
+AlphaEarth Foundations,CANCER,Cancer (excl. skin),Embeddings,0.3134,55348,21979
+AlphaEarth Foundations,CANCER,Cancer (excl. skin),All indices + Embeddings,0.4508,55348,21979
+AlphaEarth Foundations,CASTHMA,Current asthma,ReADI,0.267,55348,21979
+AlphaEarth Foundations,CASTHMA,Current asthma,SVI,0.0299,55348,21979
+AlphaEarth Foundations,CASTHMA,Current asthma,SDI,0.0546,55348,21979
+AlphaEarth Foundations,CASTHMA,Current asthma,All indices,0.4638,55348,21979
+AlphaEarth Foundations,CASTHMA,Current asthma,Embeddings,0.2849,55348,21979
+AlphaEarth Foundations,CASTHMA,Current asthma,All indices + Embeddings,0.533,55348,21979
+AlphaEarth Foundations,CHD,Coronary heart disease,ReADI,0.2748,55348,21979
+AlphaEarth Foundations,CHD,Coronary heart disease,SVI,-0.0389,55348,21979
+AlphaEarth Foundations,CHD,Coronary heart disease,SDI,-0.0505,55348,21979
+AlphaEarth Foundations,CHD,Coronary heart disease,All indices,0.5353,55348,21979
+AlphaEarth Foundations,CHD,Coronary heart disease,Embeddings,0.1692,55348,21979
+AlphaEarth Foundations,CHD,Coronary heart disease,All indices + Embeddings,0.5776,55348,21979
+AlphaEarth Foundations,CHECKUP,Annual checkup,ReADI,-0.2235,55348,21979
+AlphaEarth Foundations,CHECKUP,Annual checkup,SVI,0.053,55348,21979
+AlphaEarth Foundations,CHECKUP,Annual checkup,SDI,-0.1169,55348,21979
+AlphaEarth Foundations,CHECKUP,Annual checkup,All indices,0.1251,55348,21979
+AlphaEarth Foundations,CHECKUP,Annual checkup,Embeddings,0.5394,55348,21979
+AlphaEarth Foundations,CHECKUP,Annual checkup,All indices + Embeddings,0.6139,55348,21979
+AlphaEarth Foundations,CHOLSCREEN,Cholesterol screening,ReADI,0.3505,55348,21979
+AlphaEarth Foundations,CHOLSCREEN,Cholesterol screening,SVI,0.2794,55348,21979
+AlphaEarth Foundations,CHOLSCREEN,Cholesterol screening,SDI,0.4879,55348,21979
+AlphaEarth Foundations,CHOLSCREEN,Cholesterol screening,All indices,0.5124,55348,21979
+AlphaEarth Foundations,CHOLSCREEN,Cholesterol screening,Embeddings,0.2937,55348,21979
+AlphaEarth Foundations,CHOLSCREEN,Cholesterol screening,All indices + Embeddings,0.6577,55348,21979
+AlphaEarth Foundations,COGNITION,Cognitive decline,ReADI,0.7579,55348,21979
+AlphaEarth Foundations,COGNITION,Cognitive decline,SVI,0.3283,55348,21979
+AlphaEarth Foundations,COGNITION,Cognitive decline,SDI,0.6374,55348,21979
+AlphaEarth Foundations,COGNITION,Cognitive decline,All indices,0.7565,55348,21979
+AlphaEarth Foundations,COGNITION,Cognitive decline,Embeddings,0.2678,55348,21979
+AlphaEarth Foundations,COGNITION,Cognitive decline,All indices + Embeddings,0.7758,55348,21979
+AlphaEarth Foundations,COLON_SCREEN,Colorectal cancer screening,ReADI,0.206,60053,21978
+AlphaEarth Foundations,COLON_SCREEN,Colorectal cancer screening,SVI,0.5691,60053,21978
+AlphaEarth Foundations,COLON_SCREEN,Colorectal cancer screening,SDI,0.4155,60053,21978
+AlphaEarth Foundations,COLON_SCREEN,Colorectal cancer screening,All indices,0.5764,60053,21978
+AlphaEarth Foundations,COLON_SCREEN,Colorectal cancer screening,Embeddings,0.3998,60053,21978
+AlphaEarth Foundations,COLON_SCREEN,Colorectal cancer screening,All indices + Embeddings,0.7164,60053,21978
+AlphaEarth Foundations,COPD,COPD,ReADI,0.4857,55348,21979
+AlphaEarth Foundations,COPD,COPD,SVI,-0.0548,55348,21979
+AlphaEarth Foundations,COPD,COPD,SDI,-0.0046,55348,21979
+AlphaEarth Foundations,COPD,COPD,All indices,0.7473,55348,21979
+AlphaEarth Foundations,COPD,COPD,Embeddings,0.2688,55348,21979
+AlphaEarth Foundations,COPD,COPD,All indices + Embeddings,0.7563,55348,21979
+AlphaEarth Foundations,CSMOKING,Current smoking,ReADI,0.7317,55348,21979
+AlphaEarth Foundations,CSMOKING,Current smoking,SVI,5e-4,55348,21979
+AlphaEarth Foundations,CSMOKING,Current smoking,SDI,0.2417,55348,21979
+AlphaEarth Foundations,CSMOKING,Current smoking,All indices,0.8046,55348,21979
+AlphaEarth Foundations,CSMOKING,Current smoking,Embeddings,0.3438,55348,21979
+AlphaEarth Foundations,CSMOKING,Current smoking,All indices + Embeddings,0.8165,55348,21979
+AlphaEarth Foundations,DENTAL,Dental visit,ReADI,0.8092,60055,21979
+AlphaEarth Foundations,DENTAL,Dental visit,SVI,0.2375,60055,21979
+AlphaEarth Foundations,DENTAL,Dental visit,SDI,0.5597,60055,21979
+AlphaEarth Foundations,DENTAL,Dental visit,All indices,0.8408,60055,21979
+AlphaEarth Foundations,DENTAL,Dental visit,Embeddings,0.3065,60055,21979
+AlphaEarth Foundations,DENTAL,Dental visit,All indices + Embeddings,0.8708,60055,21979
+AlphaEarth Foundations,DEPRESSION,Depression,ReADI,-0.1154,55348,21979
+AlphaEarth Foundations,DEPRESSION,Depression,SVI,-0.1123,55348,21979
+AlphaEarth Foundations,DEPRESSION,Depression,SDI,-0.1372,55348,21979
+AlphaEarth Foundations,DEPRESSION,Depression,All indices,-0.0714,55348,21979
+AlphaEarth Foundations,DEPRESSION,Depression,Embeddings,0.0338,55348,21979
+AlphaEarth Foundations,DEPRESSION,Depression,All indices + Embeddings,0.2397,55348,21979
+AlphaEarth Foundations,DIABETES,Diabetes,ReADI,0.5494,55348,21979
+AlphaEarth Foundations,DIABETES,Diabetes,SVI,0.0409,55348,21979
+AlphaEarth Foundations,DIABETES,Diabetes,SDI,0.1556,55348,21979
+AlphaEarth Foundations,DIABETES,Diabetes,All indices,0.6587,55348,21979
+AlphaEarth Foundations,DIABETES,Diabetes,Embeddings,0.21,55348,21979
+AlphaEarth Foundations,DIABETES,Diabetes,All indices + Embeddings,0.6678,55348,21979
+AlphaEarth Foundations,DISABILITY,Any disability,ReADI,0.8044,55348,21979
+AlphaEarth Foundations,DISABILITY,Any disability,SVI,0.2208,55348,21979
+AlphaEarth Foundations,DISABILITY,Any disability,SDI,0.426,55348,21979
+AlphaEarth Foundations,DISABILITY,Any disability,All indices,0.768,55348,21979
+AlphaEarth Foundations,DISABILITY,Any disability,Embeddings,0.2346,55348,21979
+AlphaEarth Foundations,DISABILITY,Any disability,All indices + Embeddings,0.7957,55348,21979
+AlphaEarth Foundations,EMOTIONSPT,Emotional support,ReADI,0.1235,40352,18580
+AlphaEarth Foundations,EMOTIONSPT,Emotional support,SVI,0.619,40352,18580
+AlphaEarth Foundations,EMOTIONSPT,Emotional support,SDI,0.4135,40352,18580
+AlphaEarth Foundations,EMOTIONSPT,Emotional support,All indices,0.5663,40352,18580
+AlphaEarth Foundations,EMOTIONSPT,Emotional support,Embeddings,0.3363,40352,18580
+AlphaEarth Foundations,EMOTIONSPT,Emotional support,All indices + Embeddings,0.6625,40352,18580
+AlphaEarth Foundations,FOODINSECU,Food insecurity,ReADI,0.7393,40352,18580
+AlphaEarth Foundations,FOODINSECU,Food insecurity,SVI,0.4196,40352,18580
+AlphaEarth Foundations,FOODINSECU,Food insecurity,SDI,0.7241,40352,18580
+AlphaEarth Foundations,FOODINSECU,Food insecurity,All indices,0.8776,40352,18580
+AlphaEarth Foundations,FOODINSECU,Food insecurity,Embeddings,0.2712,40352,18580
+AlphaEarth Foundations,FOODINSECU,Food insecurity,All indices + Embeddings,0.8698,40352,18580
+AlphaEarth Foundations,FOODSTAMP,Food stamp use,ReADI,0.7098,40352,18580
+AlphaEarth Foundations,FOODSTAMP,Food stamp use,SVI,0.3752,40352,18580
+AlphaEarth Foundations,FOODSTAMP,Food stamp use,SDI,0.7206,40352,18580
+AlphaEarth Foundations,FOODSTAMP,Food stamp use,All indices,0.8084,40352,18580
+AlphaEarth Foundations,FOODSTAMP,Food stamp use,Embeddings,0.2329,40352,18580
+AlphaEarth Foundations,FOODSTAMP,Food stamp use,All indices + Embeddings,0.7724,40352,18580
+AlphaEarth Foundations,GHLTH,Fair/poor general health,ReADI,0.7462,55348,21979
+AlphaEarth Foundations,GHLTH,Fair/poor general health,SVI,0.4389,55348,21979
+AlphaEarth Foundations,GHLTH,Fair/poor general health,SDI,0.5841,55348,21979
+AlphaEarth Foundations,GHLTH,Fair/poor general health,All indices,0.8084,55348,21979
+AlphaEarth Foundations,GHLTH,Fair/poor general health,Embeddings,0.1705,55348,21979
+AlphaEarth Foundations,GHLTH,Fair/poor general health,All indices + Embeddings,0.7971,55348,21979
+AlphaEarth Foundations,HEARING,Hearing disability,ReADI,0.1745,55348,21979
+AlphaEarth Foundations,HEARING,Hearing disability,SVI,-0.0532,55348,21979
+AlphaEarth Foundations,HEARING,Hearing disability,SDI,-0.0966,55348,21979
+AlphaEarth Foundations,HEARING,Hearing disability,All indices,0.4414,55348,21979
+AlphaEarth Foundations,HEARING,Hearing disability,Embeddings,-0.0013,55348,21979
+AlphaEarth Foundations,HEARING,Hearing disability,All indices + Embeddings,0.411,55348,21979
+AlphaEarth Foundations,HIGHCHOL,High cholesterol,ReADI,-0.1119,55348,21979
+AlphaEarth Foundations,HIGHCHOL,High cholesterol,SVI,-0.0974,55348,21979
+AlphaEarth Foundations,HIGHCHOL,High cholesterol,SDI,-0.0719,55348,21979
+AlphaEarth Foundations,HIGHCHOL,High cholesterol,All indices,0.2433,55348,21979
+AlphaEarth Foundations,HIGHCHOL,High cholesterol,Embeddings,0.1679,55348,21979
+AlphaEarth Foundations,HIGHCHOL,High cholesterol,All indices + Embeddings,0.3303,55348,21979
+AlphaEarth Foundations,HOUSINSECU,Housing insecurity,ReADI,0.6382,40352,18580
+AlphaEarth Foundations,HOUSINSECU,Housing insecurity,SVI,0.4601,40352,18580
+AlphaEarth Foundations,HOUSINSECU,Housing insecurity,SDI,0.6992,40352,18580
+AlphaEarth Foundations,HOUSINSECU,Housing insecurity,All indices,0.8306,40352,18580
+AlphaEarth Foundations,HOUSINSECU,Housing insecurity,Embeddings,0.3175,40352,18580
+AlphaEarth Foundations,HOUSINSECU,Housing insecurity,All indices + Embeddings,0.8033,40352,18580
+AlphaEarth Foundations,INDEPLIVE,Independent living difficulty,ReADI,0.8712,55348,21979
+AlphaEarth Foundations,INDEPLIVE,Independent living difficulty,SVI,0.2302,55348,21979
+AlphaEarth Foundations,INDEPLIVE,Independent living difficulty,SDI,0.5806,55348,21979
+AlphaEarth Foundations,INDEPLIVE,Independent living difficulty,All indices,0.8577,55348,21979
+AlphaEarth Foundations,INDEPLIVE,Independent living difficulty,Embeddings,0.2461,55348,21979
+AlphaEarth Foundations,INDEPLIVE,Independent living difficulty,All indices + Embeddings,0.829,55348,21979
+AlphaEarth Foundations,LACKTRPT,Lack of transportation,ReADI,0.7451,40352,18580
+AlphaEarth Foundations,LACKTRPT,Lack of transportation,SVI,0.3592,40352,18580
+AlphaEarth Foundations,LACKTRPT,Lack of transportation,SDI,0.7407,40352,18580
+AlphaEarth Foundations,LACKTRPT,Lack of transportation,All indices,0.8591,40352,18580
+AlphaEarth Foundations,LACKTRPT,Lack of transportation,Embeddings,0.2387,40352,18580
+AlphaEarth Foundations,LACKTRPT,Lack of transportation,All indices + Embeddings,0.8577,40352,18580
+AlphaEarth Foundations,LONELINESS,Loneliness,ReADI,0.0342,40352,18580
+AlphaEarth Foundations,LONELINESS,Loneliness,SVI,0.4037,40352,18580
+AlphaEarth Foundations,LONELINESS,Loneliness,SDI,0.3817,40352,18580
+AlphaEarth Foundations,LONELINESS,Loneliness,All indices,0.4351,40352,18580
+AlphaEarth Foundations,LONELINESS,Loneliness,Embeddings,0.0922,40352,18580
+AlphaEarth Foundations,LONELINESS,Loneliness,All indices + Embeddings,0.2662,40352,18580
+AlphaEarth Foundations,LPA,Physical inactivity,ReADI,0.7617,55348,21979
+AlphaEarth Foundations,LPA,Physical inactivity,SVI,0.1985,55348,21979
+AlphaEarth Foundations,LPA,Physical inactivity,SDI,0.4075,55348,21979
+AlphaEarth Foundations,LPA,Physical inactivity,All indices,0.8026,55348,21979
+AlphaEarth Foundations,LPA,Physical inactivity,Embeddings,0.1558,55348,21979
+AlphaEarth Foundations,LPA,Physical inactivity,All indices + Embeddings,0.8127,55348,21979
+AlphaEarth Foundations,MAMMOUSE,Mammography use,ReADI,0.3277,60024,21970
+AlphaEarth Foundations,MAMMOUSE,Mammography use,SVI,0.1283,60024,21970
+AlphaEarth Foundations,MAMMOUSE,Mammography use,SDI,0.2031,60024,21970
+AlphaEarth Foundations,MAMMOUSE,Mammography use,All indices,0.3354,60024,21970
+AlphaEarth Foundations,MAMMOUSE,Mammography use,Embeddings,0.2241,60024,21970
+AlphaEarth Foundations,MAMMOUSE,Mammography use,All indices + Embeddings,0.5302,60024,21970
+AlphaEarth Foundations,MHLTH,Poor mental health days,ReADI,0.5987,55348,21979
+AlphaEarth Foundations,MHLTH,Poor mental health days,SVI,0.1649,55348,21979
+AlphaEarth Foundations,MHLTH,Poor mental health days,SDI,0.5132,55348,21979
+AlphaEarth Foundations,MHLTH,Poor mental health days,All indices,0.6012,55348,21979
+AlphaEarth Foundations,MHLTH,Poor mental health days,Embeddings,0.2596,55348,21979
+AlphaEarth Foundations,MHLTH,Poor mental health days,All indices + Embeddings,0.5952,55348,21979
+AlphaEarth Foundations,MOBILITY,Mobility disability,ReADI,0.667,55348,21979
+AlphaEarth Foundations,MOBILITY,Mobility disability,SVI,0.1283,55348,21979
+AlphaEarth Foundations,MOBILITY,Mobility disability,SDI,0.2631,55348,21979
+AlphaEarth Foundations,MOBILITY,Mobility disability,All indices,0.7188,55348,21979
+AlphaEarth Foundations,MOBILITY,Mobility disability,Embeddings,0.2065,55348,21979
+AlphaEarth Foundations,MOBILITY,Mobility disability,All indices + Embeddings,0.7294,55348,21979
+AlphaEarth Foundations,OBESITY,Obesity,ReADI,0.4459,55348,21979
+AlphaEarth Foundations,OBESITY,Obesity,SVI,-0.2328,55348,21979
+AlphaEarth Foundations,OBESITY,Obesity,SDI,-0.0931,55348,21979
+AlphaEarth Foundations,OBESITY,Obesity,All indices,0.6249,55348,21979
+AlphaEarth Foundations,OBESITY,Obesity,Embeddings,0.3373,55348,21979
+AlphaEarth Foundations,OBESITY,Obesity,All indices + Embeddings,0.7032,55348,21979
+AlphaEarth Foundations,PHLTH,Poor physical health days,ReADI,0.7445,55348,21979
+AlphaEarth Foundations,PHLTH,Poor physical health days,SVI,0.2162,55348,21979
+AlphaEarth Foundations,PHLTH,Poor physical health days,SDI,0.3652,55348,21979
+AlphaEarth Foundations,PHLTH,Poor physical health days,All indices,0.7629,55348,21979
+AlphaEarth Foundations,PHLTH,Poor physical health days,Embeddings,0.2125,55348,21979
+AlphaEarth Foundations,PHLTH,Poor physical health days,All indices + Embeddings,0.7826,55348,21979
+AlphaEarth Foundations,SELFCARE,Self-care disability,ReADI,0.8035,55348,21979
+AlphaEarth Foundations,SELFCARE,Self-care disability,SVI,0.2197,55348,21979
+AlphaEarth Foundations,SELFCARE,Self-care disability,SDI,0.4905,55348,21979
+AlphaEarth Foundations,SELFCARE,Self-care disability,All indices,0.8262,55348,21979
+AlphaEarth Foundations,SELFCARE,Self-care disability,Embeddings,0.2201,55348,21979
+AlphaEarth Foundations,SELFCARE,Self-care disability,All indices + Embeddings,0.824,55348,21979
+AlphaEarth Foundations,SHUTUTILITY,Utility shutoff,ReADI,0.7888,40352,18580
+AlphaEarth Foundations,SHUTUTILITY,Utility shutoff,SVI,0.0608,40352,18580
+AlphaEarth Foundations,SHUTUTILITY,Utility shutoff,SDI,0.5544,40352,18580
+AlphaEarth Foundations,SHUTUTILITY,Utility shutoff,All indices,0.8184,40352,18580
+AlphaEarth Foundations,SHUTUTILITY,Utility shutoff,Embeddings,0.1928,40352,18580
+AlphaEarth Foundations,SHUTUTILITY,Utility shutoff,All indices + Embeddings,0.848,40352,18580
+AlphaEarth Foundations,SLEEP,Short sleep duration,ReADI,0.4753,60055,21979
+AlphaEarth Foundations,SLEEP,Short sleep duration,SVI,-0.0361,60055,21979
+AlphaEarth Foundations,SLEEP,Short sleep duration,SDI,0.2265,60055,21979
+AlphaEarth Foundations,SLEEP,Short sleep duration,All indices,0.47,60055,21979
+AlphaEarth Foundations,SLEEP,Short sleep duration,Embeddings,0.2436,60055,21979
+AlphaEarth Foundations,SLEEP,Short sleep duration,All indices + Embeddings,0.5694,60055,21979
+AlphaEarth Foundations,STROKE,Stroke,ReADI,0.4809,55348,21979
+AlphaEarth Foundations,STROKE,Stroke,SVI,0.0013,55348,21979
+AlphaEarth Foundations,STROKE,Stroke,SDI,0.0743,55348,21979
+AlphaEarth Foundations,STROKE,Stroke,All indices,0.6427,55348,21979
+AlphaEarth Foundations,STROKE,Stroke,Embeddings,0.2425,55348,21979
+AlphaEarth Foundations,STROKE,Stroke,All indices + Embeddings,0.6747,55348,21979
+AlphaEarth Foundations,TEETHLOST,Tooth loss,ReADI,0.8244,60030,21971
+AlphaEarth Foundations,TEETHLOST,Tooth loss,SVI,0.0607,60030,21971
+AlphaEarth Foundations,TEETHLOST,Tooth loss,SDI,0.4346,60030,21971
+AlphaEarth Foundations,TEETHLOST,Tooth loss,All indices,0.8409,60030,21971
+AlphaEarth Foundations,TEETHLOST,Tooth loss,Embeddings,0.2581,60030,21971
+AlphaEarth Foundations,TEETHLOST,Tooth loss,All indices + Embeddings,0.8516,60030,21971
+AlphaEarth Foundations,VISION,Vision disability,ReADI,0.806,55348,21979
+AlphaEarth Foundations,VISION,Vision disability,SVI,0.361,55348,21979
+AlphaEarth Foundations,VISION,Vision disability,SDI,0.6189,55348,21979
+AlphaEarth Foundations,VISION,Vision disability,All indices,0.8727,55348,21979
+AlphaEarth Foundations,VISION,Vision disability,Embeddings,0.2392,55348,21979
+AlphaEarth Foundations,VISION,Vision disability,All indices + Embeddings,0.8805,55348,21979
+Clay-v1.5,ACCESS2,Lack of health insurance,ReADI,0.5469,52755,19512
+Clay-v1.5,ACCESS2,Lack of health insurance,SVI,0.1838,52755,19512
+Clay-v1.5,ACCESS2,Lack of health insurance,SDI,0.4162,52755,19512
+Clay-v1.5,ACCESS2,Lack of health insurance,All indices,0.5843,52755,19512
+Clay-v1.5,ACCESS2,Lack of health insurance,Embeddings,0.2368,52755,19512
+Clay-v1.5,ACCESS2,Lack of health insurance,All indices + Embeddings,0.6534,52755,19512
+Clay-v1.5,ARTHRITIS,Arthritis,ReADI,0.0677,52755,19512
+Clay-v1.5,ARTHRITIS,Arthritis,SVI,0.1295,52755,19512
+Clay-v1.5,ARTHRITIS,Arthritis,SDI,-0.0119,52755,19512
+Clay-v1.5,ARTHRITIS,Arthritis,All indices,0.5766,52755,19512
+Clay-v1.5,ARTHRITIS,Arthritis,Embeddings,0.4128,52755,19512
+Clay-v1.5,ARTHRITIS,Arthritis,All indices + Embeddings,0.6281,52755,19512
+Clay-v1.5,BINGE,Binge drinking,ReADI,0.1359,52755,19512
+Clay-v1.5,BINGE,Binge drinking,SVI,0.092,52755,19512
+Clay-v1.5,BINGE,Binge drinking,SDI,0.0392,52755,19512
+Clay-v1.5,BINGE,Binge drinking,All indices,0.3029,52755,19512
+Clay-v1.5,BINGE,Binge drinking,Embeddings,0.046,52755,19512
+Clay-v1.5,BINGE,Binge drinking,All indices + Embeddings,0.2565,52755,19512
+Clay-v1.5,BPHIGH,High blood pressure,ReADI,0.2126,52755,19512
+Clay-v1.5,BPHIGH,High blood pressure,SVI,-0.0729,52755,19512
+Clay-v1.5,BPHIGH,High blood pressure,SDI,-0.1337,52755,19512
+Clay-v1.5,BPHIGH,High blood pressure,All indices,0.5581,52755,19512
+Clay-v1.5,BPHIGH,High blood pressure,Embeddings,0.2757,52755,19512
+Clay-v1.5,BPHIGH,High blood pressure,All indices + Embeddings,0.609,52755,19512
+Clay-v1.5,BPMED,BP medication use,ReADI,-0.0856,52755,19512
+Clay-v1.5,BPMED,BP medication use,SVI,0.0086,52755,19512
+Clay-v1.5,BPMED,BP medication use,SDI,0.0093,52755,19512
+Clay-v1.5,BPMED,BP medication use,All indices,0.3096,52755,19512
+Clay-v1.5,BPMED,BP medication use,Embeddings,0.3068,52755,19512
+Clay-v1.5,BPMED,BP medication use,All indices + Embeddings,0.4208,52755,19512
+Clay-v1.5,CANCER,Cancer (excl. skin),ReADI,0.0701,52755,19512
+Clay-v1.5,CANCER,Cancer (excl. skin),SVI,0.3507,52755,19512
+Clay-v1.5,CANCER,Cancer (excl. skin),SDI,0.3361,52755,19512
+Clay-v1.5,CANCER,Cancer (excl. skin),All indices,0.4994,52755,19512
+Clay-v1.5,CANCER,Cancer (excl. skin),Embeddings,0.5045,52755,19512
+Clay-v1.5,CANCER,Cancer (excl. skin),All indices + Embeddings,0.6044,52755,19512
+Clay-v1.5,CASTHMA,Current asthma,ReADI,0.2653,52755,19512
+Clay-v1.5,CASTHMA,Current asthma,SVI,0.0411,52755,19512
+Clay-v1.5,CASTHMA,Current asthma,SDI,0.0571,52755,19512
+Clay-v1.5,CASTHMA,Current asthma,All indices,0.4532,52755,19512
+Clay-v1.5,CASTHMA,Current asthma,Embeddings,0.1444,52755,19512
+Clay-v1.5,CASTHMA,Current asthma,All indices + Embeddings,0.5176,52755,19512
+Clay-v1.5,CHD,Coronary heart disease,ReADI,0.297,52755,19512
+Clay-v1.5,CHD,Coronary heart disease,SVI,-0.0127,52755,19512
+Clay-v1.5,CHD,Coronary heart disease,SDI,-0.0293,52755,19512
+Clay-v1.5,CHD,Coronary heart disease,All indices,0.5467,52755,19512
+Clay-v1.5,CHD,Coronary heart disease,Embeddings,0.2657,52755,19512
+Clay-v1.5,CHD,Coronary heart disease,All indices + Embeddings,0.5927,52755,19512
+Clay-v1.5,CHECKUP,Annual checkup,ReADI,-0.1624,52755,19512
+Clay-v1.5,CHECKUP,Annual checkup,SVI,0.0829,52755,19512
+Clay-v1.5,CHECKUP,Annual checkup,SDI,-0.0672,52755,19512
+Clay-v1.5,CHECKUP,Annual checkup,All indices,0.1546,52755,19512
+Clay-v1.5,CHECKUP,Annual checkup,Embeddings,0.3298,52755,19512
+Clay-v1.5,CHECKUP,Annual checkup,All indices + Embeddings,0.3822,52755,19512
+Clay-v1.5,CHOLSCREEN,Cholesterol screening,ReADI,0.3432,52755,19512
+Clay-v1.5,CHOLSCREEN,Cholesterol screening,SVI,0.2602,52755,19512
+Clay-v1.5,CHOLSCREEN,Cholesterol screening,SDI,0.4738,52755,19512
+Clay-v1.5,CHOLSCREEN,Cholesterol screening,All indices,0.5015,52755,19512
+Clay-v1.5,CHOLSCREEN,Cholesterol screening,Embeddings,0.3023,52755,19512
+Clay-v1.5,CHOLSCREEN,Cholesterol screening,All indices + Embeddings,0.5779,52755,19512
+Clay-v1.5,COGNITION,Cognitive decline,ReADI,0.7632,52755,19512
+Clay-v1.5,COGNITION,Cognitive decline,SVI,0.3166,52755,19512
+Clay-v1.5,COGNITION,Cognitive decline,SDI,0.6293,52755,19512
+Clay-v1.5,COGNITION,Cognitive decline,All indices,0.7603,52755,19512
+Clay-v1.5,COGNITION,Cognitive decline,Embeddings,0.3196,52755,19512
+Clay-v1.5,COGNITION,Cognitive decline,All indices + Embeddings,0.7609,52755,19512
+Clay-v1.5,COLON_SCREEN,Colorectal cancer screening,ReADI,0.2241,57340,19511
+Clay-v1.5,COLON_SCREEN,Colorectal cancer screening,SVI,0.5632,57340,19511
+Clay-v1.5,COLON_SCREEN,Colorectal cancer screening,SDI,0.4273,57340,19511
+Clay-v1.5,COLON_SCREEN,Colorectal cancer screening,All indices,0.5811,57340,19511
+Clay-v1.5,COLON_SCREEN,Colorectal cancer screening,Embeddings,0.3779,57340,19511
+Clay-v1.5,COLON_SCREEN,Colorectal cancer screening,All indices + Embeddings,0.6225,57340,19511
+Clay-v1.5,COPD,COPD,ReADI,0.5169,52755,19512
+Clay-v1.5,COPD,COPD,SVI,-0.0085,52755,19512
+Clay-v1.5,COPD,COPD,SDI,0.0316,52755,19512
+Clay-v1.5,COPD,COPD,All indices,0.7551,52755,19512
+Clay-v1.5,COPD,COPD,Embeddings,0.2626,52755,19512
+Clay-v1.5,COPD,COPD,All indices + Embeddings,0.7695,52755,19512
+Clay-v1.5,CSMOKING,Current smoking,ReADI,0.7392,52755,19512
+Clay-v1.5,CSMOKING,Current smoking,SVI,0.0368,52755,19512
+Clay-v1.5,CSMOKING,Current smoking,SDI,0.2552,52755,19512
+Clay-v1.5,CSMOKING,Current smoking,All indices,0.8048,52755,19512
+Clay-v1.5,CSMOKING,Current smoking,Embeddings,0.2503,52755,19512
+Clay-v1.5,CSMOKING,Current smoking,All indices + Embeddings,0.8129,52755,19512
+Clay-v1.5,DENTAL,Dental visit,ReADI,0.8046,57342,19512
+Clay-v1.5,DENTAL,Dental visit,SVI,0.238,57342,19512
+Clay-v1.5,DENTAL,Dental visit,SDI,0.5494,57342,19512
+Clay-v1.5,DENTAL,Dental visit,All indices,0.834,57342,19512
+Clay-v1.5,DENTAL,Dental visit,Embeddings,0.2288,57342,19512
+Clay-v1.5,DENTAL,Dental visit,All indices + Embeddings,0.8348,57342,19512
+Clay-v1.5,DEPRESSION,Depression,ReADI,-0.1284,52755,19512
+Clay-v1.5,DEPRESSION,Depression,SVI,-0.1205,52755,19512
+Clay-v1.5,DEPRESSION,Depression,SDI,-0.1584,52755,19512
+Clay-v1.5,DEPRESSION,Depression,All indices,-0.0554,52755,19512
+Clay-v1.5,DEPRESSION,Depression,Embeddings,-0.2118,52755,19512
+Clay-v1.5,DEPRESSION,Depression,All indices + Embeddings,-0.0599,52755,19512
+Clay-v1.5,DIABETES,Diabetes,ReADI,0.5584,52755,19512
+Clay-v1.5,DIABETES,Diabetes,SVI,0.0802,52755,19512
+Clay-v1.5,DIABETES,Diabetes,SDI,0.1765,52755,19512
+Clay-v1.5,DIABETES,Diabetes,All indices,0.6647,52755,19512
+Clay-v1.5,DIABETES,Diabetes,Embeddings,0.2015,52755,19512
+Clay-v1.5,DIABETES,Diabetes,All indices + Embeddings,0.6542,52755,19512
+Clay-v1.5,DISABILITY,Any disability,ReADI,0.8088,52755,19512
+Clay-v1.5,DISABILITY,Any disability,SVI,0.2226,52755,19512
+Clay-v1.5,DISABILITY,Any disability,SDI,0.4215,52755,19512
+Clay-v1.5,DISABILITY,Any disability,All indices,0.7705,52755,19512
+Clay-v1.5,DISABILITY,Any disability,Embeddings,0.2911,52755,19512
+Clay-v1.5,DISABILITY,Any disability,All indices + Embeddings,0.7769,52755,19512
+Clay-v1.5,EMOTIONSPT,Emotional support,ReADI,0.1613,38866,16138
+Clay-v1.5,EMOTIONSPT,Emotional support,SVI,0.6176,38866,16138
+Clay-v1.5,EMOTIONSPT,Emotional support,SDI,0.4403,38866,16138
+Clay-v1.5,EMOTIONSPT,Emotional support,All indices,0.5825,38866,16138
+Clay-v1.5,EMOTIONSPT,Emotional support,Embeddings,0.386,38866,16138
+Clay-v1.5,EMOTIONSPT,Emotional support,All indices + Embeddings,0.5317,38866,16138
+Clay-v1.5,FOODINSECU,Food insecurity,ReADI,0.7464,38866,16138
+Clay-v1.5,FOODINSECU,Food insecurity,SVI,0.4122,38866,16138
+Clay-v1.5,FOODINSECU,Food insecurity,SDI,0.7234,38866,16138
+Clay-v1.5,FOODINSECU,Food insecurity,All indices,0.877,38866,16138
+Clay-v1.5,FOODINSECU,Food insecurity,Embeddings,0.3495,38866,16138
+Clay-v1.5,FOODINSECU,Food insecurity,All indices + Embeddings,0.8893,38866,16138
+Clay-v1.5,FOODSTAMP,Food stamp use,ReADI,0.719,38866,16138
+Clay-v1.5,FOODSTAMP,Food stamp use,SVI,0.3738,38866,16138
+Clay-v1.5,FOODSTAMP,Food stamp use,SDI,0.7224,38866,16138
+Clay-v1.5,FOODSTAMP,Food stamp use,All indices,0.8141,38866,16138
+Clay-v1.5,FOODSTAMP,Food stamp use,Embeddings,0.3189,38866,16138
+Clay-v1.5,FOODSTAMP,Food stamp use,All indices + Embeddings,0.8199,38866,16138
+Clay-v1.5,GHLTH,Fair/poor general health,ReADI,0.7563,52755,19512
+Clay-v1.5,GHLTH,Fair/poor general health,SVI,0.4242,52755,19512
+Clay-v1.5,GHLTH,Fair/poor general health,SDI,0.5783,52755,19512
+Clay-v1.5,GHLTH,Fair/poor general health,All indices,0.8132,52755,19512
+Clay-v1.5,GHLTH,Fair/poor general health,Embeddings,0.3349,52755,19512
+Clay-v1.5,GHLTH,Fair/poor general health,All indices + Embeddings,0.8215,52755,19512
+Clay-v1.5,HEARING,Hearing disability,ReADI,0.1898,52755,19512
+Clay-v1.5,HEARING,Hearing disability,SVI,-0.0271,52755,19512
+Clay-v1.5,HEARING,Hearing disability,SDI,-0.0703,52755,19512
+Clay-v1.5,HEARING,Hearing disability,All indices,0.4379,52755,19512
+Clay-v1.5,HEARING,Hearing disability,Embeddings,0.2713,52755,19512
+Clay-v1.5,HEARING,Hearing disability,All indices + Embeddings,0.5168,52755,19512
+Clay-v1.5,HIGHCHOL,High cholesterol,ReADI,-0.0915,52755,19512
+Clay-v1.5,HIGHCHOL,High cholesterol,SVI,-0.0844,52755,19512
+Clay-v1.5,HIGHCHOL,High cholesterol,SDI,-0.0522,52755,19512
+Clay-v1.5,HIGHCHOL,High cholesterol,All indices,0.2519,52755,19512
+Clay-v1.5,HIGHCHOL,High cholesterol,Embeddings,0.1678,52755,19512
+Clay-v1.5,HIGHCHOL,High cholesterol,All indices + Embeddings,0.2905,52755,19512
+Clay-v1.5,HOUSINSECU,Housing insecurity,ReADI,0.6512,38866,16138
+Clay-v1.5,HOUSINSECU,Housing insecurity,SVI,0.4436,38866,16138
+Clay-v1.5,HOUSINSECU,Housing insecurity,SDI,0.7035,38866,16138
+Clay-v1.5,HOUSINSECU,Housing insecurity,All indices,0.8308,38866,16138
+Clay-v1.5,HOUSINSECU,Housing insecurity,Embeddings,0.3769,38866,16138
+Clay-v1.5,HOUSINSECU,Housing insecurity,All indices + Embeddings,0.8498,38866,16138
+Clay-v1.5,INDEPLIVE,Independent living difficulty,ReADI,0.8763,52755,19512
+Clay-v1.5,INDEPLIVE,Independent living difficulty,SVI,0.2344,52755,19512
+Clay-v1.5,INDEPLIVE,Independent living difficulty,SDI,0.5766,52755,19512
+Clay-v1.5,INDEPLIVE,Independent living difficulty,All indices,0.8626,52755,19512
+Clay-v1.5,INDEPLIVE,Independent living difficulty,Embeddings,0.277,52755,19512
+Clay-v1.5,INDEPLIVE,Independent living difficulty,All indices + Embeddings,0.8594,52755,19512
+Clay-v1.5,LACKTRPT,Lack of transportation,ReADI,0.7511,38866,16138
+Clay-v1.5,LACKTRPT,Lack of transportation,SVI,0.3547,38866,16138
+Clay-v1.5,LACKTRPT,Lack of transportation,SDI,0.7405,38866,16138
+Clay-v1.5,LACKTRPT,Lack of transportation,All indices,0.8591,38866,16138
+Clay-v1.5,LACKTRPT,Lack of transportation,Embeddings,0.3327,38866,16138
+Clay-v1.5,LACKTRPT,Lack of transportation,All indices + Embeddings,0.8757,38866,16138
+Clay-v1.5,LONELINESS,Loneliness,ReADI,0.0579,38866,16138
+Clay-v1.5,LONELINESS,Loneliness,SVI,0.4017,38866,16138
+Clay-v1.5,LONELINESS,Loneliness,SDI,0.3967,38866,16138
+Clay-v1.5,LONELINESS,Loneliness,All indices,0.4478,38866,16138
+Clay-v1.5,LONELINESS,Loneliness,Embeddings,0.3516,38866,16138
+Clay-v1.5,LONELINESS,Loneliness,All indices + Embeddings,0.4621,38866,16138
+Clay-v1.5,LPA,Physical inactivity,ReADI,0.7571,52755,19512
+Clay-v1.5,LPA,Physical inactivity,SVI,0.2142,52755,19512
+Clay-v1.5,LPA,Physical inactivity,SDI,0.4084,52755,19512
+Clay-v1.5,LPA,Physical inactivity,All indices,0.7987,52755,19512
+Clay-v1.5,LPA,Physical inactivity,Embeddings,0.2388,52755,19512
+Clay-v1.5,LPA,Physical inactivity,All indices + Embeddings,0.7984,52755,19512
+Clay-v1.5,MAMMOUSE,Mammography use,ReADI,0.302,57312,19506
+Clay-v1.5,MAMMOUSE,Mammography use,SVI,0.1191,57312,19506
+Clay-v1.5,MAMMOUSE,Mammography use,SDI,0.1816,57312,19506
+Clay-v1.5,MAMMOUSE,Mammography use,All indices,0.3093,57312,19506
+Clay-v1.5,MAMMOUSE,Mammography use,Embeddings,0.1877,57312,19506
+Clay-v1.5,MAMMOUSE,Mammography use,All indices + Embeddings,0.4169,57312,19506
+Clay-v1.5,MHLTH,Poor mental health days,ReADI,0.6107,52755,19512
+Clay-v1.5,MHLTH,Poor mental health days,SVI,0.1608,52755,19512
+Clay-v1.5,MHLTH,Poor mental health days,SDI,0.5065,52755,19512
+Clay-v1.5,MHLTH,Poor mental health days,All indices,0.6196,52755,19512
+Clay-v1.5,MHLTH,Poor mental health days,Embeddings,0.264,52755,19512
+Clay-v1.5,MHLTH,Poor mental health days,All indices + Embeddings,0.613,52755,19512
+Clay-v1.5,MOBILITY,Mobility disability,ReADI,0.6729,52755,19512
+Clay-v1.5,MOBILITY,Mobility disability,SVI,0.1375,52755,19512
+Clay-v1.5,MOBILITY,Mobility disability,SDI,0.2628,52755,19512
+Clay-v1.5,MOBILITY,Mobility disability,All indices,0.7236,52755,19512
+Clay-v1.5,MOBILITY,Mobility disability,Embeddings,0.2461,52755,19512
+Clay-v1.5,MOBILITY,Mobility disability,All indices + Embeddings,0.7194,52755,19512
+Clay-v1.5,OBESITY,Obesity,ReADI,0.4572,52755,19512
+Clay-v1.5,OBESITY,Obesity,SVI,-0.1805,52755,19512
+Clay-v1.5,OBESITY,Obesity,SDI,-0.069,52755,19512
+Clay-v1.5,OBESITY,Obesity,All indices,0.6434,52755,19512
+Clay-v1.5,OBESITY,Obesity,Embeddings,0.0708,52755,19512
+Clay-v1.5,OBESITY,Obesity,All indices + Embeddings,0.6337,52755,19512
+Clay-v1.5,PHLTH,Poor physical health days,ReADI,0.7463,52755,19512
+Clay-v1.5,PHLTH,Poor physical health days,SVI,0.212,52755,19512
+Clay-v1.5,PHLTH,Poor physical health days,SDI,0.3555,52755,19512
+Clay-v1.5,PHLTH,Poor physical health days,All indices,0.7659,52755,19512
+Clay-v1.5,PHLTH,Poor physical health days,Embeddings,0.2376,52755,19512
+Clay-v1.5,PHLTH,Poor physical health days,All indices + Embeddings,0.7587,52755,19512
+Clay-v1.5,SELFCARE,Self-care disability,ReADI,0.8057,52755,19512
+Clay-v1.5,SELFCARE,Self-care disability,SVI,0.2263,52755,19512
+Clay-v1.5,SELFCARE,Self-care disability,SDI,0.4869,52755,19512
+Clay-v1.5,SELFCARE,Self-care disability,All indices,0.8251,52755,19512
+Clay-v1.5,SELFCARE,Self-care disability,Embeddings,0.237,52755,19512
+Clay-v1.5,SELFCARE,Self-care disability,All indices + Embeddings,0.8304,52755,19512
+Clay-v1.5,SHUTUTILITY,Utility shutoff,ReADI,0.7877,38866,16138
+Clay-v1.5,SHUTUTILITY,Utility shutoff,SVI,0.089,38866,16138
+Clay-v1.5,SHUTUTILITY,Utility shutoff,SDI,0.5541,38866,16138
+Clay-v1.5,SHUTUTILITY,Utility shutoff,All indices,0.8167,38866,16138
+Clay-v1.5,SHUTUTILITY,Utility shutoff,Embeddings,0.2171,38866,16138
+Clay-v1.5,SHUTUTILITY,Utility shutoff,All indices + Embeddings,0.8441,38866,16138
+Clay-v1.5,SLEEP,Short sleep duration,ReADI,0.472,57342,19512
+Clay-v1.5,SLEEP,Short sleep duration,SVI,-0.0469,57342,19512
+Clay-v1.5,SLEEP,Short sleep duration,SDI,0.2159,57342,19512
+Clay-v1.5,SLEEP,Short sleep duration,All indices,0.4597,57342,19512
+Clay-v1.5,SLEEP,Short sleep duration,Embeddings,0.0706,57342,19512
+Clay-v1.5,SLEEP,Short sleep duration,All indices + Embeddings,0.4945,57342,19512
+Clay-v1.5,STROKE,Stroke,ReADI,0.5049,52755,19512
+Clay-v1.5,STROKE,Stroke,SVI,0.0379,52755,19512
+Clay-v1.5,STROKE,Stroke,SDI,0.0999,52755,19512
+Clay-v1.5,STROKE,Stroke,All indices,0.6528,52755,19512
+Clay-v1.5,STROKE,Stroke,Embeddings,0.1871,52755,19512
+Clay-v1.5,STROKE,Stroke,All indices + Embeddings,0.6697,52755,19512
+Clay-v1.5,TEETHLOST,Tooth loss,ReADI,0.8256,57320,19506
+Clay-v1.5,TEETHLOST,Tooth loss,SVI,0.0872,57320,19506
+Clay-v1.5,TEETHLOST,Tooth loss,SDI,0.4366,57320,19506
+Clay-v1.5,TEETHLOST,Tooth loss,All indices,0.84,57320,19506
+Clay-v1.5,TEETHLOST,Tooth loss,Embeddings,0.1995,57320,19506
+Clay-v1.5,TEETHLOST,Tooth loss,All indices + Embeddings,0.8425,57320,19506
+Clay-v1.5,VISION,Vision disability,ReADI,0.809,52755,19512
+Clay-v1.5,VISION,Vision disability,SVI,0.3556,52755,19512
+Clay-v1.5,VISION,Vision disability,SDI,0.6141,52755,19512
+Clay-v1.5,VISION,Vision disability,All indices,0.8709,52755,19512
+Clay-v1.5,VISION,Vision disability,Embeddings,0.2856,52755,19512
+Clay-v1.5,VISION,Vision disability,All indices + Embeddings,0.8822,52755,19512
+OlmoEarth-1.2 Base,ACCESS2,Lack of health insurance,ReADI,0.5564,54519,21672
+OlmoEarth-1.2 Base,ACCESS2,Lack of health insurance,SVI,0.1622,54519,21672
+OlmoEarth-1.2 Base,ACCESS2,Lack of health insurance,SDI,0.4203,54519,21672
+OlmoEarth-1.2 Base,ACCESS2,Lack of health insurance,All indices,0.5734,54519,21672
+OlmoEarth-1.2 Base,ACCESS2,Lack of health insurance,Embeddings,0.0471,54519,21672
+OlmoEarth-1.2 Base,ACCESS2,Lack of health insurance,All indices + Embeddings,0.4718,54519,21672
+OlmoEarth-1.2 Base,ARTHRITIS,Arthritis,ReADI,0.0474,54519,21672
+OlmoEarth-1.2 Base,ARTHRITIS,Arthritis,SVI,0.1132,54519,21672
+OlmoEarth-1.2 Base,ARTHRITIS,Arthritis,SDI,-0.0314,54519,21672
+OlmoEarth-1.2 Base,ARTHRITIS,Arthritis,All indices,0.569,54519,21672
+OlmoEarth-1.2 Base,ARTHRITIS,Arthritis,Embeddings,0.4885,54519,21672
+OlmoEarth-1.2 Base,ARTHRITIS,Arthritis,All indices + Embeddings,0.6434,54519,21672
+OlmoEarth-1.2 Base,BINGE,Binge drinking,ReADI,0.1255,54519,21672
+OlmoEarth-1.2 Base,BINGE,Binge drinking,SVI,0.0838,54519,21672
+OlmoEarth-1.2 Base,BINGE,Binge drinking,SDI,0.0358,54519,21672
+OlmoEarth-1.2 Base,BINGE,Binge drinking,All indices,0.2887,54519,21672
+OlmoEarth-1.2 Base,BINGE,Binge drinking,Embeddings,0.123,54519,21672
+OlmoEarth-1.2 Base,BINGE,Binge drinking,All indices + Embeddings,0.3334,54519,21672
+OlmoEarth-1.2 Base,BPHIGH,High blood pressure,ReADI,0.1779,54519,21672
+OlmoEarth-1.2 Base,BPHIGH,High blood pressure,SVI,-0.1204,54519,21672
+OlmoEarth-1.2 Base,BPHIGH,High blood pressure,SDI,-0.1748,54519,21672
+OlmoEarth-1.2 Base,BPHIGH,High blood pressure,All indices,0.5454,54519,21672
+OlmoEarth-1.2 Base,BPHIGH,High blood pressure,Embeddings,0.4175,54519,21672
+OlmoEarth-1.2 Base,BPHIGH,High blood pressure,All indices + Embeddings,0.6531,54519,21672
+OlmoEarth-1.2 Base,BPMED,BP medication use,ReADI,-0.1216,54519,21672
+OlmoEarth-1.2 Base,BPMED,BP medication use,SVI,-0.0217,54519,21672
+OlmoEarth-1.2 Base,BPMED,BP medication use,SDI,-0.0297,54519,21672
+OlmoEarth-1.2 Base,BPMED,BP medication use,All indices,0.2814,54519,21672
+OlmoEarth-1.2 Base,BPMED,BP medication use,Embeddings,0.4138,54519,21672
+OlmoEarth-1.2 Base,BPMED,BP medication use,All indices + Embeddings,0.4923,54519,21672
+OlmoEarth-1.2 Base,CANCER,Cancer (excl. skin),ReADI,0.0658,54519,21672
+OlmoEarth-1.2 Base,CANCER,Cancer (excl. skin),SVI,0.3559,54519,21672
+OlmoEarth-1.2 Base,CANCER,Cancer (excl. skin),SDI,0.3253,54519,21672
+OlmoEarth-1.2 Base,CANCER,Cancer (excl. skin),All indices,0.4963,54519,21672
+OlmoEarth-1.2 Base,CANCER,Cancer (excl. skin),Embeddings,0.5095,54519,21672
+OlmoEarth-1.2 Base,CANCER,Cancer (excl. skin),All indices + Embeddings,0.6215,54519,21672
+OlmoEarth-1.2 Base,CASTHMA,Current asthma,ReADI,0.2682,54519,21672
+OlmoEarth-1.2 Base,CASTHMA,Current asthma,SVI,0.0297,54519,21672
+OlmoEarth-1.2 Base,CASTHMA,Current asthma,SDI,0.0585,54519,21672
+OlmoEarth-1.2 Base,CASTHMA,Current asthma,All indices,0.4599,54519,21672
+OlmoEarth-1.2 Base,CASTHMA,Current asthma,Embeddings,0.4099,54519,21672
+OlmoEarth-1.2 Base,CASTHMA,Current asthma,All indices + Embeddings,0.6227,54519,21672
+OlmoEarth-1.2 Base,CHD,Coronary heart disease,ReADI,0.2783,54519,21672
+OlmoEarth-1.2 Base,CHD,Coronary heart disease,SVI,-0.0352,54519,21672
+OlmoEarth-1.2 Base,CHD,Coronary heart disease,SDI,-0.0459,54519,21672
+OlmoEarth-1.2 Base,CHD,Coronary heart disease,All indices,0.5359,54519,21672
+OlmoEarth-1.2 Base,CHD,Coronary heart disease,Embeddings,0.3412,54519,21672
+OlmoEarth-1.2 Base,CHD,Coronary heart disease,All indices + Embeddings,0.615,54519,21672
+OlmoEarth-1.2 Base,CHECKUP,Annual checkup,ReADI,-0.2117,54519,21672
+OlmoEarth-1.2 Base,CHECKUP,Annual checkup,SVI,0.0593,54519,21672
+OlmoEarth-1.2 Base,CHECKUP,Annual checkup,SDI,-0.1091,54519,21672
+OlmoEarth-1.2 Base,CHECKUP,Annual checkup,All indices,0.1332,54519,21672
+OlmoEarth-1.2 Base,CHECKUP,Annual checkup,Embeddings,0.5123,54519,21672
+OlmoEarth-1.2 Base,CHECKUP,Annual checkup,All indices + Embeddings,0.5558,54519,21672
+OlmoEarth-1.2 Base,CHOLSCREEN,Cholesterol screening,ReADI,0.3546,54519,21672
+OlmoEarth-1.2 Base,CHOLSCREEN,Cholesterol screening,SVI,0.2798,54519,21672
+OlmoEarth-1.2 Base,CHOLSCREEN,Cholesterol screening,SDI,0.4886,54519,21672
+OlmoEarth-1.2 Base,CHOLSCREEN,Cholesterol screening,All indices,0.5152,54519,21672
+OlmoEarth-1.2 Base,CHOLSCREEN,Cholesterol screening,Embeddings,0.4227,54519,21672
+OlmoEarth-1.2 Base,CHOLSCREEN,Cholesterol screening,All indices + Embeddings,0.6501,54519,21672
+OlmoEarth-1.2 Base,COGNITION,Cognitive decline,ReADI,0.7592,54519,21672
+OlmoEarth-1.2 Base,COGNITION,Cognitive decline,SVI,0.3292,54519,21672
+OlmoEarth-1.2 Base,COGNITION,Cognitive decline,SDI,0.6375,54519,21672
+OlmoEarth-1.2 Base,COGNITION,Cognitive decline,All indices,0.7591,54519,21672
+OlmoEarth-1.2 Base,COGNITION,Cognitive decline,Embeddings,0.4406,54519,21672
+OlmoEarth-1.2 Base,COGNITION,Cognitive decline,All indices + Embeddings,0.8029,54519,21672
+OlmoEarth-1.2 Base,COLON_SCREEN,Colorectal cancer screening,ReADI,0.21,59103,21671
+OlmoEarth-1.2 Base,COLON_SCREEN,Colorectal cancer screening,SVI,0.5699,59103,21671
+OlmoEarth-1.2 Base,COLON_SCREEN,Colorectal cancer screening,SDI,0.4171,59103,21671
+OlmoEarth-1.2 Base,COLON_SCREEN,Colorectal cancer screening,All indices,0.5796,59103,21671
+OlmoEarth-1.2 Base,COLON_SCREEN,Colorectal cancer screening,Embeddings,0.4874,59103,21671
+OlmoEarth-1.2 Base,COLON_SCREEN,Colorectal cancer screening,All indices + Embeddings,0.7193,59103,21671
+OlmoEarth-1.2 Base,COPD,COPD,ReADI,0.4925,54519,21672
+OlmoEarth-1.2 Base,COPD,COPD,SVI,-0.0485,54519,21672
+OlmoEarth-1.2 Base,COPD,COPD,SDI,0.0038,54519,21672
+OlmoEarth-1.2 Base,COPD,COPD,All indices,0.7482,54519,21672
+OlmoEarth-1.2 Base,COPD,COPD,Embeddings,0.4308,54519,21672
+OlmoEarth-1.2 Base,COPD,COPD,All indices + Embeddings,0.7845,54519,21672
+OlmoEarth-1.2 Base,CSMOKING,Current smoking,ReADI,0.7358,54519,21672
+OlmoEarth-1.2 Base,CSMOKING,Current smoking,SVI,0.0076,54519,21672
+OlmoEarth-1.2 Base,CSMOKING,Current smoking,SDI,0.2489,54519,21672
+OlmoEarth-1.2 Base,CSMOKING,Current smoking,All indices,0.8054,54519,21672
+OlmoEarth-1.2 Base,CSMOKING,Current smoking,Embeddings,0.4642,54519,21672
+OlmoEarth-1.2 Base,CSMOKING,Current smoking,All indices + Embeddings,0.8346,54519,21672
+OlmoEarth-1.2 Base,DENTAL,Dental visit,ReADI,0.8091,59105,21672
+OlmoEarth-1.2 Base,DENTAL,Dental visit,SVI,0.2369,59105,21672
+OlmoEarth-1.2 Base,DENTAL,Dental visit,SDI,0.56,59105,21672
+OlmoEarth-1.2 Base,DENTAL,Dental visit,All indices,0.8403,59105,21672
+OlmoEarth-1.2 Base,DENTAL,Dental visit,Embeddings,0.39,59105,21672
+OlmoEarth-1.2 Base,DENTAL,Dental visit,All indices + Embeddings,0.8402,59105,21672
+OlmoEarth-1.2 Base,DEPRESSION,Depression,ReADI,-0.1154,54519,21672
+OlmoEarth-1.2 Base,DEPRESSION,Depression,SVI,-0.116,54519,21672
+OlmoEarth-1.2 Base,DEPRESSION,Depression,SDI,-0.1391,54519,21672
+OlmoEarth-1.2 Base,DEPRESSION,Depression,All indices,-0.0724,54519,21672
+OlmoEarth-1.2 Base,DEPRESSION,Depression,Embeddings,0.1495,54519,21672
+OlmoEarth-1.2 Base,DEPRESSION,Depression,All indices + Embeddings,0.1965,54519,21672
+OlmoEarth-1.2 Base,DIABETES,Diabetes,ReADI,0.5521,54519,21672
+OlmoEarth-1.2 Base,DIABETES,Diabetes,SVI,0.0431,54519,21672
+OlmoEarth-1.2 Base,DIABETES,Diabetes,SDI,0.159,54519,21672
+OlmoEarth-1.2 Base,DIABETES,Diabetes,All indices,0.6594,54519,21672
+OlmoEarth-1.2 Base,DIABETES,Diabetes,Embeddings,0.3366,54519,21672
+OlmoEarth-1.2 Base,DIABETES,Diabetes,All indices + Embeddings,0.6952,54519,21672
+OlmoEarth-1.2 Base,DISABILITY,Any disability,ReADI,0.8041,54519,21672
+OlmoEarth-1.2 Base,DISABILITY,Any disability,SVI,0.2235,54519,21672
+OlmoEarth-1.2 Base,DISABILITY,Any disability,SDI,0.4287,54519,21672
+OlmoEarth-1.2 Base,DISABILITY,Any disability,All indices,0.7684,54519,21672
+OlmoEarth-1.2 Base,DISABILITY,Any disability,Embeddings,0.3903,54519,21672
+OlmoEarth-1.2 Base,DISABILITY,Any disability,All indices + Embeddings,0.8151,54519,21672
+OlmoEarth-1.2 Base,EMOTIONSPT,Emotional support,ReADI,0.1307,39650,18298
+OlmoEarth-1.2 Base,EMOTIONSPT,Emotional support,SVI,0.6206,39650,18298
+OlmoEarth-1.2 Base,EMOTIONSPT,Emotional support,SDI,0.4183,39650,18298
+OlmoEarth-1.2 Base,EMOTIONSPT,Emotional support,All indices,0.5708,39650,18298
+OlmoEarth-1.2 Base,EMOTIONSPT,Emotional support,Embeddings,0.4198,39650,18298
+OlmoEarth-1.2 Base,EMOTIONSPT,Emotional support,All indices + Embeddings,0.6337,39650,18298
+OlmoEarth-1.2 Base,FOODINSECU,Food insecurity,ReADI,0.7415,39650,18298
+OlmoEarth-1.2 Base,FOODINSECU,Food insecurity,SVI,0.4205,39650,18298
+OlmoEarth-1.2 Base,FOODINSECU,Food insecurity,SDI,0.7253,39650,18298
+OlmoEarth-1.2 Base,FOODINSECU,Food insecurity,All indices,0.8779,39650,18298
+OlmoEarth-1.2 Base,FOODINSECU,Food insecurity,Embeddings,0.4686,39650,18298
+OlmoEarth-1.2 Base,FOODINSECU,Food insecurity,All indices + Embeddings,0.8953,39650,18298
+OlmoEarth-1.2 Base,FOODSTAMP,Food stamp use,ReADI,0.7121,39650,18298
+OlmoEarth-1.2 Base,FOODSTAMP,Food stamp use,SVI,0.3773,39650,18298
+OlmoEarth-1.2 Base,FOODSTAMP,Food stamp use,SDI,0.722,39650,18298
+OlmoEarth-1.2 Base,FOODSTAMP,Food stamp use,All indices,0.8104,39650,18298
+OlmoEarth-1.2 Base,FOODSTAMP,Food stamp use,Embeddings,0.3807,39650,18298
+OlmoEarth-1.2 Base,FOODSTAMP,Food stamp use,All indices + Embeddings,0.7809,39650,18298
+OlmoEarth-1.2 Base,GHLTH,Fair/poor general health,ReADI,0.7471,54519,21672
+OlmoEarth-1.2 Base,GHLTH,Fair/poor general health,SVI,0.4377,54519,21672
+OlmoEarth-1.2 Base,GHLTH,Fair/poor general health,SDI,0.584,54519,21672
+OlmoEarth-1.2 Base,GHLTH,Fair/poor general health,All indices,0.8094,54519,21672
+OlmoEarth-1.2 Base,GHLTH,Fair/poor general health,Embeddings,0.4364,54519,21672
+OlmoEarth-1.2 Base,GHLTH,Fair/poor general health,All indices + Embeddings,0.8364,54519,21672
+OlmoEarth-1.2 Base,HEARING,Hearing disability,ReADI,0.1772,54519,21672
+OlmoEarth-1.2 Base,HEARING,Hearing disability,SVI,-0.0504,54519,21672
+OlmoEarth-1.2 Base,HEARING,Hearing disability,SDI,-0.0927,54519,21672
+OlmoEarth-1.2 Base,HEARING,Hearing disability,All indices,0.441,54519,21672
+OlmoEarth-1.2 Base,HEARING,Hearing disability,Embeddings,0.2908,54519,21672
+OlmoEarth-1.2 Base,HEARING,Hearing disability,All indices + Embeddings,0.5081,54519,21672
+OlmoEarth-1.2 Base,HIGHCHOL,High cholesterol,ReADI,-0.1048,54519,21672
+OlmoEarth-1.2 Base,HIGHCHOL,High cholesterol,SVI,-0.0941,54519,21672
+OlmoEarth-1.2 Base,HIGHCHOL,High cholesterol,SDI,-0.0672,54519,21672
+OlmoEarth-1.2 Base,HIGHCHOL,High cholesterol,All indices,0.2453,54519,21672
+OlmoEarth-1.2 Base,HIGHCHOL,High cholesterol,Embeddings,0.2959,54519,21672
+OlmoEarth-1.2 Base,HIGHCHOL,High cholesterol,All indices + Embeddings,0.405,54519,21672
+OlmoEarth-1.2 Base,HOUSINSECU,Housing insecurity,ReADI,0.6422,39650,18298
+OlmoEarth-1.2 Base,HOUSINSECU,Housing insecurity,SVI,0.4591,39650,18298
+OlmoEarth-1.2 Base,HOUSINSECU,Housing insecurity,SDI,0.7008,39650,18298
+OlmoEarth-1.2 Base,HOUSINSECU,Housing insecurity,All indices,0.8317,39650,18298
+OlmoEarth-1.2 Base,HOUSINSECU,Housing insecurity,Embeddings,0.4579,39650,18298
+OlmoEarth-1.2 Base,HOUSINSECU,Housing insecurity,All indices + Embeddings,0.8534,39650,18298
+OlmoEarth-1.2 Base,INDEPLIVE,Independent living difficulty,ReADI,0.8713,54519,21672
+OlmoEarth-1.2 Base,INDEPLIVE,Independent living difficulty,SVI,0.2327,54519,21672
+OlmoEarth-1.2 Base,INDEPLIVE,Independent living difficulty,SDI,0.5826,54519,21672
+OlmoEarth-1.2 Base,INDEPLIVE,Independent living difficulty,All indices,0.858,54519,21672
+OlmoEarth-1.2 Base,INDEPLIVE,Independent living difficulty,Embeddings,0.4011,54519,21672
+OlmoEarth-1.2 Base,INDEPLIVE,Independent living difficulty,All indices + Embeddings,0.8549,54519,21672
+OlmoEarth-1.2 Base,LACKTRPT,Lack of transportation,ReADI,0.747,39650,18298
+OlmoEarth-1.2 Base,LACKTRPT,Lack of transportation,SVI,0.3613,39650,18298
+OlmoEarth-1.2 Base,LACKTRPT,Lack of transportation,SDI,0.7422,39650,18298
+OlmoEarth-1.2 Base,LACKTRPT,Lack of transportation,All indices,0.8598,39650,18298
+OlmoEarth-1.2 Base,LACKTRPT,Lack of transportation,Embeddings,0.4681,39650,18298
+OlmoEarth-1.2 Base,LACKTRPT,Lack of transportation,All indices + Embeddings,0.8793,39650,18298
+OlmoEarth-1.2 Base,LONELINESS,Loneliness,ReADI,0.0431,39650,18298
+OlmoEarth-1.2 Base,LONELINESS,Loneliness,SVI,0.4069,39650,18298
+OlmoEarth-1.2 Base,LONELINESS,Loneliness,SDI,0.3867,39650,18298
+OlmoEarth-1.2 Base,LONELINESS,Loneliness,All indices,0.4416,39650,18298
+OlmoEarth-1.2 Base,LONELINESS,Loneliness,Embeddings,0.294,39650,18298
+OlmoEarth-1.2 Base,LONELINESS,Loneliness,All indices + Embeddings,0.4504,39650,18298
+OlmoEarth-1.2 Base,LPA,Physical inactivity,ReADI,0.763,54519,21672
+OlmoEarth-1.2 Base,LPA,Physical inactivity,SVI,0.2023,54519,21672
+OlmoEarth-1.2 Base,LPA,Physical inactivity,SDI,0.4118,54519,21672
+OlmoEarth-1.2 Base,LPA,Physical inactivity,All indices,0.8037,54519,21672
+OlmoEarth-1.2 Base,LPA,Physical inactivity,Embeddings,0.399,54519,21672
+OlmoEarth-1.2 Base,LPA,Physical inactivity,All indices + Embeddings,0.8424,54519,21672
+OlmoEarth-1.2 Base,MAMMOUSE,Mammography use,ReADI,0.3255,59074,21664
+OlmoEarth-1.2 Base,MAMMOUSE,Mammography use,SVI,0.1286,59074,21664
+OlmoEarth-1.2 Base,MAMMOUSE,Mammography use,SDI,0.2019,59074,21664
+OlmoEarth-1.2 Base,MAMMOUSE,Mammography use,All indices,0.3338,59074,21664
+OlmoEarth-1.2 Base,MAMMOUSE,Mammography use,Embeddings,0.2382,59074,21664
+OlmoEarth-1.2 Base,MAMMOUSE,Mammography use,All indices + Embeddings,0.4397,59074,21664
+OlmoEarth-1.2 Base,MHLTH,Poor mental health days,ReADI,0.601,54519,21672
+OlmoEarth-1.2 Base,MHLTH,Poor mental health days,SVI,0.1675,54519,21672
+OlmoEarth-1.2 Base,MHLTH,Poor mental health days,SDI,0.5141,54519,21672
+OlmoEarth-1.2 Base,MHLTH,Poor mental health days,All indices,0.6041,54519,21672
+OlmoEarth-1.2 Base,MHLTH,Poor mental health days,Embeddings,0.3821,54519,21672
+OlmoEarth-1.2 Base,MHLTH,Poor mental health days,All indices + Embeddings,0.6762,54519,21672
+OlmoEarth-1.2 Base,MOBILITY,Mobility disability,ReADI,0.6683,54519,21672
+OlmoEarth-1.2 Base,MOBILITY,Mobility disability,SVI,0.1299,54519,21672
+OlmoEarth-1.2 Base,MOBILITY,Mobility disability,SDI,0.2657,54519,21672
+OlmoEarth-1.2 Base,MOBILITY,Mobility disability,All indices,0.7184,54519,21672
+OlmoEarth-1.2 Base,MOBILITY,Mobility disability,Embeddings,0.3668,54519,21672
+OlmoEarth-1.2 Base,MOBILITY,Mobility disability,All indices + Embeddings,0.7553,54519,21672
+OlmoEarth-1.2 Base,OBESITY,Obesity,ReADI,0.453,54519,21672
+OlmoEarth-1.2 Base,OBESITY,Obesity,SVI,-0.2228,54519,21672
+OlmoEarth-1.2 Base,OBESITY,Obesity,SDI,-0.0822,54519,21672
+OlmoEarth-1.2 Base,OBESITY,Obesity,All indices,0.6284,54519,21672
+OlmoEarth-1.2 Base,OBESITY,Obesity,Embeddings,0.3419,54519,21672
+OlmoEarth-1.2 Base,OBESITY,Obesity,All indices + Embeddings,0.6919,54519,21672
+OlmoEarth-1.2 Base,PHLTH,Poor physical health days,ReADI,0.7439,54519,21672
+OlmoEarth-1.2 Base,PHLTH,Poor physical health days,SVI,0.2173,54519,21672
+OlmoEarth-1.2 Base,PHLTH,Poor physical health days,SDI,0.3663,54519,21672
+OlmoEarth-1.2 Base,PHLTH,Poor physical health days,All indices,0.762,54519,21672
+OlmoEarth-1.2 Base,PHLTH,Poor physical health days,Embeddings,0.3744,54519,21672
+OlmoEarth-1.2 Base,PHLTH,Poor physical health days,All indices + Embeddings,0.808,54519,21672
+OlmoEarth-1.2 Base,SELFCARE,Self-care disability,ReADI,0.8046,54519,21672
+OlmoEarth-1.2 Base,SELFCARE,Self-care disability,SVI,0.2211,54519,21672
+OlmoEarth-1.2 Base,SELFCARE,Self-care disability,SDI,0.4924,54519,21672
+OlmoEarth-1.2 Base,SELFCARE,Self-care disability,All indices,0.8268,54519,21672
+OlmoEarth-1.2 Base,SELFCARE,Self-care disability,Embeddings,0.3877,54519,21672
+OlmoEarth-1.2 Base,SELFCARE,Self-care disability,All indices + Embeddings,0.838,54519,21672
+OlmoEarth-1.2 Base,SHUTUTILITY,Utility shutoff,ReADI,0.7891,39650,18298
+OlmoEarth-1.2 Base,SHUTUTILITY,Utility shutoff,SVI,0.0681,39650,18298
+OlmoEarth-1.2 Base,SHUTUTILITY,Utility shutoff,SDI,0.558,39650,18298
+OlmoEarth-1.2 Base,SHUTUTILITY,Utility shutoff,All indices,0.8185,39650,18298
+OlmoEarth-1.2 Base,SHUTUTILITY,Utility shutoff,Embeddings,0.4064,39650,18298
+OlmoEarth-1.2 Base,SHUTUTILITY,Utility shutoff,All indices + Embeddings,0.8415,39650,18298
+OlmoEarth-1.2 Base,SLEEP,Short sleep duration,ReADI,0.4784,59105,21672
+OlmoEarth-1.2 Base,SLEEP,Short sleep duration,SVI,-0.032,59105,21672
+OlmoEarth-1.2 Base,SLEEP,Short sleep duration,SDI,0.2326,59105,21672
+OlmoEarth-1.2 Base,SLEEP,Short sleep duration,All indices,0.4731,59105,21672
+OlmoEarth-1.2 Base,SLEEP,Short sleep duration,Embeddings,0.2615,59105,21672
+OlmoEarth-1.2 Base,SLEEP,Short sleep duration,All indices + Embeddings,0.5854,59105,21672
+OlmoEarth-1.2 Base,STROKE,Stroke,ReADI,0.4841,54519,21672
+OlmoEarth-1.2 Base,STROKE,Stroke,SVI,0.0056,54519,21672
+OlmoEarth-1.2 Base,STROKE,Stroke,SDI,0.0798,54519,21672
+OlmoEarth-1.2 Base,STROKE,Stroke,All indices,0.6434,54519,21672
+OlmoEarth-1.2 Base,STROKE,Stroke,Embeddings,0.3411,54519,21672
+OlmoEarth-1.2 Base,STROKE,Stroke,All indices + Embeddings,0.6887,54519,21672
+OlmoEarth-1.2 Base,TEETHLOST,Tooth loss,ReADI,0.8252,59080,21666
+OlmoEarth-1.2 Base,TEETHLOST,Tooth loss,SVI,0.0656,59080,21666
+OlmoEarth-1.2 Base,TEETHLOST,Tooth loss,SDI,0.438,59080,21666
+OlmoEarth-1.2 Base,TEETHLOST,Tooth loss,All indices,0.8408,59080,21666
+OlmoEarth-1.2 Base,TEETHLOST,Tooth loss,Embeddings,0.3704,59080,21666
+OlmoEarth-1.2 Base,TEETHLOST,Tooth loss,All indices + Embeddings,0.8455,59080,21666
+OlmoEarth-1.2 Base,VISION,Vision disability,ReADI,0.8076,54519,21672
+OlmoEarth-1.2 Base,VISION,Vision disability,SVI,0.3603,54519,21672
+OlmoEarth-1.2 Base,VISION,Vision disability,SDI,0.62,54519,21672
+OlmoEarth-1.2 Base,VISION,Vision disability,All indices,0.8731,54519,21672
+OlmoEarth-1.2 Base,VISION,Vision disability,Embeddings,0.4047,54519,21672
+OlmoEarth-1.2 Base,VISION,Vision disability,All indices + Embeddings,0.8919,54519,21672
+OlmoEarth-1.2 Nano,ACCESS2,Lack of health insurance,ReADI,0.5564,54519,21672
+OlmoEarth-1.2 Nano,ACCESS2,Lack of health insurance,SVI,0.1622,54519,21672
+OlmoEarth-1.2 Nano,ACCESS2,Lack of health insurance,SDI,0.4203,54519,21672
+OlmoEarth-1.2 Nano,ACCESS2,Lack of health insurance,All indices,0.5734,54519,21672
+OlmoEarth-1.2 Nano,ACCESS2,Lack of health insurance,Embeddings,0.2336,54519,21672
+OlmoEarth-1.2 Nano,ACCESS2,Lack of health insurance,All indices + Embeddings,0.5452,54519,21672
+OlmoEarth-1.2 Nano,ARTHRITIS,Arthritis,ReADI,0.0474,54519,21672
+OlmoEarth-1.2 Nano,ARTHRITIS,Arthritis,SVI,0.1132,54519,21672
+OlmoEarth-1.2 Nano,ARTHRITIS,Arthritis,SDI,-0.0314,54519,21672
+OlmoEarth-1.2 Nano,ARTHRITIS,Arthritis,All indices,0.569,54519,21672
+OlmoEarth-1.2 Nano,ARTHRITIS,Arthritis,Embeddings,0.4532,54519,21672
+OlmoEarth-1.2 Nano,ARTHRITIS,Arthritis,All indices + Embeddings,0.6429,54519,21672
+OlmoEarth-1.2 Nano,BINGE,Binge drinking,ReADI,0.1255,54519,21672
+OlmoEarth-1.2 Nano,BINGE,Binge drinking,SVI,0.0838,54519,21672
+OlmoEarth-1.2 Nano,BINGE,Binge drinking,SDI,0.0358,54519,21672
+OlmoEarth-1.2 Nano,BINGE,Binge drinking,All indices,0.2887,54519,21672
+OlmoEarth-1.2 Nano,BINGE,Binge drinking,Embeddings,0.0465,54519,21672
+OlmoEarth-1.2 Nano,BINGE,Binge drinking,All indices + Embeddings,0.2648,54519,21672
+OlmoEarth-1.2 Nano,BPHIGH,High blood pressure,ReADI,0.1779,54519,21672
+OlmoEarth-1.2 Nano,BPHIGH,High blood pressure,SVI,-0.1204,54519,21672
+OlmoEarth-1.2 Nano,BPHIGH,High blood pressure,SDI,-0.1748,54519,21672
+OlmoEarth-1.2 Nano,BPHIGH,High blood pressure,All indices,0.5454,54519,21672
+OlmoEarth-1.2 Nano,BPHIGH,High blood pressure,Embeddings,0.329,54519,21672
+OlmoEarth-1.2 Nano,BPHIGH,High blood pressure,All indices + Embeddings,0.6284,54519,21672
+OlmoEarth-1.2 Nano,BPMED,BP medication use,ReADI,-0.1216,54519,21672
+OlmoEarth-1.2 Nano,BPMED,BP medication use,SVI,-0.0217,54519,21672
+OlmoEarth-1.2 Nano,BPMED,BP medication use,SDI,-0.0297,54519,21672
+OlmoEarth-1.2 Nano,BPMED,BP medication use,All indices,0.2814,54519,21672
+OlmoEarth-1.2 Nano,BPMED,BP medication use,Embeddings,0.3236,54519,21672
+OlmoEarth-1.2 Nano,BPMED,BP medication use,All indices + Embeddings,0.4448,54519,21672
+OlmoEarth-1.2 Nano,CANCER,Cancer (excl. skin),ReADI,0.0658,54519,21672
+OlmoEarth-1.2 Nano,CANCER,Cancer (excl. skin),SVI,0.3559,54519,21672
+OlmoEarth-1.2 Nano,CANCER,Cancer (excl. skin),SDI,0.3253,54519,21672
+OlmoEarth-1.2 Nano,CANCER,Cancer (excl. skin),All indices,0.4963,54519,21672
+OlmoEarth-1.2 Nano,CANCER,Cancer (excl. skin),Embeddings,0.4813,54519,21672
+OlmoEarth-1.2 Nano,CANCER,Cancer (excl. skin),All indices + Embeddings,0.6054,54519,21672
+OlmoEarth-1.2 Nano,CASTHMA,Current asthma,ReADI,0.2682,54519,21672
+OlmoEarth-1.2 Nano,CASTHMA,Current asthma,SVI,0.0297,54519,21672
+OlmoEarth-1.2 Nano,CASTHMA,Current asthma,SDI,0.0585,54519,21672
+OlmoEarth-1.2 Nano,CASTHMA,Current asthma,All indices,0.4599,54519,21672
+OlmoEarth-1.2 Nano,CASTHMA,Current asthma,Embeddings,0.2558,54519,21672
+OlmoEarth-1.2 Nano,CASTHMA,Current asthma,All indices + Embeddings,0.5957,54519,21672
+OlmoEarth-1.2 Nano,CHD,Coronary heart disease,ReADI,0.2783,54519,21672
+OlmoEarth-1.2 Nano,CHD,Coronary heart disease,SVI,-0.0352,54519,21672
+OlmoEarth-1.2 Nano,CHD,Coronary heart disease,SDI,-0.0459,54519,21672
+OlmoEarth-1.2 Nano,CHD,Coronary heart disease,All indices,0.5359,54519,21672
+OlmoEarth-1.2 Nano,CHD,Coronary heart disease,Embeddings,0.2892,54519,21672
+OlmoEarth-1.2 Nano,CHD,Coronary heart disease,All indices + Embeddings,0.5879,54519,21672
+OlmoEarth-1.2 Nano,CHECKUP,Annual checkup,ReADI,-0.2117,54519,21672
+OlmoEarth-1.2 Nano,CHECKUP,Annual checkup,SVI,0.0593,54519,21672
+OlmoEarth-1.2 Nano,CHECKUP,Annual checkup,SDI,-0.1091,54519,21672
+OlmoEarth-1.2 Nano,CHECKUP,Annual checkup,All indices,0.1332,54519,21672
+OlmoEarth-1.2 Nano,CHECKUP,Annual checkup,Embeddings,0.417,54519,21672
+OlmoEarth-1.2 Nano,CHECKUP,Annual checkup,All indices + Embeddings,0.4697,54519,21672
+OlmoEarth-1.2 Nano,CHOLSCREEN,Cholesterol screening,ReADI,0.3546,54519,21672
+OlmoEarth-1.2 Nano,CHOLSCREEN,Cholesterol screening,SVI,0.2798,54519,21672
+OlmoEarth-1.2 Nano,CHOLSCREEN,Cholesterol screening,SDI,0.4886,54519,21672
+OlmoEarth-1.2 Nano,CHOLSCREEN,Cholesterol screening,All indices,0.5152,54519,21672
+OlmoEarth-1.2 Nano,CHOLSCREEN,Cholesterol screening,Embeddings,0.2829,54519,21672
+OlmoEarth-1.2 Nano,CHOLSCREEN,Cholesterol screening,All indices + Embeddings,0.6032,54519,21672
+OlmoEarth-1.2 Nano,COGNITION,Cognitive decline,ReADI,0.7592,54519,21672
+OlmoEarth-1.2 Nano,COGNITION,Cognitive decline,SVI,0.3292,54519,21672
+OlmoEarth-1.2 Nano,COGNITION,Cognitive decline,SDI,0.6375,54519,21672
+OlmoEarth-1.2 Nano,COGNITION,Cognitive decline,All indices,0.7591,54519,21672
+OlmoEarth-1.2 Nano,COGNITION,Cognitive decline,Embeddings,0.3201,54519,21672
+OlmoEarth-1.2 Nano,COGNITION,Cognitive decline,All indices + Embeddings,0.7895,54519,21672
+OlmoEarth-1.2 Nano,COLON_SCREEN,Colorectal cancer screening,ReADI,0.21,59103,21671
+OlmoEarth-1.2 Nano,COLON_SCREEN,Colorectal cancer screening,SVI,0.5699,59103,21671
+OlmoEarth-1.2 Nano,COLON_SCREEN,Colorectal cancer screening,SDI,0.4171,59103,21671
+OlmoEarth-1.2 Nano,COLON_SCREEN,Colorectal cancer screening,All indices,0.5796,59103,21671
+OlmoEarth-1.2 Nano,COLON_SCREEN,Colorectal cancer screening,Embeddings,0.4141,59103,21671
+OlmoEarth-1.2 Nano,COLON_SCREEN,Colorectal cancer screening,All indices + Embeddings,0.6817,59103,21671
+OlmoEarth-1.2 Nano,COPD,COPD,ReADI,0.4925,54519,21672
+OlmoEarth-1.2 Nano,COPD,COPD,SVI,-0.0485,54519,21672
+OlmoEarth-1.2 Nano,COPD,COPD,SDI,0.0038,54519,21672
+OlmoEarth-1.2 Nano,COPD,COPD,All indices,0.7482,54519,21672
+OlmoEarth-1.2 Nano,COPD,COPD,Embeddings,0.3247,54519,21672
+OlmoEarth-1.2 Nano,COPD,COPD,All indices + Embeddings,0.7796,54519,21672
+OlmoEarth-1.2 Nano,CSMOKING,Current smoking,ReADI,0.7358,54519,21672
+OlmoEarth-1.2 Nano,CSMOKING,Current smoking,SVI,0.0076,54519,21672
+OlmoEarth-1.2 Nano,CSMOKING,Current smoking,SDI,0.2489,54519,21672
+OlmoEarth-1.2 Nano,CSMOKING,Current smoking,All indices,0.8054,54519,21672
+OlmoEarth-1.2 Nano,CSMOKING,Current smoking,Embeddings,0.3242,54519,21672
+OlmoEarth-1.2 Nano,CSMOKING,Current smoking,All indices + Embeddings,0.8259,54519,21672
+OlmoEarth-1.2 Nano,DENTAL,Dental visit,ReADI,0.8091,59105,21672
+OlmoEarth-1.2 Nano,DENTAL,Dental visit,SVI,0.2369,59105,21672
+OlmoEarth-1.2 Nano,DENTAL,Dental visit,SDI,0.56,59105,21672
+OlmoEarth-1.2 Nano,DENTAL,Dental visit,All indices,0.8403,59105,21672
+OlmoEarth-1.2 Nano,DENTAL,Dental visit,Embeddings,0.2864,59105,21672
+OlmoEarth-1.2 Nano,DENTAL,Dental visit,All indices + Embeddings,0.8297,59105,21672
+OlmoEarth-1.2 Nano,DEPRESSION,Depression,ReADI,-0.1154,54519,21672
+OlmoEarth-1.2 Nano,DEPRESSION,Depression,SVI,-0.116,54519,21672
+OlmoEarth-1.2 Nano,DEPRESSION,Depression,SDI,-0.1391,54519,21672
+OlmoEarth-1.2 Nano,DEPRESSION,Depression,All indices,-0.0724,54519,21672
+OlmoEarth-1.2 Nano,DEPRESSION,Depression,Embeddings,0.0024,54519,21672
+OlmoEarth-1.2 Nano,DEPRESSION,Depression,All indices + Embeddings,0.1973,54519,21672
+OlmoEarth-1.2 Nano,DIABETES,Diabetes,ReADI,0.5521,54519,21672
+OlmoEarth-1.2 Nano,DIABETES,Diabetes,SVI,0.0431,54519,21672
+OlmoEarth-1.2 Nano,DIABETES,Diabetes,SDI,0.159,54519,21672
+OlmoEarth-1.2 Nano,DIABETES,Diabetes,All indices,0.6594,54519,21672
+OlmoEarth-1.2 Nano,DIABETES,Diabetes,Embeddings,0.2498,54519,21672
+OlmoEarth-1.2 Nano,DIABETES,Diabetes,All indices + Embeddings,0.6703,54519,21672
+OlmoEarth-1.2 Nano,DISABILITY,Any disability,ReADI,0.8041,54519,21672
+OlmoEarth-1.2 Nano,DISABILITY,Any disability,SVI,0.2235,54519,21672
+OlmoEarth-1.2 Nano,DISABILITY,Any disability,SDI,0.4287,54519,21672
+OlmoEarth-1.2 Nano,DISABILITY,Any disability,All indices,0.7684,54519,21672
+OlmoEarth-1.2 Nano,DISABILITY,Any disability,Embeddings,0.3021,54519,21672
+OlmoEarth-1.2 Nano,DISABILITY,Any disability,All indices + Embeddings,0.792,54519,21672
+OlmoEarth-1.2 Nano,EMOTIONSPT,Emotional support,ReADI,0.1307,39650,18298
+OlmoEarth-1.2 Nano,EMOTIONSPT,Emotional support,SVI,0.6206,39650,18298
+OlmoEarth-1.2 Nano,EMOTIONSPT,Emotional support,SDI,0.4183,39650,18298
+OlmoEarth-1.2 Nano,EMOTIONSPT,Emotional support,All indices,0.5708,39650,18298
+OlmoEarth-1.2 Nano,EMOTIONSPT,Emotional support,Embeddings,0.3446,39650,18298
+OlmoEarth-1.2 Nano,EMOTIONSPT,Emotional support,All indices + Embeddings,0.5578,39650,18298
+OlmoEarth-1.2 Nano,FOODINSECU,Food insecurity,ReADI,0.7415,39650,18298
+OlmoEarth-1.2 Nano,FOODINSECU,Food insecurity,SVI,0.4205,39650,18298
+OlmoEarth-1.2 Nano,FOODINSECU,Food insecurity,SDI,0.7253,39650,18298
+OlmoEarth-1.2 Nano,FOODINSECU,Food insecurity,All indices,0.8779,39650,18298
+OlmoEarth-1.2 Nano,FOODINSECU,Food insecurity,Embeddings,0.3676,39650,18298
+OlmoEarth-1.2 Nano,FOODINSECU,Food insecurity,All indices + Embeddings,0.8901,39650,18298
+OlmoEarth-1.2 Nano,FOODSTAMP,Food stamp use,ReADI,0.7121,39650,18298
+OlmoEarth-1.2 Nano,FOODSTAMP,Food stamp use,SVI,0.3773,39650,18298
+OlmoEarth-1.2 Nano,FOODSTAMP,Food stamp use,SDI,0.722,39650,18298
+OlmoEarth-1.2 Nano,FOODSTAMP,Food stamp use,All indices,0.8104,39650,18298
+OlmoEarth-1.2 Nano,FOODSTAMP,Food stamp use,Embeddings,0.2952,39650,18298
+OlmoEarth-1.2 Nano,FOODSTAMP,Food stamp use,All indices + Embeddings,0.7841,39650,18298
+OlmoEarth-1.2 Nano,GHLTH,Fair/poor general health,ReADI,0.7471,54519,21672
+OlmoEarth-1.2 Nano,GHLTH,Fair/poor general health,SVI,0.4377,54519,21672
+OlmoEarth-1.2 Nano,GHLTH,Fair/poor general health,SDI,0.584,54519,21672
+OlmoEarth-1.2 Nano,GHLTH,Fair/poor general health,All indices,0.8094,54519,21672
+OlmoEarth-1.2 Nano,GHLTH,Fair/poor general health,Embeddings,0.3372,54519,21672
+OlmoEarth-1.2 Nano,GHLTH,Fair/poor general health,All indices + Embeddings,0.8208,54519,21672
+OlmoEarth-1.2 Nano,HEARING,Hearing disability,ReADI,0.1772,54519,21672
+OlmoEarth-1.2 Nano,HEARING,Hearing disability,SVI,-0.0504,54519,21672
+OlmoEarth-1.2 Nano,HEARING,Hearing disability,SDI,-0.0927,54519,21672
+OlmoEarth-1.2 Nano,HEARING,Hearing disability,All indices,0.441,54519,21672
+OlmoEarth-1.2 Nano,HEARING,Hearing disability,Embeddings,0.246,54519,21672
+OlmoEarth-1.2 Nano,HEARING,Hearing disability,All indices + Embeddings,0.5239,54519,21672
+OlmoEarth-1.2 Nano,HIGHCHOL,High cholesterol,ReADI,-0.1048,54519,21672
+OlmoEarth-1.2 Nano,HIGHCHOL,High cholesterol,SVI,-0.0941,54519,21672
+OlmoEarth-1.2 Nano,HIGHCHOL,High cholesterol,SDI,-0.0672,54519,21672
+OlmoEarth-1.2 Nano,HIGHCHOL,High cholesterol,All indices,0.2453,54519,21672
+OlmoEarth-1.2 Nano,HIGHCHOL,High cholesterol,Embeddings,0.2203,54519,21672
+OlmoEarth-1.2 Nano,HIGHCHOL,High cholesterol,All indices + Embeddings,0.347,54519,21672
+OlmoEarth-1.2 Nano,HOUSINSECU,Housing insecurity,ReADI,0.6422,39650,18298
+OlmoEarth-1.2 Nano,HOUSINSECU,Housing insecurity,SVI,0.4591,39650,18298
+OlmoEarth-1.2 Nano,HOUSINSECU,Housing insecurity,SDI,0.7008,39650,18298
+OlmoEarth-1.2 Nano,HOUSINSECU,Housing insecurity,All indices,0.8317,39650,18298
+OlmoEarth-1.2 Nano,HOUSINSECU,Housing insecurity,Embeddings,0.3752,39650,18298
+OlmoEarth-1.2 Nano,HOUSINSECU,Housing insecurity,All indices + Embeddings,0.8402,39650,18298
+OlmoEarth-1.2 Nano,INDEPLIVE,Independent living difficulty,ReADI,0.8713,54519,21672
+OlmoEarth-1.2 Nano,INDEPLIVE,Independent living difficulty,SVI,0.2327,54519,21672
+OlmoEarth-1.2 Nano,INDEPLIVE,Independent living difficulty,SDI,0.5826,54519,21672
+OlmoEarth-1.2 Nano,INDEPLIVE,Independent living difficulty,All indices,0.858,54519,21672
+OlmoEarth-1.2 Nano,INDEPLIVE,Independent living difficulty,Embeddings,0.2981,54519,21672
+OlmoEarth-1.2 Nano,INDEPLIVE,Independent living difficulty,All indices + Embeddings,0.8492,54519,21672
+OlmoEarth-1.2 Nano,LACKTRPT,Lack of transportation,ReADI,0.747,39650,18298
+OlmoEarth-1.2 Nano,LACKTRPT,Lack of transportation,SVI,0.3613,39650,18298
+OlmoEarth-1.2 Nano,LACKTRPT,Lack of transportation,SDI,0.7422,39650,18298
+OlmoEarth-1.2 Nano,LACKTRPT,Lack of transportation,All indices,0.8598,39650,18298
+OlmoEarth-1.2 Nano,LACKTRPT,Lack of transportation,Embeddings,0.3564,39650,18298
+OlmoEarth-1.2 Nano,LACKTRPT,Lack of transportation,All indices + Embeddings,0.8707,39650,18298
+OlmoEarth-1.2 Nano,LONELINESS,Loneliness,ReADI,0.0431,39650,18298
+OlmoEarth-1.2 Nano,LONELINESS,Loneliness,SVI,0.4069,39650,18298
+OlmoEarth-1.2 Nano,LONELINESS,Loneliness,SDI,0.3867,39650,18298
+OlmoEarth-1.2 Nano,LONELINESS,Loneliness,All indices,0.4416,39650,18298
+OlmoEarth-1.2 Nano,LONELINESS,Loneliness,Embeddings,0.2689,39650,18298
+OlmoEarth-1.2 Nano,LONELINESS,Loneliness,All indices + Embeddings,0.397,39650,18298
+OlmoEarth-1.2 Nano,LPA,Physical inactivity,ReADI,0.763,54519,21672
+OlmoEarth-1.2 Nano,LPA,Physical inactivity,SVI,0.2023,54519,21672
+OlmoEarth-1.2 Nano,LPA,Physical inactivity,SDI,0.4118,54519,21672
+OlmoEarth-1.2 Nano,LPA,Physical inactivity,All indices,0.8037,54519,21672
+OlmoEarth-1.2 Nano,LPA,Physical inactivity,Embeddings,0.3129,54519,21672
+OlmoEarth-1.2 Nano,LPA,Physical inactivity,All indices + Embeddings,0.8268,54519,21672
+OlmoEarth-1.2 Nano,MAMMOUSE,Mammography use,ReADI,0.3255,59074,21664
+OlmoEarth-1.2 Nano,MAMMOUSE,Mammography use,SVI,0.1286,59074,21664
+OlmoEarth-1.2 Nano,MAMMOUSE,Mammography use,SDI,0.2019,59074,21664
+OlmoEarth-1.2 Nano,MAMMOUSE,Mammography use,All indices,0.3338,59074,21664
+OlmoEarth-1.2 Nano,MAMMOUSE,Mammography use,Embeddings,0.1514,59074,21664
+OlmoEarth-1.2 Nano,MAMMOUSE,Mammography use,All indices + Embeddings,0.3983,59074,21664
+OlmoEarth-1.2 Nano,MHLTH,Poor mental health days,ReADI,0.601,54519,21672
+OlmoEarth-1.2 Nano,MHLTH,Poor mental health days,SVI,0.1675,54519,21672
+OlmoEarth-1.2 Nano,MHLTH,Poor mental health days,SDI,0.5141,54519,21672
+OlmoEarth-1.2 Nano,MHLTH,Poor mental health days,All indices,0.6041,54519,21672
+OlmoEarth-1.2 Nano,MHLTH,Poor mental health days,Embeddings,0.2656,54519,21672
+OlmoEarth-1.2 Nano,MHLTH,Poor mental health days,All indices + Embeddings,0.6538,54519,21672
+OlmoEarth-1.2 Nano,MOBILITY,Mobility disability,ReADI,0.6683,54519,21672
+OlmoEarth-1.2 Nano,MOBILITY,Mobility disability,SVI,0.1299,54519,21672
+OlmoEarth-1.2 Nano,MOBILITY,Mobility disability,SDI,0.2657,54519,21672
+OlmoEarth-1.2 Nano,MOBILITY,Mobility disability,All indices,0.7184,54519,21672
+OlmoEarth-1.2 Nano,MOBILITY,Mobility disability,Embeddings,0.2629,54519,21672
+OlmoEarth-1.2 Nano,MOBILITY,Mobility disability,All indices + Embeddings,0.7224,54519,21672
+OlmoEarth-1.2 Nano,OBESITY,Obesity,ReADI,0.453,54519,21672
+OlmoEarth-1.2 Nano,OBESITY,Obesity,SVI,-0.2228,54519,21672
+OlmoEarth-1.2 Nano,OBESITY,Obesity,SDI,-0.0822,54519,21672
+OlmoEarth-1.2 Nano,OBESITY,Obesity,All indices,0.6284,54519,21672
+OlmoEarth-1.2 Nano,OBESITY,Obesity,Embeddings,0.1821,54519,21672
+OlmoEarth-1.2 Nano,OBESITY,Obesity,All indices + Embeddings,0.6659,54519,21672
+OlmoEarth-1.2 Nano,PHLTH,Poor physical health days,ReADI,0.7439,54519,21672
+OlmoEarth-1.2 Nano,PHLTH,Poor physical health days,SVI,0.2173,54519,21672
+OlmoEarth-1.2 Nano,PHLTH,Poor physical health days,SDI,0.3663,54519,21672
+OlmoEarth-1.2 Nano,PHLTH,Poor physical health days,All indices,0.762,54519,21672
+OlmoEarth-1.2 Nano,PHLTH,Poor physical health days,Embeddings,0.2747,54519,21672
+OlmoEarth-1.2 Nano,PHLTH,Poor physical health days,All indices + Embeddings,0.7776,54519,21672
+OlmoEarth-1.2 Nano,SELFCARE,Self-care disability,ReADI,0.8046,54519,21672
+OlmoEarth-1.2 Nano,SELFCARE,Self-care disability,SVI,0.2211,54519,21672
+OlmoEarth-1.2 Nano,SELFCARE,Self-care disability,SDI,0.4924,54519,21672
+OlmoEarth-1.2 Nano,SELFCARE,Self-care disability,All indices,0.8268,54519,21672
+OlmoEarth-1.2 Nano,SELFCARE,Self-care disability,Embeddings,0.2873,54519,21672
+OlmoEarth-1.2 Nano,SELFCARE,Self-care disability,All indices + Embeddings,0.827,54519,21672
+OlmoEarth-1.2 Nano,SHUTUTILITY,Utility shutoff,ReADI,0.7891,39650,18298
+OlmoEarth-1.2 Nano,SHUTUTILITY,Utility shutoff,SVI,0.0681,39650,18298
+OlmoEarth-1.2 Nano,SHUTUTILITY,Utility shutoff,SDI,0.558,39650,18298
+OlmoEarth-1.2 Nano,SHUTUTILITY,Utility shutoff,All indices,0.8185,39650,18298
+OlmoEarth-1.2 Nano,SHUTUTILITY,Utility shutoff,Embeddings,0.2918,39650,18298
+OlmoEarth-1.2 Nano,SHUTUTILITY,Utility shutoff,All indices + Embeddings,0.8443,39650,18298
+OlmoEarth-1.2 Nano,SLEEP,Short sleep duration,ReADI,0.4784,59105,21672
+OlmoEarth-1.2 Nano,SLEEP,Short sleep duration,SVI,-0.032,59105,21672
+OlmoEarth-1.2 Nano,SLEEP,Short sleep duration,SDI,0.2326,59105,21672
+OlmoEarth-1.2 Nano,SLEEP,Short sleep duration,All indices,0.4731,59105,21672
+OlmoEarth-1.2 Nano,SLEEP,Short sleep duration,Embeddings,0.1746,59105,21672
+OlmoEarth-1.2 Nano,SLEEP,Short sleep duration,All indices + Embeddings,0.5643,59105,21672
+OlmoEarth-1.2 Nano,STROKE,Stroke,ReADI,0.4841,54519,21672
+OlmoEarth-1.2 Nano,STROKE,Stroke,SVI,0.0056,54519,21672
+OlmoEarth-1.2 Nano,STROKE,Stroke,SDI,0.0798,54519,21672
+OlmoEarth-1.2 Nano,STROKE,Stroke,All indices,0.6434,54519,21672
+OlmoEarth-1.2 Nano,STROKE,Stroke,Embeddings,0.2631,54519,21672
+OlmoEarth-1.2 Nano,STROKE,Stroke,All indices + Embeddings,0.6658,54519,21672
+OlmoEarth-1.2 Nano,TEETHLOST,Tooth loss,ReADI,0.8252,59080,21666
+OlmoEarth-1.2 Nano,TEETHLOST,Tooth loss,SVI,0.0656,59080,21666
+OlmoEarth-1.2 Nano,TEETHLOST,Tooth loss,SDI,0.438,59080,21666
+OlmoEarth-1.2 Nano,TEETHLOST,Tooth loss,All indices,0.8408,59080,21666
+OlmoEarth-1.2 Nano,TEETHLOST,Tooth loss,Embeddings,0.2388,59080,21666
+OlmoEarth-1.2 Nano,TEETHLOST,Tooth loss,All indices + Embeddings,0.8456,59080,21666
+OlmoEarth-1.2 Nano,VISION,Vision disability,ReADI,0.8076,54519,21672
+OlmoEarth-1.2 Nano,VISION,Vision disability,SVI,0.3603,54519,21672
+OlmoEarth-1.2 Nano,VISION,Vision disability,SDI,0.62,54519,21672
+OlmoEarth-1.2 Nano,VISION,Vision disability,All indices,0.8731,54519,21672
+OlmoEarth-1.2 Nano,VISION,Vision disability,Embeddings,0.3182,54519,21672
+OlmoEarth-1.2 Nano,VISION,Vision disability,All indices + Embeddings,0.8829,54519,21672
+Prithvi-EO-2.0 300M-TL,ACCESS2,Lack of health insurance,ReADI,0.4267,54391,15990
+Prithvi-EO-2.0 300M-TL,ACCESS2,Lack of health insurance,SVI,0.0298,54391,15990
+Prithvi-EO-2.0 300M-TL,ACCESS2,Lack of health insurance,SDI,0.2192,54391,15990
+Prithvi-EO-2.0 300M-TL,ACCESS2,Lack of health insurance,All indices,0.5016,54391,15990
+Prithvi-EO-2.0 300M-TL,ACCESS2,Lack of health insurance,Embeddings,-0.3743,54391,15990
+Prithvi-EO-2.0 300M-TL,ACCESS2,Lack of health insurance,All indices + Embeddings,0.5629,54391,15990
+Prithvi-EO-2.0 300M-TL,ARTHRITIS,Arthritis,ReADI,0.1414,54391,15990
+Prithvi-EO-2.0 300M-TL,ARTHRITIS,Arthritis,SVI,0.0792,54391,15990
+Prithvi-EO-2.0 300M-TL,ARTHRITIS,Arthritis,SDI,9e-4,54391,15990
+Prithvi-EO-2.0 300M-TL,ARTHRITIS,Arthritis,All indices,0.5296,54391,15990
+Prithvi-EO-2.0 300M-TL,ARTHRITIS,Arthritis,Embeddings,0.262,54391,15990
+Prithvi-EO-2.0 300M-TL,ARTHRITIS,Arthritis,All indices + Embeddings,0.5666,54391,15990
+Prithvi-EO-2.0 300M-TL,BINGE,Binge drinking,ReADI,0.1588,54391,15990
+Prithvi-EO-2.0 300M-TL,BINGE,Binge drinking,SVI,0.0825,54391,15990
+Prithvi-EO-2.0 300M-TL,BINGE,Binge drinking,SDI,0.0383,54391,15990
+Prithvi-EO-2.0 300M-TL,BINGE,Binge drinking,All indices,0.3109,54391,15990
+Prithvi-EO-2.0 300M-TL,BINGE,Binge drinking,Embeddings,0.0818,54391,15990
+Prithvi-EO-2.0 300M-TL,BINGE,Binge drinking,All indices + Embeddings,0.3319,54391,15990
+Prithvi-EO-2.0 300M-TL,BPHIGH,High blood pressure,ReADI,0.328,54391,15990
+Prithvi-EO-2.0 300M-TL,BPHIGH,High blood pressure,SVI,-0.0196,54391,15990
+Prithvi-EO-2.0 300M-TL,BPHIGH,High blood pressure,SDI,-0.0229,54391,15990
+Prithvi-EO-2.0 300M-TL,BPHIGH,High blood pressure,All indices,0.5663,54391,15990
+Prithvi-EO-2.0 300M-TL,BPHIGH,High blood pressure,Embeddings,0.1365,54391,15990
+Prithvi-EO-2.0 300M-TL,BPHIGH,High blood pressure,All indices + Embeddings,0.6179,54391,15990
+Prithvi-EO-2.0 300M-TL,BPMED,BP medication use,ReADI,-0.0391,54391,15990
+Prithvi-EO-2.0 300M-TL,BPMED,BP medication use,SVI,0.0041,54391,15990
+Prithvi-EO-2.0 300M-TL,BPMED,BP medication use,SDI,0.0061,54391,15990
+Prithvi-EO-2.0 300M-TL,BPMED,BP medication use,All indices,0.3064,54391,15990
+Prithvi-EO-2.0 300M-TL,BPMED,BP medication use,Embeddings,0.2253,54391,15990
+Prithvi-EO-2.0 300M-TL,BPMED,BP medication use,All indices + Embeddings,0.3743,54391,15990
+Prithvi-EO-2.0 300M-TL,CANCER,Cancer (excl. skin),ReADI,0.0734,54391,15990
+Prithvi-EO-2.0 300M-TL,CANCER,Cancer (excl. skin),SVI,0.2525,54391,15990
+Prithvi-EO-2.0 300M-TL,CANCER,Cancer (excl. skin),SDI,0.2797,54391,15990
+Prithvi-EO-2.0 300M-TL,CANCER,Cancer (excl. skin),All indices,0.4247,54391,15990
+Prithvi-EO-2.0 300M-TL,CANCER,Cancer (excl. skin),Embeddings,0.358,54391,15990
+Prithvi-EO-2.0 300M-TL,CANCER,Cancer (excl. skin),All indices + Embeddings,0.5005,54391,15990
+Prithvi-EO-2.0 300M-TL,CASTHMA,Current asthma,ReADI,0.2588,54391,15990
+Prithvi-EO-2.0 300M-TL,CASTHMA,Current asthma,SVI,-0.0232,54391,15990
+Prithvi-EO-2.0 300M-TL,CASTHMA,Current asthma,SDI,0.1203,54391,15990
+Prithvi-EO-2.0 300M-TL,CASTHMA,Current asthma,All indices,0.3291,54391,15990
+Prithvi-EO-2.0 300M-TL,CASTHMA,Current asthma,Embeddings,2e-4,54391,15990
+Prithvi-EO-2.0 300M-TL,CASTHMA,Current asthma,All indices + Embeddings,0.4568,54391,15990
+Prithvi-EO-2.0 300M-TL,CHD,Coronary heart disease,ReADI,0.3745,54391,15990
+Prithvi-EO-2.0 300M-TL,CHD,Coronary heart disease,SVI,0.0252,54391,15990
+Prithvi-EO-2.0 300M-TL,CHD,Coronary heart disease,SDI,0.035,54391,15990
+Prithvi-EO-2.0 300M-TL,CHD,Coronary heart disease,All indices,0.5647,54391,15990
+Prithvi-EO-2.0 300M-TL,CHD,Coronary heart disease,Embeddings,0.1167,54391,15990
+Prithvi-EO-2.0 300M-TL,CHD,Coronary heart disease,All indices + Embeddings,0.5989,54391,15990
+Prithvi-EO-2.0 300M-TL,CHECKUP,Annual checkup,ReADI,-0.0793,54391,15990
+Prithvi-EO-2.0 300M-TL,CHECKUP,Annual checkup,SVI,0.0635,54391,15990
+Prithvi-EO-2.0 300M-TL,CHECKUP,Annual checkup,SDI,-0.0121,54391,15990
+Prithvi-EO-2.0 300M-TL,CHECKUP,Annual checkup,All indices,0.1478,54391,15990
+Prithvi-EO-2.0 300M-TL,CHECKUP,Annual checkup,Embeddings,0.2538,54391,15990
+Prithvi-EO-2.0 300M-TL,CHECKUP,Annual checkup,All indices + Embeddings,0.3484,54391,15990
+Prithvi-EO-2.0 300M-TL,CHOLSCREEN,Cholesterol screening,ReADI,0.2991,54391,15990
+Prithvi-EO-2.0 300M-TL,CHOLSCREEN,Cholesterol screening,SVI,0.201,54391,15990
+Prithvi-EO-2.0 300M-TL,CHOLSCREEN,Cholesterol screening,SDI,0.4154,54391,15990
+Prithvi-EO-2.0 300M-TL,CHOLSCREEN,Cholesterol screening,All indices,0.462,54391,15990
+Prithvi-EO-2.0 300M-TL,CHOLSCREEN,Cholesterol screening,Embeddings,0.1803,54391,15990
+Prithvi-EO-2.0 300M-TL,CHOLSCREEN,Cholesterol screening,All indices + Embeddings,0.5252,54391,15990
+Prithvi-EO-2.0 300M-TL,COGNITION,Cognitive decline,ReADI,0.7597,54391,15990
+Prithvi-EO-2.0 300M-TL,COGNITION,Cognitive decline,SVI,0.295,54391,15990
+Prithvi-EO-2.0 300M-TL,COGNITION,Cognitive decline,SDI,0.6035,54391,15990
+Prithvi-EO-2.0 300M-TL,COGNITION,Cognitive decline,All indices,0.7708,54391,15990
+Prithvi-EO-2.0 300M-TL,COGNITION,Cognitive decline,Embeddings,0.0925,54391,15990
+Prithvi-EO-2.0 300M-TL,COGNITION,Cognitive decline,All indices + Embeddings,0.7596,54391,15990
+Prithvi-EO-2.0 300M-TL,COLON_SCREEN,Colorectal cancer screening,ReADI,0.2745,59070,15989
+Prithvi-EO-2.0 300M-TL,COLON_SCREEN,Colorectal cancer screening,SVI,0.4202,59070,15989
+Prithvi-EO-2.0 300M-TL,COLON_SCREEN,Colorectal cancer screening,SDI,0.391,59070,15989
+Prithvi-EO-2.0 300M-TL,COLON_SCREEN,Colorectal cancer screening,All indices,0.5128,59070,15989
+Prithvi-EO-2.0 300M-TL,COLON_SCREEN,Colorectal cancer screening,Embeddings,0.2011,59070,15989
+Prithvi-EO-2.0 300M-TL,COLON_SCREEN,Colorectal cancer screening,All indices + Embeddings,0.5801,59070,15989
+Prithvi-EO-2.0 300M-TL,COPD,COPD,ReADI,0.6358,54391,15990
+Prithvi-EO-2.0 300M-TL,COPD,COPD,SVI,0.0687,54391,15990
+Prithvi-EO-2.0 300M-TL,COPD,COPD,SDI,0.1725,54391,15990
+Prithvi-EO-2.0 300M-TL,COPD,COPD,All indices,0.7684,54391,15990
+Prithvi-EO-2.0 300M-TL,COPD,COPD,Embeddings,0.0847,54391,15990
+Prithvi-EO-2.0 300M-TL,COPD,COPD,All indices + Embeddings,0.7802,54391,15990
+Prithvi-EO-2.0 300M-TL,CSMOKING,Current smoking,ReADI,0.7744,54391,15990
+Prithvi-EO-2.0 300M-TL,CSMOKING,Current smoking,SVI,0.1233,54391,15990
+Prithvi-EO-2.0 300M-TL,CSMOKING,Current smoking,SDI,0.3481,54391,15990
+Prithvi-EO-2.0 300M-TL,CSMOKING,Current smoking,All indices,0.8058,54391,15990
+Prithvi-EO-2.0 300M-TL,CSMOKING,Current smoking,Embeddings,0.1099,54391,15990
+Prithvi-EO-2.0 300M-TL,CSMOKING,Current smoking,All indices + Embeddings,0.812,54391,15990
+Prithvi-EO-2.0 300M-TL,DENTAL,Dental visit,ReADI,0.7732,59072,15990
+Prithvi-EO-2.0 300M-TL,DENTAL,Dental visit,SVI,0.2012,59072,15990
+Prithvi-EO-2.0 300M-TL,DENTAL,Dental visit,SDI,0.5037,59072,15990
+Prithvi-EO-2.0 300M-TL,DENTAL,Dental visit,All indices,0.8019,59072,15990
+Prithvi-EO-2.0 300M-TL,DENTAL,Dental visit,Embeddings,-0.033,59072,15990
+Prithvi-EO-2.0 300M-TL,DENTAL,Dental visit,All indices + Embeddings,0.7716,59072,15990
+Prithvi-EO-2.0 300M-TL,DEPRESSION,Depression,ReADI,-0.4138,54391,15990
+Prithvi-EO-2.0 300M-TL,DEPRESSION,Depression,SVI,-0.3973,54391,15990
+Prithvi-EO-2.0 300M-TL,DEPRESSION,Depression,SDI,-0.4287,54391,15990
+Prithvi-EO-2.0 300M-TL,DEPRESSION,Depression,All indices,-0.3589,54391,15990
+Prithvi-EO-2.0 300M-TL,DEPRESSION,Depression,Embeddings,-0.3013,54391,15990
+Prithvi-EO-2.0 300M-TL,DEPRESSION,Depression,All indices + Embeddings,-0.1345,54391,15990
+Prithvi-EO-2.0 300M-TL,DIABETES,Diabetes,ReADI,0.5658,54391,15990
+Prithvi-EO-2.0 300M-TL,DIABETES,Diabetes,SVI,0.0726,54391,15990
+Prithvi-EO-2.0 300M-TL,DIABETES,Diabetes,SDI,0.1797,54391,15990
+Prithvi-EO-2.0 300M-TL,DIABETES,Diabetes,All indices,0.6682,54391,15990
+Prithvi-EO-2.0 300M-TL,DIABETES,Diabetes,Embeddings,0.0737,54391,15990
+Prithvi-EO-2.0 300M-TL,DIABETES,Diabetes,All indices + Embeddings,0.6873,54391,15990
+Prithvi-EO-2.0 300M-TL,DISABILITY,Any disability,ReADI,0.806,54391,15990
+Prithvi-EO-2.0 300M-TL,DISABILITY,Any disability,SVI,0.2098,54391,15990
+Prithvi-EO-2.0 300M-TL,DISABILITY,Any disability,SDI,0.3964,54391,15990
+Prithvi-EO-2.0 300M-TL,DISABILITY,Any disability,All indices,0.7946,54391,15990
+Prithvi-EO-2.0 300M-TL,DISABILITY,Any disability,Embeddings,0.0086,54391,15990
+Prithvi-EO-2.0 300M-TL,DISABILITY,Any disability,All indices + Embeddings,0.8192,54391,15990
+Prithvi-EO-2.0 300M-TL,EMOTIONSPT,Emotional support,ReADI,0.1837,39468,12610
+Prithvi-EO-2.0 300M-TL,EMOTIONSPT,Emotional support,SVI,0.4986,39468,12610
+Prithvi-EO-2.0 300M-TL,EMOTIONSPT,Emotional support,SDI,0.3876,39468,12610
+Prithvi-EO-2.0 300M-TL,EMOTIONSPT,Emotional support,All indices,0.505,39468,12610
+Prithvi-EO-2.0 300M-TL,EMOTIONSPT,Emotional support,Embeddings,0.2757,39468,12610
+Prithvi-EO-2.0 300M-TL,EMOTIONSPT,Emotional support,All indices + Embeddings,0.6108,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODINSECU,Food insecurity,ReADI,0.7811,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODINSECU,Food insecurity,SVI,0.3332,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODINSECU,Food insecurity,SDI,0.6934,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODINSECU,Food insecurity,All indices,0.86240000000000006,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODINSECU,Food insecurity,Embeddings,0.0363,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODINSECU,Food insecurity,All indices + Embeddings,0.876,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODSTAMP,Food stamp use,ReADI,0.7403,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODSTAMP,Food stamp use,SVI,0.3287,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODSTAMP,Food stamp use,SDI,0.7053,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODSTAMP,Food stamp use,All indices,0.8125,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODSTAMP,Food stamp use,Embeddings,-0.0334,39468,12610
+Prithvi-EO-2.0 300M-TL,FOODSTAMP,Food stamp use,All indices + Embeddings,0.8211,39468,12610
+Prithvi-EO-2.0 300M-TL,GHLTH,Fair/poor general health,ReADI,0.8,54391,15990
+Prithvi-EO-2.0 300M-TL,GHLTH,Fair/poor general health,SVI,0.3238,54391,15990
+Prithvi-EO-2.0 300M-TL,GHLTH,Fair/poor general health,SDI,0.5184,54391,15990
+Prithvi-EO-2.0 300M-TL,GHLTH,Fair/poor general health,All indices,0.8408,54391,15990
+Prithvi-EO-2.0 300M-TL,GHLTH,Fair/poor general health,Embeddings,0.0669,54391,15990
+Prithvi-EO-2.0 300M-TL,GHLTH,Fair/poor general health,All indices + Embeddings,0.8541,54391,15990
+Prithvi-EO-2.0 300M-TL,HEARING,Hearing disability,ReADI,0.2556,54391,15990
+Prithvi-EO-2.0 300M-TL,HEARING,Hearing disability,SVI,-0.0035,54391,15990
+Prithvi-EO-2.0 300M-TL,HEARING,Hearing disability,SDI,-0.0172,54391,15990
+Prithvi-EO-2.0 300M-TL,HEARING,Hearing disability,All indices,0.4345,54391,15990
+Prithvi-EO-2.0 300M-TL,HEARING,Hearing disability,Embeddings,0.1048,54391,15990
+Prithvi-EO-2.0 300M-TL,HEARING,Hearing disability,All indices + Embeddings,0.5271,54391,15990
+Prithvi-EO-2.0 300M-TL,HIGHCHOL,High cholesterol,ReADI,-0.1018,54391,15990
+Prithvi-EO-2.0 300M-TL,HIGHCHOL,High cholesterol,SVI,-0.109,54391,15990
+Prithvi-EO-2.0 300M-TL,HIGHCHOL,High cholesterol,SDI,-0.0894,54391,15990
+Prithvi-EO-2.0 300M-TL,HIGHCHOL,High cholesterol,All indices,0.2472,54391,15990
+Prithvi-EO-2.0 300M-TL,HIGHCHOL,High cholesterol,Embeddings,0.1381,54391,15990
+Prithvi-EO-2.0 300M-TL,HIGHCHOL,High cholesterol,All indices + Embeddings,0.3106,54391,15990
+Prithvi-EO-2.0 300M-TL,HOUSINSECU,Housing insecurity,ReADI,0.6908,39468,12610
+Prithvi-EO-2.0 300M-TL,HOUSINSECU,Housing insecurity,SVI,0.3533,39468,12610
+Prithvi-EO-2.0 300M-TL,HOUSINSECU,Housing insecurity,SDI,0.6713,39468,12610
+Prithvi-EO-2.0 300M-TL,HOUSINSECU,Housing insecurity,All indices,0.8103,39468,12610
+Prithvi-EO-2.0 300M-TL,HOUSINSECU,Housing insecurity,Embeddings,0.0294,39468,12610
+Prithvi-EO-2.0 300M-TL,HOUSINSECU,Housing insecurity,All indices + Embeddings,0.8266,39468,12610
+Prithvi-EO-2.0 300M-TL,INDEPLIVE,Independent living difficulty,ReADI,0.8817,54391,15990
+Prithvi-EO-2.0 300M-TL,INDEPLIVE,Independent living difficulty,SVI,0.2369,54391,15990
+Prithvi-EO-2.0 300M-TL,INDEPLIVE,Independent living difficulty,SDI,0.5753,54391,15990
+Prithvi-EO-2.0 300M-TL,INDEPLIVE,Independent living difficulty,All indices,0.8753,54391,15990
+Prithvi-EO-2.0 300M-TL,INDEPLIVE,Independent living difficulty,Embeddings,0.0698,54391,15990
+Prithvi-EO-2.0 300M-TL,INDEPLIVE,Independent living difficulty,All indices + Embeddings,0.8729,54391,15990
+Prithvi-EO-2.0 300M-TL,LACKTRPT,Lack of transportation,ReADI,0.7591,39468,12610
+Prithvi-EO-2.0 300M-TL,LACKTRPT,Lack of transportation,SVI,0.319,39468,12610
+Prithvi-EO-2.0 300M-TL,LACKTRPT,Lack of transportation,SDI,0.7275,39468,12610
+Prithvi-EO-2.0 300M-TL,LACKTRPT,Lack of transportation,All indices,0.8462,39468,12610
+Prithvi-EO-2.0 300M-TL,LACKTRPT,Lack of transportation,Embeddings,0.0526,39468,12610
+Prithvi-EO-2.0 300M-TL,LACKTRPT,Lack of transportation,All indices + Embeddings,0.8571,39468,12610
+Prithvi-EO-2.0 300M-TL,LONELINESS,Loneliness,ReADI,0.1581,39468,12610
+Prithvi-EO-2.0 300M-TL,LONELINESS,Loneliness,SVI,0.3274,39468,12610
+Prithvi-EO-2.0 300M-TL,LONELINESS,Loneliness,SDI,0.4228,39468,12610
+Prithvi-EO-2.0 300M-TL,LONELINESS,Loneliness,All indices,0.4405,39468,12610
+Prithvi-EO-2.0 300M-TL,LONELINESS,Loneliness,Embeddings,0.1841,39468,12610
+Prithvi-EO-2.0 300M-TL,LONELINESS,Loneliness,All indices + Embeddings,0.3271,39468,12610
+Prithvi-EO-2.0 300M-TL,LPA,Physical inactivity,ReADI,0.7238,54391,15990
+Prithvi-EO-2.0 300M-TL,LPA,Physical inactivity,SVI,0.1431,54391,15990
+Prithvi-EO-2.0 300M-TL,LPA,Physical inactivity,SDI,0.343,54391,15990
+Prithvi-EO-2.0 300M-TL,LPA,Physical inactivity,All indices,0.7627,54391,15990
+Prithvi-EO-2.0 300M-TL,LPA,Physical inactivity,Embeddings,0.0295,54391,15990
+Prithvi-EO-2.0 300M-TL,LPA,Physical inactivity,All indices + Embeddings,0.7908,54391,15990
+Prithvi-EO-2.0 300M-TL,MAMMOUSE,Mammography use,ReADI,0.2339,59041,15986
+Prithvi-EO-2.0 300M-TL,MAMMOUSE,Mammography use,SVI,0.0687,59041,15986
+Prithvi-EO-2.0 300M-TL,MAMMOUSE,Mammography use,SDI,0.1257,59041,15986
+Prithvi-EO-2.0 300M-TL,MAMMOUSE,Mammography use,All indices,0.2405,59041,15986
+Prithvi-EO-2.0 300M-TL,MAMMOUSE,Mammography use,Embeddings,0.014,59041,15986
+Prithvi-EO-2.0 300M-TL,MAMMOUSE,Mammography use,All indices + Embeddings,0.3585,59041,15986
+Prithvi-EO-2.0 300M-TL,MHLTH,Poor mental health days,ReADI,0.5958,54391,15990
+Prithvi-EO-2.0 300M-TL,MHLTH,Poor mental health days,SVI,0.188,54391,15990
+Prithvi-EO-2.0 300M-TL,MHLTH,Poor mental health days,SDI,0.5099,54391,15990
+Prithvi-EO-2.0 300M-TL,MHLTH,Poor mental health days,All indices,0.623,54391,15990
+Prithvi-EO-2.0 300M-TL,MHLTH,Poor mental health days,Embeddings,0.163,54391,15990
+Prithvi-EO-2.0 300M-TL,MHLTH,Poor mental health days,All indices + Embeddings,0.631,54391,15990
+Prithvi-EO-2.0 300M-TL,MOBILITY,Mobility disability,ReADI,0.6739,54391,15990
+Prithvi-EO-2.0 300M-TL,MOBILITY,Mobility disability,SVI,0.1293,54391,15990
+Prithvi-EO-2.0 300M-TL,MOBILITY,Mobility disability,SDI,0.2511,54391,15990
+Prithvi-EO-2.0 300M-TL,MOBILITY,Mobility disability,All indices,0.7424,54391,15990
+Prithvi-EO-2.0 300M-TL,MOBILITY,Mobility disability,Embeddings,0.047,54391,15990
+Prithvi-EO-2.0 300M-TL,MOBILITY,Mobility disability,All indices + Embeddings,0.7655,54391,15990
+Prithvi-EO-2.0 300M-TL,OBESITY,Obesity,ReADI,0.5567,54391,15990
+Prithvi-EO-2.0 300M-TL,OBESITY,Obesity,SVI,-0.0625,54391,15990
+Prithvi-EO-2.0 300M-TL,OBESITY,Obesity,SDI,0.085,54391,15990
+Prithvi-EO-2.0 300M-TL,OBESITY,Obesity,All indices,0.6569,54391,15990
+Prithvi-EO-2.0 300M-TL,OBESITY,Obesity,Embeddings,0.041,54391,15990
+Prithvi-EO-2.0 300M-TL,OBESITY,Obesity,All indices + Embeddings,0.6781,54391,15990
+Prithvi-EO-2.0 300M-TL,PHLTH,Poor physical health days,ReADI,0.7392,54391,15990
+Prithvi-EO-2.0 300M-TL,PHLTH,Poor physical health days,SVI,0.176,54391,15990
+Prithvi-EO-2.0 300M-TL,PHLTH,Poor physical health days,SDI,0.3154,54391,15990
+Prithvi-EO-2.0 300M-TL,PHLTH,Poor physical health days,All indices,0.7806,54391,15990
+Prithvi-EO-2.0 300M-TL,PHLTH,Poor physical health days,Embeddings,0.0193,54391,15990
+Prithvi-EO-2.0 300M-TL,PHLTH,Poor physical health days,All indices + Embeddings,0.7857,54391,15990
+Prithvi-EO-2.0 300M-TL,SELFCARE,Self-care disability,ReADI,0.8169,54391,15990
+Prithvi-EO-2.0 300M-TL,SELFCARE,Self-care disability,SVI,0.2014,54391,15990
+Prithvi-EO-2.0 300M-TL,SELFCARE,Self-care disability,SDI,0.465,54391,15990
+Prithvi-EO-2.0 300M-TL,SELFCARE,Self-care disability,All indices,0.8424,54391,15990
+Prithvi-EO-2.0 300M-TL,SELFCARE,Self-care disability,Embeddings,0.0133,54391,15990
+Prithvi-EO-2.0 300M-TL,SELFCARE,Self-care disability,All indices + Embeddings,0.854,54391,15990
+Prithvi-EO-2.0 300M-TL,SHUTUTILITY,Utility shutoff,ReADI,0.7911,39468,12610
+Prithvi-EO-2.0 300M-TL,SHUTUTILITY,Utility shutoff,SVI,0.1903,39468,12610
+Prithvi-EO-2.0 300M-TL,SHUTUTILITY,Utility shutoff,SDI,0.6378,39468,12610
+Prithvi-EO-2.0 300M-TL,SHUTUTILITY,Utility shutoff,All indices,0.8278,39468,12610
+Prithvi-EO-2.0 300M-TL,SHUTUTILITY,Utility shutoff,Embeddings,-0.0835,39468,12610
+Prithvi-EO-2.0 300M-TL,SHUTUTILITY,Utility shutoff,All indices + Embeddings,0.8425,39468,12610
+Prithvi-EO-2.0 300M-TL,SLEEP,Short sleep duration,ReADI,0.4529,59072,15990
+Prithvi-EO-2.0 300M-TL,SLEEP,Short sleep duration,SVI,-0.0129,59072,15990
+Prithvi-EO-2.0 300M-TL,SLEEP,Short sleep duration,SDI,0.2364,59072,15990
+Prithvi-EO-2.0 300M-TL,SLEEP,Short sleep duration,All indices,0.4471,59072,15990
+Prithvi-EO-2.0 300M-TL,SLEEP,Short sleep duration,Embeddings,-0.0087,59072,15990
+Prithvi-EO-2.0 300M-TL,SLEEP,Short sleep duration,All indices + Embeddings,0.5188,59072,15990
+Prithvi-EO-2.0 300M-TL,STROKE,Stroke,ReADI,0.5657,54391,15990
+Prithvi-EO-2.0 300M-TL,STROKE,Stroke,SVI,0.0929,54391,15990
+Prithvi-EO-2.0 300M-TL,STROKE,Stroke,SDI,0.1825,54391,15990
+Prithvi-EO-2.0 300M-TL,STROKE,Stroke,All indices,0.6802,54391,15990
+Prithvi-EO-2.0 300M-TL,STROKE,Stroke,Embeddings,0.0705,54391,15990
+Prithvi-EO-2.0 300M-TL,STROKE,Stroke,All indices + Embeddings,0.7058,54391,15990
+Prithvi-EO-2.0 300M-TL,TEETHLOST,Tooth loss,ReADI,0.8462,59048,15986
+Prithvi-EO-2.0 300M-TL,TEETHLOST,Tooth loss,SVI,0.1847,59048,15986
+Prithvi-EO-2.0 300M-TL,TEETHLOST,Tooth loss,SDI,0.5403,59048,15986
+Prithvi-EO-2.0 300M-TL,TEETHLOST,Tooth loss,All indices,0.8536,59048,15986
+Prithvi-EO-2.0 300M-TL,TEETHLOST,Tooth loss,Embeddings,0.0967,59048,15986
+Prithvi-EO-2.0 300M-TL,TEETHLOST,Tooth loss,All indices + Embeddings,0.8579,59048,15986
+Prithvi-EO-2.0 300M-TL,VISION,Vision disability,ReADI,0.8301,54391,15990
+Prithvi-EO-2.0 300M-TL,VISION,Vision disability,SVI,0.2687,54391,15990
+Prithvi-EO-2.0 300M-TL,VISION,Vision disability,SDI,0.5631,54391,15990
+Prithvi-EO-2.0 300M-TL,VISION,Vision disability,All indices,0.8701,54391,15990
+Prithvi-EO-2.0 300M-TL,VISION,Vision disability,Embeddings,-0.0542,54391,15990
+Prithvi-EO-2.0 300M-TL,VISION,Vision disability,All indices + Embeddings,0.881,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ACCESS2,Lack of health insurance,ReADI,0.4267,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ACCESS2,Lack of health insurance,SVI,0.0298,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ACCESS2,Lack of health insurance,SDI,0.2192,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ACCESS2,Lack of health insurance,All indices,0.5016,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ACCESS2,Lack of health insurance,Embeddings,-0.3072,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ACCESS2,Lack of health insurance,All indices + Embeddings,0.5706,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ARTHRITIS,Arthritis,ReADI,0.1414,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ARTHRITIS,Arthritis,SVI,0.0792,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ARTHRITIS,Arthritis,SDI,9e-4,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ARTHRITIS,Arthritis,All indices,0.5296,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ARTHRITIS,Arthritis,Embeddings,0.2841,54391,15990
+Prithvi-EO-2.0 Tiny-TL,ARTHRITIS,Arthritis,All indices + Embeddings,0.5597,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BINGE,Binge drinking,ReADI,0.1588,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BINGE,Binge drinking,SVI,0.0825,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BINGE,Binge drinking,SDI,0.0383,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BINGE,Binge drinking,All indices,0.3109,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BINGE,Binge drinking,Embeddings,0.0585,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BINGE,Binge drinking,All indices + Embeddings,0.2947,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPHIGH,High blood pressure,ReADI,0.328,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPHIGH,High blood pressure,SVI,-0.0196,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPHIGH,High blood pressure,SDI,-0.0229,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPHIGH,High blood pressure,All indices,0.5663,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPHIGH,High blood pressure,Embeddings,0.1792,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPHIGH,High blood pressure,All indices + Embeddings,0.6158,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPMED,BP medication use,ReADI,-0.0391,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPMED,BP medication use,SVI,0.0041,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPMED,BP medication use,SDI,0.0061,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPMED,BP medication use,All indices,0.3064,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPMED,BP medication use,Embeddings,0.1918,54391,15990
+Prithvi-EO-2.0 Tiny-TL,BPMED,BP medication use,All indices + Embeddings,0.3627,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CANCER,Cancer (excl. skin),ReADI,0.0734,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CANCER,Cancer (excl. skin),SVI,0.2525,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CANCER,Cancer (excl. skin),SDI,0.2797,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CANCER,Cancer (excl. skin),All indices,0.4247,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CANCER,Cancer (excl. skin),Embeddings,0.3363,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CANCER,Cancer (excl. skin),All indices + Embeddings,0.4902,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CASTHMA,Current asthma,ReADI,0.2588,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CASTHMA,Current asthma,SVI,-0.0232,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CASTHMA,Current asthma,SDI,0.1203,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CASTHMA,Current asthma,All indices,0.3291,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CASTHMA,Current asthma,Embeddings,0.0244,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CASTHMA,Current asthma,All indices + Embeddings,0.4463,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHD,Coronary heart disease,ReADI,0.3745,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHD,Coronary heart disease,SVI,0.0252,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHD,Coronary heart disease,SDI,0.035,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHD,Coronary heart disease,All indices,0.5647,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHD,Coronary heart disease,Embeddings,0.1419,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHD,Coronary heart disease,All indices + Embeddings,0.5876,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHECKUP,Annual checkup,ReADI,-0.0793,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHECKUP,Annual checkup,SVI,0.0635,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHECKUP,Annual checkup,SDI,-0.0121,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHECKUP,Annual checkup,All indices,0.1478,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHECKUP,Annual checkup,Embeddings,0.218,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHECKUP,Annual checkup,All indices + Embeddings,0.3182,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHOLSCREEN,Cholesterol screening,ReADI,0.2991,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHOLSCREEN,Cholesterol screening,SVI,0.201,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHOLSCREEN,Cholesterol screening,SDI,0.4154,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHOLSCREEN,Cholesterol screening,All indices,0.462,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHOLSCREEN,Cholesterol screening,Embeddings,0.1147,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CHOLSCREEN,Cholesterol screening,All indices + Embeddings,0.5159,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COGNITION,Cognitive decline,ReADI,0.7597,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COGNITION,Cognitive decline,SVI,0.295,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COGNITION,Cognitive decline,SDI,0.6035,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COGNITION,Cognitive decline,All indices,0.7708,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COGNITION,Cognitive decline,Embeddings,0.069,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COGNITION,Cognitive decline,All indices + Embeddings,0.7617,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COLON_SCREEN,Colorectal cancer screening,ReADI,0.2745,59070,15989
+Prithvi-EO-2.0 Tiny-TL,COLON_SCREEN,Colorectal cancer screening,SVI,0.4202,59070,15989
+Prithvi-EO-2.0 Tiny-TL,COLON_SCREEN,Colorectal cancer screening,SDI,0.391,59070,15989
+Prithvi-EO-2.0 Tiny-TL,COLON_SCREEN,Colorectal cancer screening,All indices,0.5128,59070,15989
+Prithvi-EO-2.0 Tiny-TL,COLON_SCREEN,Colorectal cancer screening,Embeddings,0.1855,59070,15989
+Prithvi-EO-2.0 Tiny-TL,COLON_SCREEN,Colorectal cancer screening,All indices + Embeddings,0.5717,59070,15989
+Prithvi-EO-2.0 Tiny-TL,COPD,COPD,ReADI,0.6358,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COPD,COPD,SVI,0.0687,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COPD,COPD,SDI,0.1725,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COPD,COPD,All indices,0.7684,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COPD,COPD,Embeddings,0.1375,54391,15990
+Prithvi-EO-2.0 Tiny-TL,COPD,COPD,All indices + Embeddings,0.7787,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CSMOKING,Current smoking,ReADI,0.7744,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CSMOKING,Current smoking,SVI,0.1233,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CSMOKING,Current smoking,SDI,0.3481,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CSMOKING,Current smoking,All indices,0.8058,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CSMOKING,Current smoking,Embeddings,0.1251,54391,15990
+Prithvi-EO-2.0 Tiny-TL,CSMOKING,Current smoking,All indices + Embeddings,0.8063,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DENTAL,Dental visit,ReADI,0.7732,59072,15990
+Prithvi-EO-2.0 Tiny-TL,DENTAL,Dental visit,SVI,0.2012,59072,15990
+Prithvi-EO-2.0 Tiny-TL,DENTAL,Dental visit,SDI,0.5037,59072,15990
+Prithvi-EO-2.0 Tiny-TL,DENTAL,Dental visit,All indices,0.8019,59072,15990
+Prithvi-EO-2.0 Tiny-TL,DENTAL,Dental visit,Embeddings,-0.0879,59072,15990
+Prithvi-EO-2.0 Tiny-TL,DENTAL,Dental visit,All indices + Embeddings,0.6919,59072,15990
+Prithvi-EO-2.0 Tiny-TL,DEPRESSION,Depression,ReADI,-0.4138,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DEPRESSION,Depression,SVI,-0.3973,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DEPRESSION,Depression,SDI,-0.4287,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DEPRESSION,Depression,All indices,-0.3589,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DEPRESSION,Depression,Embeddings,-0.4292,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DEPRESSION,Depression,All indices + Embeddings,-0.234,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DIABETES,Diabetes,ReADI,0.5658,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DIABETES,Diabetes,SVI,0.0726,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DIABETES,Diabetes,SDI,0.1797,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DIABETES,Diabetes,All indices,0.6682,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DIABETES,Diabetes,Embeddings,0.0809,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DIABETES,Diabetes,All indices + Embeddings,0.6849,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DISABILITY,Any disability,ReADI,0.806,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DISABILITY,Any disability,SVI,0.2098,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DISABILITY,Any disability,SDI,0.3964,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DISABILITY,Any disability,All indices,0.7946,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DISABILITY,Any disability,Embeddings,0.0649,54391,15990
+Prithvi-EO-2.0 Tiny-TL,DISABILITY,Any disability,All indices + Embeddings,0.8072,54391,15990
+Prithvi-EO-2.0 Tiny-TL,EMOTIONSPT,Emotional support,ReADI,0.1837,39468,12610
+Prithvi-EO-2.0 Tiny-TL,EMOTIONSPT,Emotional support,SVI,0.4986,39468,12610
+Prithvi-EO-2.0 Tiny-TL,EMOTIONSPT,Emotional support,SDI,0.3876,39468,12610
+Prithvi-EO-2.0 Tiny-TL,EMOTIONSPT,Emotional support,All indices,0.505,39468,12610
+Prithvi-EO-2.0 Tiny-TL,EMOTIONSPT,Emotional support,Embeddings,0.2418,39468,12610
+Prithvi-EO-2.0 Tiny-TL,EMOTIONSPT,Emotional support,All indices + Embeddings,0.5952,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODINSECU,Food insecurity,ReADI,0.7811,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODINSECU,Food insecurity,SVI,0.3332,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODINSECU,Food insecurity,SDI,0.6934,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODINSECU,Food insecurity,All indices,0.86240000000000006,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODINSECU,Food insecurity,Embeddings,0.081,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODINSECU,Food insecurity,All indices + Embeddings,0.8741,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODSTAMP,Food stamp use,ReADI,0.7403,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODSTAMP,Food stamp use,SVI,0.3287,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODSTAMP,Food stamp use,SDI,0.7053,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODSTAMP,Food stamp use,All indices,0.8125,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODSTAMP,Food stamp use,Embeddings,0.0643,39468,12610
+Prithvi-EO-2.0 Tiny-TL,FOODSTAMP,Food stamp use,All indices + Embeddings,0.8146,39468,12610
+Prithvi-EO-2.0 Tiny-TL,GHLTH,Fair/poor general health,ReADI,0.8,54391,15990
+Prithvi-EO-2.0 Tiny-TL,GHLTH,Fair/poor general health,SVI,0.3238,54391,15990
+Prithvi-EO-2.0 Tiny-TL,GHLTH,Fair/poor general health,SDI,0.5184,54391,15990
+Prithvi-EO-2.0 Tiny-TL,GHLTH,Fair/poor general health,All indices,0.8408,54391,15990
+Prithvi-EO-2.0 Tiny-TL,GHLTH,Fair/poor general health,Embeddings,0.0963,54391,15990
+Prithvi-EO-2.0 Tiny-TL,GHLTH,Fair/poor general health,All indices + Embeddings,0.8529,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HEARING,Hearing disability,ReADI,0.2556,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HEARING,Hearing disability,SVI,-0.0035,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HEARING,Hearing disability,SDI,-0.0172,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HEARING,Hearing disability,All indices,0.4345,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HEARING,Hearing disability,Embeddings,0.1539,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HEARING,Hearing disability,All indices + Embeddings,0.5119,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HIGHCHOL,High cholesterol,ReADI,-0.1018,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HIGHCHOL,High cholesterol,SVI,-0.109,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HIGHCHOL,High cholesterol,SDI,-0.0894,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HIGHCHOL,High cholesterol,All indices,0.2472,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HIGHCHOL,High cholesterol,Embeddings,0.1262,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HIGHCHOL,High cholesterol,All indices + Embeddings,0.3063,54391,15990
+Prithvi-EO-2.0 Tiny-TL,HOUSINSECU,Housing insecurity,ReADI,0.6908,39468,12610
+Prithvi-EO-2.0 Tiny-TL,HOUSINSECU,Housing insecurity,SVI,0.3533,39468,12610
+Prithvi-EO-2.0 Tiny-TL,HOUSINSECU,Housing insecurity,SDI,0.6713,39468,12610
+Prithvi-EO-2.0 Tiny-TL,HOUSINSECU,Housing insecurity,All indices,0.8103,39468,12610
+Prithvi-EO-2.0 Tiny-TL,HOUSINSECU,Housing insecurity,Embeddings,0.0979,39468,12610
+Prithvi-EO-2.0 Tiny-TL,HOUSINSECU,Housing insecurity,All indices + Embeddings,0.8255,39468,12610
+Prithvi-EO-2.0 Tiny-TL,INDEPLIVE,Independent living difficulty,ReADI,0.8817,54391,15990
+Prithvi-EO-2.0 Tiny-TL,INDEPLIVE,Independent living difficulty,SVI,0.2369,54391,15990
+Prithvi-EO-2.0 Tiny-TL,INDEPLIVE,Independent living difficulty,SDI,0.5753,54391,15990
+Prithvi-EO-2.0 Tiny-TL,INDEPLIVE,Independent living difficulty,All indices,0.8753,54391,15990
+Prithvi-EO-2.0 Tiny-TL,INDEPLIVE,Independent living difficulty,Embeddings,0.0822,54391,15990
+Prithvi-EO-2.0 Tiny-TL,INDEPLIVE,Independent living difficulty,All indices + Embeddings,0.8738,54391,15990
+Prithvi-EO-2.0 Tiny-TL,LACKTRPT,Lack of transportation,ReADI,0.7591,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LACKTRPT,Lack of transportation,SVI,0.319,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LACKTRPT,Lack of transportation,SDI,0.7275,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LACKTRPT,Lack of transportation,All indices,0.8462,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LACKTRPT,Lack of transportation,Embeddings,0.0792,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LACKTRPT,Lack of transportation,All indices + Embeddings,0.8558,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LONELINESS,Loneliness,ReADI,0.1581,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LONELINESS,Loneliness,SVI,0.3274,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LONELINESS,Loneliness,SDI,0.4228,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LONELINESS,Loneliness,All indices,0.4405,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LONELINESS,Loneliness,Embeddings,0.1613,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LONELINESS,Loneliness,All indices + Embeddings,0.3625,39468,12610
+Prithvi-EO-2.0 Tiny-TL,LPA,Physical inactivity,ReADI,0.7238,54391,15990
+Prithvi-EO-2.0 Tiny-TL,LPA,Physical inactivity,SVI,0.1431,54391,15990
+Prithvi-EO-2.0 Tiny-TL,LPA,Physical inactivity,SDI,0.343,54391,15990
+Prithvi-EO-2.0 Tiny-TL,LPA,Physical inactivity,All indices,0.7627,54391,15990
+Prithvi-EO-2.0 Tiny-TL,LPA,Physical inactivity,Embeddings,0.0213,54391,15990
+Prithvi-EO-2.0 Tiny-TL,LPA,Physical inactivity,All indices + Embeddings,0.7825,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MAMMOUSE,Mammography use,ReADI,0.2339,59041,15986
+Prithvi-EO-2.0 Tiny-TL,MAMMOUSE,Mammography use,SVI,0.0687,59041,15986
+Prithvi-EO-2.0 Tiny-TL,MAMMOUSE,Mammography use,SDI,0.1257,59041,15986
+Prithvi-EO-2.0 Tiny-TL,MAMMOUSE,Mammography use,All indices,0.2405,59041,15986
+Prithvi-EO-2.0 Tiny-TL,MAMMOUSE,Mammography use,Embeddings,0.0304,59041,15986
+Prithvi-EO-2.0 Tiny-TL,MAMMOUSE,Mammography use,All indices + Embeddings,0.3421,59041,15986
+Prithvi-EO-2.0 Tiny-TL,MHLTH,Poor mental health days,ReADI,0.5958,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MHLTH,Poor mental health days,SVI,0.188,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MHLTH,Poor mental health days,SDI,0.5099,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MHLTH,Poor mental health days,All indices,0.623,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MHLTH,Poor mental health days,Embeddings,0.1216,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MHLTH,Poor mental health days,All indices + Embeddings,0.6308,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MOBILITY,Mobility disability,ReADI,0.6739,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MOBILITY,Mobility disability,SVI,0.1293,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MOBILITY,Mobility disability,SDI,0.2511,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MOBILITY,Mobility disability,All indices,0.7424,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MOBILITY,Mobility disability,Embeddings,0.0691,54391,15990
+Prithvi-EO-2.0 Tiny-TL,MOBILITY,Mobility disability,All indices + Embeddings,0.7573,54391,15990
+Prithvi-EO-2.0 Tiny-TL,OBESITY,Obesity,ReADI,0.5567,54391,15990
+Prithvi-EO-2.0 Tiny-TL,OBESITY,Obesity,SVI,-0.0625,54391,15990
+Prithvi-EO-2.0 Tiny-TL,OBESITY,Obesity,SDI,0.085,54391,15990
+Prithvi-EO-2.0 Tiny-TL,OBESITY,Obesity,All indices,0.6569,54391,15990
+Prithvi-EO-2.0 Tiny-TL,OBESITY,Obesity,Embeddings,0.0148,54391,15990
+Prithvi-EO-2.0 Tiny-TL,OBESITY,Obesity,All indices + Embeddings,0.6573,54391,15990
+Prithvi-EO-2.0 Tiny-TL,PHLTH,Poor physical health days,ReADI,0.7392,54391,15990
+Prithvi-EO-2.0 Tiny-TL,PHLTH,Poor physical health days,SVI,0.176,54391,15990
+Prithvi-EO-2.0 Tiny-TL,PHLTH,Poor physical health days,SDI,0.3154,54391,15990
+Prithvi-EO-2.0 Tiny-TL,PHLTH,Poor physical health days,All indices,0.7806,54391,15990
+Prithvi-EO-2.0 Tiny-TL,PHLTH,Poor physical health days,Embeddings,0.0383,54391,15990
+Prithvi-EO-2.0 Tiny-TL,PHLTH,Poor physical health days,All indices + Embeddings,0.7826,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SELFCARE,Self-care disability,ReADI,0.8169,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SELFCARE,Self-care disability,SVI,0.2014,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SELFCARE,Self-care disability,SDI,0.465,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SELFCARE,Self-care disability,All indices,0.8424,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SELFCARE,Self-care disability,Embeddings,0.0284,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SELFCARE,Self-care disability,All indices + Embeddings,0.8535,54391,15990
+Prithvi-EO-2.0 Tiny-TL,SHUTUTILITY,Utility shutoff,ReADI,0.7911,39468,12610
+Prithvi-EO-2.0 Tiny-TL,SHUTUTILITY,Utility shutoff,SVI,0.1903,39468,12610
+Prithvi-EO-2.0 Tiny-TL,SHUTUTILITY,Utility shutoff,SDI,0.6378,39468,12610
+Prithvi-EO-2.0 Tiny-TL,SHUTUTILITY,Utility shutoff,All indices,0.8278,39468,12610
+Prithvi-EO-2.0 Tiny-TL,SHUTUTILITY,Utility shutoff,Embeddings,0.0103,39468,12610
+Prithvi-EO-2.0 Tiny-TL,SHUTUTILITY,Utility shutoff,All indices + Embeddings,0.8423,39468,12610
+Prithvi-EO-2.0 Tiny-TL,SLEEP,Short sleep duration,ReADI,0.4529,59072,15990
+Prithvi-EO-2.0 Tiny-TL,SLEEP,Short sleep duration,SVI,-0.0129,59072,15990
+Prithvi-EO-2.0 Tiny-TL,SLEEP,Short sleep duration,SDI,0.2364,59072,15990
+Prithvi-EO-2.0 Tiny-TL,SLEEP,Short sleep duration,All indices,0.4471,59072,15990
+Prithvi-EO-2.0 Tiny-TL,SLEEP,Short sleep duration,Embeddings,0.0225,59072,15990
+Prithvi-EO-2.0 Tiny-TL,SLEEP,Short sleep duration,All indices + Embeddings,0.4913,59072,15990
+Prithvi-EO-2.0 Tiny-TL,STROKE,Stroke,ReADI,0.5657,54391,15990
+Prithvi-EO-2.0 Tiny-TL,STROKE,Stroke,SVI,0.0929,54391,15990
+Prithvi-EO-2.0 Tiny-TL,STROKE,Stroke,SDI,0.1825,54391,15990
+Prithvi-EO-2.0 Tiny-TL,STROKE,Stroke,All indices,0.6802,54391,15990
+Prithvi-EO-2.0 Tiny-TL,STROKE,Stroke,Embeddings,0.0971,54391,15990
+Prithvi-EO-2.0 Tiny-TL,STROKE,Stroke,All indices + Embeddings,0.7019,54391,15990
+Prithvi-EO-2.0 Tiny-TL,TEETHLOST,Tooth loss,ReADI,0.8462,59048,15986
+Prithvi-EO-2.0 Tiny-TL,TEETHLOST,Tooth loss,SVI,0.1847,59048,15986
+Prithvi-EO-2.0 Tiny-TL,TEETHLOST,Tooth loss,SDI,0.5403,59048,15986
+Prithvi-EO-2.0 Tiny-TL,TEETHLOST,Tooth loss,All indices,0.8536,59048,15986
+Prithvi-EO-2.0 Tiny-TL,TEETHLOST,Tooth loss,Embeddings,0.1118,59048,15986
+Prithvi-EO-2.0 Tiny-TL,TEETHLOST,Tooth loss,All indices + Embeddings,0.8569,59048,15986
+Prithvi-EO-2.0 Tiny-TL,VISION,Vision disability,ReADI,0.8301,54391,15990
+Prithvi-EO-2.0 Tiny-TL,VISION,Vision disability,SVI,0.2687,54391,15990
+Prithvi-EO-2.0 Tiny-TL,VISION,Vision disability,SDI,0.5631,54391,15990
+Prithvi-EO-2.0 Tiny-TL,VISION,Vision disability,All indices,0.8701,54391,15990
+Prithvi-EO-2.0 Tiny-TL,VISION,Vision disability,Embeddings,-0.0037,54391,15990
+Prithvi-EO-2.0 Tiny-TL,VISION,Vision disability,All indices + Embeddings,0.8805,54391,15990

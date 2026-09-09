@@ -1,0 +1,19 @@
+embedding_model,index,mean_r2_index,mean_delta_r2,mean_r2_sequential_combined,n_outcomes
+OlmoEarth-1.2 Base,ReADI,0.456,0.1464,0.6023,40
+OlmoEarth-1.2 Nano,ReADI,0.456,0.1154,0.5714,40
+Clay-v1.5,ReADI,0.4637,0.1006,0.5643,40
+AlphaEarth Foundations,ReADI,0.453,0.1002,0.5532,40
+Prithvi-EO-2.0 300M-TL,ReADI,0.4773,0.0739,0.5512,40
+Prithvi-EO-2.0 Tiny-TL,ReADI,0.4773,0.0647,0.542,40
+OlmoEarth-1.2 Base,SDI,0.3013,0.2099,0.5113,40
+OlmoEarth-1.2 Nano,SDI,0.3013,0.1626,0.464,40
+AlphaEarth Foundations,SDI,0.2984,0.1504,0.4488,40
+Clay-v1.5,SDI,0.3059,0.142,0.4479,40
+Prithvi-EO-2.0 Tiny-TL,SDI,0.3024,0.0739,0.3763,40
+Prithvi-EO-2.0 300M-TL,SDI,0.3024,0.0654,0.3678,40
+OlmoEarth-1.2 Base,SVI,0.1659,0.2073,0.3732,40
+AlphaEarth Foundations,SVI,0.1637,0.142,0.3057,40
+OlmoEarth-1.2 Nano,SVI,0.1659,0.1389,0.3048,40
+Clay-v1.5,SVI,0.1739,0.0989,0.2727,40
+Prithvi-EO-2.0 Tiny-TL,SVI,0.1466,0.0444,0.191,40
+Prithvi-EO-2.0 300M-TL,SVI,0.1466,0.0327,0.1793,40

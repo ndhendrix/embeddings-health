@@ -1,0 +1,41 @@
+outcome,outcome_label,AlphaEarth Foundations,Prithvi-EO-2.0 Tiny-TL,Prithvi-EO-2.0 300M-TL,OlmoEarth-1.2 Nano,OlmoEarth-1.2 Base,Clay-v1.5
+CHECKUP,Annual checkup,52.2%,19.2%,21.2%,36.6%,47.8%,25.1%
+DISABILITY,Any disability,23.9%,17.0%,9.2%,31.5%,35.6%,32.2%
+ARTHRITIS,Arthritis,26.4%,23.3%,18.5%,40.8%,44.8%,35.2%
+BPMED,BP medication use,28.4%,13.0%,14.4%,24.3%,32.2%,21.7%
+BINGE,Binge drinking,2.6%,10.1%,10.6%,6.3%,14.3%,8.1%
+COPD,COPD,34.7%,22.0%,15.6%,39.5%,45.8%,37.2%
+CANCER,Cancer (excl. skin),0.0%,15.2%,13.0%,27.5%,32.3%,27.8%
+CHOLSCREEN,Cholesterol screening,13.7%,4.1%,8.9%,9.1%,21.4%,8.6%
+COGNITION,Cognitive decline,9.9%,1.5%,0.0%,18.9%,25.7%,18.5%
+COLON_SCREEN,Colorectal cancer screening,27.8%,11.5%,12.7%,25.2%,41.6%,10.0%
+CHD,Coronary heart disease,22.9%,18.4%,15.9%,33.1%,36.1%,31.2%
+CASTHMA,Current asthma,29.8%,4.5%,0.0%,34.2%,47.4%,20.2%
+CSMOKING,Current smoking,40.5%,16.2%,15.0%,36.8%,46.9%,33.0%
+DENTAL,Dental visit,18.5%,0.0%,0.0%,3.7%,9.0%,3.9%
+DEPRESSION,Depression,9.7%,0.0%,0.0%,1.4%,13.5%,0.0%
+DIABETES,Diabetes,27.2%,14.9%,12.4%,29.3%,34.4%,26.1%
+EMOTIONSPT,Emotional support,0.0%,9.5%,18.6%,9.9%,24.8%,0.0%
+GHLTH,Fair/poor general health,17.2%,15.1%,13.0%,29.6%,35.1%,27.5%
+FOODINSECU,Food insecurity,0.0%,0.0%,0.0%,22.5%,27.6%,22.1%
+FOODSTAMP,Food stamp use,0.4%,0.0%,0.0%,6.8%,8.1%,12.6%
+HEARING,Hearing disability,0.0%,16.5%,11.8%,25.1%,27.6%,25.9%
+BPHIGH,High blood pressure,39.1%,21.9%,18.0%,38.2%,44.3%,32.7%
+HIGHCHOL,High cholesterol,11.4%,4.5%,6.5%,16.0%,23.1%,8.8%
+HOUSINSECU,Housing insecurity,0.0%,0.0%,0.0%,21.1%,25.5%,21.3%
+INDEPLIVE,Independent living difficulty,25.0%,12.4%,6.4%,28.6%,31.8%,28.7%
+ACCESS2,Lack of health insurance,14.1%,0.0%,0.0%,5.1%,0.0%,11.3%
+LACKTRPT,Lack of transportation,10.1%,0.0%,0.0%,15.3%,21.7%,16.3%
+LONELINESS,Loneliness,0.0%,0.0%,0.0%,0.0%,0.0%,0.0%
+MAMMOUSE,Mammography use,25.2%,8.5%,4.5%,10.2%,16.3%,15.9%
+MOBILITY,Mobility disability,28.5%,18.3%,15.0%,31.7%,36.8%,31.7%
+OBESITY,Obesity,39.4%,8.3%,12.0%,24.0%,38.6%,17.8%
+LPA,Physical inactivity,18.4%,1.9%,3.0%,27.4%,29.6%,19.7%
+MHLTH,Poor mental health days,3.1%,1.8%,2.9%,12.1%,20.2%,11.6%
+PHLTH,Poor physical health days,25.5%,15.1%,14.9%,30.9%,35.7%,29.6%
+SELFCARE,Self-care disability,27.2%,14.1%,10.2%,29.1%,33.1%,28.0%
+SLEEP,Short sleep duration,14.1%,0.0%,0.0%,0.3%,8.5%,0.0%
+STROKE,Stroke,32.2%,17.8%,15.4%,33.3%,38.3%,29.2%
+TEETHLOST,Tooth loss,28.7%,16.6%,9.4%,23.5%,27.9%,26.7%
+SHUTUTILITY,Utility shutoff,11.8%,0.0%,0.0%,8.3%,14.3%,11.8%
+VISION,Vision disability,20.5%,6.3%,2.3%,27.1%,28.6%,25.7%
