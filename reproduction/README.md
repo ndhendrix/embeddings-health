@@ -67,6 +67,10 @@ and a payload checksum determine whether a completed task can be reused.
 
 ## Run on Slurm
 
+Read [SLURM.md](SLURM.md) for the execution layout, cluster-specific settings,
+shared-storage requirements, scheduler limitations, and recovery instructions.
+Use [SHERLOCK.md](SHERLOCK.md) only for the Stanford-specific example.
+
 From a Linux login node with uv or Python 3, using a shared filesystem:
 
 ```bash

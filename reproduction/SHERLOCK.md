@@ -1,5 +1,8 @@
 # Validate on Sherlock
 
+For other servers, use [the general Slurm guide](SLURM.md). Its settings table
+explains which paths, modules, queues, and resource requests must change.
+
 This branch contains the standalone reproduction package inside `reproduction/`.
 The data deposit is not published yet: cloning GitHub supplies code and reference
 results, but does not supply the 6.8 GB analysis data. Full Linux/Slurm validation
@@ -35,6 +38,7 @@ Run this in a terminal **on the Mac**, replacing `YOUR_SUNET_ID` and
 
 ```bash
 rsync -avP \
+  -e "ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
   /Users/nathanielhendrix/Documents/Current_Projects/embeddings-health/outputs/reproduction_package/ \
   YOUR_SUNET_ID@sherlock.stanford.edu:ABSOLUTE_DATA_PATH/
 ```
