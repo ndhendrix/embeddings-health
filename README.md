@@ -163,3 +163,10 @@ refit from scratch rather than loading cached OOF predictions.
 ## To do
 
 - [ ] Add TESSERA embeddings
+
+## AlphaEarth diagnostic
+
+For a paired local/Sherlock check of the median-family-income analysis, see
+[the diagnostic instructions](code/analyses/diagnostics/README.md). The diagnostic
+records inputs, feature order, folds, predictions, and environment details without
+overwriting paper results.
