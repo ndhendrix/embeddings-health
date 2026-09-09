@@ -94,3 +94,17 @@ It uses the provided tract counts by state for 138 model/target combinations.
 GroupKFold's state allocation depends on these counts, not within-state row order.
 A built-in check requires exact agreement with the previously confirmed AlphaEarth
 median-family-income folds. An environment that fails this check cannot export.
+
+### If the fold export fails validation
+
+The exporter keeps the original guard. A failed match now writes
+`acs_folds_<job ID>.diagnostic.json` alongside the intended output path, then exits
+with an error. Return that diagnostic file and the job logs. It contains candidate
+assignments, exact state differences, numerical package versions, CPU details,
+and NumPy runtime information. It is explicitly marked failed and cannot be
+imported as a release manifest. No normal `acs_folds_<job ID>.json` is created.
+
+The successful original AlphaEarth diagnostic recorded NumPy 1.26.4,
+scikit-learn 1.3.0, and an OpenBLAS CPU designation of SkylakeX. That designation
+is a diagnostic clue, not a verified Slurm constraint or exact node model.
+The new report allows comparison of both software and node CPU capabilities.
