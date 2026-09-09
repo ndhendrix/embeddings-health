@@ -2,7 +2,7 @@
 
 One command reruns the analyses supported by the shared tract-level data,
 creates scoped tables and figures, and compares the numbers against the paper.
-**The package is under validation. A completed run is successful only when
+**A completed run is successful only when
 `outputs/validation.json` reports `passed` for `all_included_analyses`.**
 A smoke-test pass is not a full replication claim.
 
@@ -30,8 +30,7 @@ running setup (`module load devel gcc/14.2.0`). Other clusters should use their
 local compiler module. The remaining pinned dependencies have compatible wheels
 for Linux x86-64 with glibc 2.17.
 
-The data deposit is not published yet. Once it is, the same command can download
-its pinned files without an API token:
+To download pinned files from a public Zenodo record without an API token:
 
 ```bash
 ./replicate.sh --record-id NUMERIC_VERSION_RECORD_ID
@@ -145,7 +144,7 @@ every tested value, and exclusions. Scoped PNG/PDF figures are redrawn from comp
 data with the paper's model colors and with excluded index curves removed. They
 are not byte-identical reproductions of the original images or page layouts.
 Floating-point results can depend on platform/compiler details, so the environment
-is recorded and a Linux release run should be validated before publication.
+is recorded in the run report. Assess each execution using its numerical checks.
 
 ## Tests and repository contents
 
@@ -159,9 +158,9 @@ execution. The `reference/` directory contains small published result tables.
 The code repo excludes large data, environments, outputs, credentials, and the
 maintainer-only scripts that read restricted indices.
 
-Before publishing, set the exact Zenodo record ID in `config.json`, choose the
-software license, and complete the data attribution/license metadata. Never
-replace the pinned checksums merely to make a different dataset pass validation.
+Use the exact Zenodo version record ID for downloads. Do not replace pinned
+checksums to accept different inputs. See [VALIDATION.md](VALIDATION.md) for
+acceptance criteria and the data record for source attributions.
 
 ## Explicit folds and analysis order
 
@@ -170,12 +169,13 @@ and `q2_order` for PLACES and heterogeneity. The latter preserves the original
 post-join order before shuffled splitting. ACS assignments come from
 `acs_folds.json`; the runner validates each sample fingerprint and never silently
 regenerates missing folds. This avoids platform-dependent ordering of equal-sized
-state groups. All 138 model/target mappings from the validated Sherlock export
-(job 42605275) are staged and pinned. Their sample fingerprints match the shared
-inputs. All 23 AlphaEarth ACS targets pass their paper comparisons. Numerical
-validation of the remaining models is still required.
+state groups. All 138 model/target mappings are pinned, with sample fingerprints
+checked against the shared inputs. Prithvi-300M excludes all-null source rows;
+none of those rows belongs to the analysis sample.
 
-The Prithvi-300M input was rebuilt after removal of 6,925 all-null rows. Every
-retained feature value is unchanged, and none of the removed rows belonged to
-the analysis sample. Existing copies of that file and `analysis_samples.parquet`
-need to be replaced with the updated files to pass the current checksums.
+## License
+
+The reproduction code and author-written documentation are available under the
+[MIT License](LICENSE). Third-party datasets, reference tables, and upstream
+materials are excluded from this grant and retain their applicable terms.
+See the data record's SOURCE_NOTICES.md for attribution and provenance limitations.

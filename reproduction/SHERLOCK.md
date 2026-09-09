@@ -4,9 +4,9 @@ For other servers, use [the general Slurm guide](SLURM.md). Its settings table
 explains which paths, modules, queues, and resource requests must change.
 
 This branch contains the standalone reproduction package inside `reproduction/`.
-The data deposit is not published yet: cloning GitHub supplies code and reference
-results, but does not supply the 6.8 GB analysis data. Full Linux/Slurm validation
-is still pending. Use a separate clone to preserve the existing analysis checkout.
+Cloning GitHub supplies code and reference results; download the data from the
+associated Zenodo record or transfer an existing copy as shown below. Use a
+separate clone to preserve the existing analysis checkout.
 
 ## 1. Clone on Sherlock
 

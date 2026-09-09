@@ -1,8 +1,7 @@
 # Adapting the reproduction package to your Slurm cluster
 
 Start with [README.md](README.md) for data and analysis scope. [SHERLOCK.md](SHERLOCK.md)
-is a Stanford example, not a portable cluster configuration. Real-cluster validation
-is still pending; see [VALIDATION_STATUS.md](VALIDATION_STATUS.md).
+is a Stanford example, not a portable cluster configuration. See [VALIDATION.md](VALIDATION.md) for the acceptance criteria for each run.
 
 ## How the run is organized
 

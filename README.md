@@ -171,7 +171,7 @@ For a paired local/Sherlock check of the median-family-income analysis, see
 records inputs, feature order, folds, predictions, and environment details without
 overwriting paper results.
 
-## Reproduction package (under validation)
+## Reproduction package
 
 The standalone package is in [reproduction/](reproduction/README.md).
 Follow [the Sherlock transfer and validation guide](reproduction/SHERLOCK.md)
