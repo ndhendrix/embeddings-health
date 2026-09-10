@@ -150,3 +150,33 @@ sbatch code/analyses/slurm/inspect_prithvi_full.sbatch
 `REPRO_REPO` defaults to `$SCRATCH/embeddings-health-reproduction`;
 `ORIGINAL_REPO` defaults to `$HOME/embeddings-health`. The launcher records both
 prepared/run locations even if absent. It does not infer replacement directories.
+
+## Paired Prithvi-300M predictor-precision comparison
+
+After the lineage report identifies Float32 predictors, run:
+
+```bash
+cd "$SCRATCH/embeddings-health-reproduction"
+git pull --ff-only origin codex/reproduction-package
+sbatch code/analyses/slurm/compare_prithvi_precision.sbatch
+```
+
+This fits the direct ACCESS2 model twice, once with Float64 predictors and once
+with all predictors (including ALAND/AWATER) cast to Float32. Both use identical
+outcomes, feature order, tract order, holdout states, model parameters, and four
+threads. It first compares the original prepared file's sample/order, targets,
+feature list and holdout metadata, and checks every predictor value against the
+Float32-cast shared inputs in column blocks. No original script is executed.
+The paper reference is read for comparison only after fitting.
+
+The job requests 4 CPUs, 32 GB and a two-hour time limit. It uses the existing
+reproduction environment. It writes `$SCRATCH/prithvi-precision-JOBID/report.json`
+and `prithvi-precision-JOBID.log` in the submission directory. Download the report;
+include the log if the job fails. Intermediate reports have status `running`;
+only `comparison_complete` means both fits and reference checks finished. Neither
+status certifies the full reproduction. Output directories cannot be reused.
+
+`REPRO_REPO`, `DATA_DIR`, and `PREPARED_DIR` may override the default paths in the
+launcher. No production data, code, cached task results, or expected scores are
+modified. A synthetic end-to-end check exercises alignment, both fit paths,
+report creation, and overwrite protection; the real-data comparison runs on Sherlock.
