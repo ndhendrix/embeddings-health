@@ -180,3 +180,45 @@ status certifies the full reproduction. Output directories cannot be reused.
 launcher. No production data, code, cached task results, or expected scores are
 modified. A synthetic end-to-end check exercises alignment, both fit paths,
 report creation, and overwrite protection; the real-data comparison runs on Sherlock.
+
+## Prithvi Tiny: two discrepant ACS targets
+
+On Sherlock, from the reproduction checkout:
+
+```bash
+cd "$SCRATCH/embeddings-health-reproduction"
+git pull --ff-only origin codex/reproduction-package
+sbatch code/analyses/slurm/compare_prithvi_tiny_acs.sbatch
+```
+
+The job compares median family income and income disparity. It checks current
+original-script preparation against shared inputs by tract ID, including sample
+membership, row order, feature order, predictor values, and target values. It
+compares frozen ACS folds with GroupKFold assignments generated on the current
+node. It fits Float64 and Float32 predictor variants with the same frozen folds;
+if relevant, it also fits current-fold and original-preparation variants. All
+fits use the reproduction estimator parameters, which are recorded alongside
+the original fit-function source. This compares current preparations; it does
+not claim to reconstruct an unrecorded historical environment.
+
+The original preparation section is executed from your original repository's
+`code/analyses/analyses_sherlock.py`; no analysis-output writing or model-fitting
+section of that script is executed. Original input paths must exist. No data are
+automatically downloaded. Tiny's original default uses no explicit AK/HI exclusion;
+any membership differences are reported instead of silently aligning the samples.
+
+Default paths follow the original Tiny ACS launcher: original code under
+`$HOME/embeddings-health`, source files under `$SCRATCH/embeddings-health`, and
+Tiny's combined CSV under `prithvi_aggregated/prithvi_tiny_2022_all_tracts.csv`.
+Override `ORIGINAL_REPO`, `ORIGINAL_DATA`, `EMBEDDINGS`, `DATA_DIR`, or `REPRO_REPO`
+if needed. Feature discrepancies can reveal a stale combined CSV from PCA64 work.
+The existing reproduction environment is used; the job requests 4 CPUs, 32 GB,
+and two hours. It can run alongside the Prithvi-300M validation with separate outputs.
+
+Return `$SCRATCH/prithvi-tiny-acs-diagnostic-JOBID/report.json`. If the job fails,
+include `tiny-acs-diagnostic-JOBID.log` from the submission directory. Per-target
+tract CSVs contain public ACS targets and fold assignments for follow-up if needed.
+Only `comparison_complete` means the entire diagnostic finished. A synthetic
+end-to-end check exercised two targets, mismatched fold assignments, precision
+variants, original preparation, and output overwrite protection. No real fits
+were run on the Mac.
