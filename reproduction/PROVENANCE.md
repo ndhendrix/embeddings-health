@@ -37,3 +37,9 @@ and AWATER. The runner applies this conversion at fitting time. A paired ACCESS2
 diagnostic reproduced the original full-run score with Float32 predictors while
 holding sample/order, outcomes, holdouts, and model parameters fixed. Broader
 numerical agreement must be assessed from the resulting run reports.
+
+Tiny's median-family-income folds place Rhode Island in fold 2 and South Dakota
+in fold 4. Its income-disparity folds place Tennessee in fold 1 and Massachusetts
+in fold 5. The paired full-input diagnostic confirmed these assignments reproduce
+the original ACS means and fold SDs. `acs_folds.json` records the correction and
+its evidence hash; all other model/target assignments are preserved.
