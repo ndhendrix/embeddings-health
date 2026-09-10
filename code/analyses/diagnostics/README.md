@@ -108,3 +108,45 @@ The successful original AlphaEarth diagnostic recorded NumPy 1.26.4,
 scikit-learn 1.3.0, and an OpenBLAS CPU designation of SkylakeX. That designation
 is a diagnostic clue, not a verified Slurm constraint or exact node model.
 The new report allows comparison of both software and node CPU capabilities.
+
+## Prithvi-300M full-run lineage inspection
+
+This diagnostic inspects the prepared directory and run root recorded in the
+final full-dimensional results. It inventories files, reads table schemas and
+array shapes, extracts small saved configuration summaries and relevant source
+lines, and compares available feature lists with the reproduction configuration.
+It does not fit models, change inputs, or transfer tract-level data into the report.
+A complete inspection is not a numerical validation pass.
+
+On Sherlock, from the separate reproduction checkout:
+
+```bash
+cd "$SCRATCH/embeddings-health-reproduction"
+git pull --ff-only origin codex/reproduction-package
+sbatch code/analyses/slurm/inspect_prithvi_full.sbatch
+```
+
+It uses the existing `reproduction/.venv` from the completed reproduction run,
+requests one CPU, 4 GB, and 15 minutes, and writes:
+
+- `$SCRATCH/prithvi-full-diagnostic-JOBID.json`
+- `prithvi-lineage-JOBID.log` in the submission directory.
+
+Download the JSON report after completion. If the job fails, include the log.
+Missing directories and inspection errors are saved in the report with
+`inspection_status: incomplete` and exit code 2. This evidence is still useful.
+Existing reports are never overwritten.
+
+Defaults follow the original result metadata. If your paths differ, set the
+relevant variables before submission (paths must be visible on compute nodes):
+
+```bash
+export ORIGINAL_REPO=/absolute/path/to/original/embeddings-health
+export PREPARED_DIR=/absolute/path/to/prithvi_300m_tl_full_prepared
+export RUN_ROOT=/absolute/path/to/original/sharded/run
+sbatch code/analyses/slurm/inspect_prithvi_full.sbatch
+```
+
+`REPRO_REPO` defaults to `$SCRATCH/embeddings-health-reproduction`;
+`ORIGINAL_REPO` defaults to `$HOME/embeddings-health`. The launcher records both
+prepared/run locations even if absent. It does not infer replacement directories.
