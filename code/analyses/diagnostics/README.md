@@ -227,3 +227,31 @@ Only `comparison_complete` means the entire diagnostic finished. A synthetic
 end-to-end check exercised two targets, mismatched fold assignments, precision
 variants, original preparation, and output overwrite protection. No real fits
 were run on the Mac.
+
+## Tiny historical-run evidence
+
+The full-input comparison matched predictor/target values and current state
+folds but not the two historical ACS reference scores. To locate saved evidence:
+
+```bash
+cd "$SCRATCH/embeddings-health-reproduction"
+git pull --ff-only origin codex/reproduction-package
+sbatch code/analyses/slurm/inspect_tiny_history.sbatch
+```
+
+Return `$SCRATCH/tiny-history-JOBID.json`; if the job fails, also return
+`tiny-history-JOBID.log` from the submission directory. The job requests one CPU,
+2 GB, and ten minutes. It does not run models or execute historical scripts.
+
+The audit searches original analysis scripts/logs, Tiny output directories,
+Tiny-specific cache folders, and top-level scheduler logs. It extracts relevant
+log/launcher lines, source hashes and timestamps, the two target rows from saved
+ACS result files, recent relevant git history, and current cached environment
+package versions. Current files and package versions do not establish what ran
+historically. Truncation, missing search locations, and read errors are explicit.
+Retain the full logs locally for follow-up; the report contains bounded excerpts.
+
+Override `ORIGINAL_REPO`, `ORIGINAL_DATA`, or `REPRO_REPO` before submission if
+these differ from the preceding diagnostic. No analysis inputs, fitted outputs,
+or environment files are changed. A synthetic check exercises discovery, cache
+messages, relevant result selection, redaction, and overwrite protection.
