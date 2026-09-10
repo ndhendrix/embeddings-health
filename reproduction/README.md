@@ -179,3 +179,10 @@ The reproduction code and author-written documentation are available under the
 [MIT License](LICENSE). Third-party datasets, reference tables, and upstream
 materials are excluded from this grant and retain their applicable terms.
 See the data record's SOURCE_NOTICES.md for attribution and provenance limitations.
+
+## Prithvi-300M predictor precision
+
+Prithvi-300M fits use Float32 embedding and area predictors, matching the original
+full-dimensional analysis. Conversion occurs only when constructing model inputs;
+shared Parquet values, outcome precision, and area-based grouping/reporting are
+preserved. Other models retain their existing predictor precision.

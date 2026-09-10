@@ -153,4 +153,25 @@ class FrozenFoldTests(unittest.TestCase):
         self.assertEqual(acs['GEOID'].to_list(),sample['GEOID'].to_list())
 
 
+class PredictorPrecisionTests(unittest.TestCase):
+    def test_prithvi_matrix_casts_embeddings_and_area_without_changing_source(self):
+        import numpy as np
+        import polars as pl
+        from analysis import predictor_matrix
+        frame = pl.DataFrame({'PR0000_MEAN': [1.00000001],
+                              'ALAND': [16777217.0], 'AWATER': [0.1],
+                              'outcome': [1.00000001]})
+        features = ['PR0000_MEAN', 'ALAND', 'AWATER']
+        original = frame.select(features).to_numpy()
+        matrix = predictor_matrix(frame, features, 'prithvi_300m_tl')
+        self.assertEqual(matrix.dtype, np.dtype('float32'))
+        np.testing.assert_array_equal(matrix, original.astype(np.float32))
+        for model in ['alphaearth', 'clay', 'olmoearth_base', 'olmoearth_nano', 'prithvi_tiny']:
+            other = predictor_matrix(frame, features, model)
+            self.assertEqual(other.dtype, original.dtype)
+            np.testing.assert_array_equal(other, original)
+        self.assertEqual(frame['ALAND'][0], 16777217.0)
+        self.assertEqual(frame['outcome'][0], 1.00000001)
+
+
 if __name__=='__main__': unittest.main()

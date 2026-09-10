@@ -15,6 +15,13 @@ def estimator(config, threads, small=False):
     return lgb.LGBMRegressor(**config['heterogeneity_parameters' if small else 'parameters'], n_jobs=threads)
 
 
+def predictor_matrix(frame, features, model):
+    """Preserve the original Prithvi-300M fitting precision, including area inputs."""
+    if model == 'prithvi_300m_tl':
+        return frame.select(pl.col(features).cast(pl.Float32)).to_numpy()
+    return frame.select(features).to_numpy()
+
+
 def task_id(task):
     return f"{task['model']}__{task['stage']}__{task['target']}"
 
@@ -88,7 +95,7 @@ def run_task(task, data, config, threads):
     if stage == 'places':
         frame = valid_values(target_frame(frame, data, target), 'observed_prevalence_pct')
         train = ~frame['state_fips'].is_in(config['holdout_states']).to_numpy()
-        X = frame.select(features).to_numpy()
+        X = predictor_matrix(frame, features, model)
         y = frame['observed_prevalence_pct'].to_numpy()
         m = estimator(config, threads)
         m.fit(X[train], y[train])
@@ -104,7 +111,7 @@ def run_task(task, data, config, threads):
             tr = r['split'].eq('train').to_numpy()
             if not np.array_equal(train, tr):
                 raise ValueError('Residual and direct holdouts differ')
-            Xr = r.select(features).to_numpy(); yr = r['residual_prevalence_points'].to_numpy()
+            Xr = predictor_matrix(r, features, model); yr = r['residual_prevalence_points'].to_numpy()
             fitted = estimator(config, threads); fitted.fit(Xr[tr], yr[tr])
             residual_r2 = float(r2_score(yr[~tr], fitted.predict(Xr[~tr])))
             stage1 = float(r2_score(r.filter(pl.col('split') == 'test')['observed_prevalence_pct'].to_numpy(),
@@ -121,7 +128,7 @@ def run_task(task, data, config, threads):
             raise ValueError(f'ACS target unavailable: {target}')
         frame = valid_values(frame.join(acs.select('GEOID', target), on='GEOID', how='left', validate='1:1').sort('analysis_order'), target)
         labels = acs_fold_labels(data, model, target, frame['GEOID'].to_list())
-        mean, std, scores = cross_validation(frame.select(features).to_numpy(), frame[target].to_numpy(), config, threads, fold_labels=labels)
+        mean, std, scores = cross_validation(predictor_matrix(frame, features, model), frame[target].to_numpy(), config, threads, fold_labels=labels)
         return {'acs': [{'embedding_model': label, 'variable': target, 'r2_mean': mean, 'r2_std': std, 'n_tracts': frame.height, 'fold_scores': scores}]}
     if stage in ('state', 'decile'):
         if stage == 'state':
@@ -142,7 +149,7 @@ def run_task(task, data, config, threads):
             valid = valid_values(frame, outcome)
             if valid.height < 50:
                 continue
-            mean, _, folds = cross_validation(valid.select(features).to_numpy(), valid[outcome].to_numpy(), config, threads, small=True)
+            mean, _, folds = cross_validation(predictor_matrix(valid, features, model), valid[outcome].to_numpy(), config, threads, small=True)
             scores.append({'outcome': outcome, 'r2': mean, 'fold_scores': folds, 'n_tracts': valid.height})
         if not scores:
             raise ValueError('No eligible outcomes')

@@ -31,3 +31,9 @@ required download by SHA-256. Source notices govern third-party materials.
 
 Numerical results can depend on platform/compiler details. Preserve the locked
 environment and use [VALIDATION.md](VALIDATION.md) to assess each run.
+
+The original Prithvi-300M prepared data use Float32 predictors, including ALAND
+and AWATER. The runner applies this conversion at fitting time. A paired ACCESS2
+diagnostic reproduced the original full-run score with Float32 predictors while
+holding sample/order, outcomes, holdouts, and model parameters fixed. Broader
+numerical agreement must be assessed from the resulting run reports.
