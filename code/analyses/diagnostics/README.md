@@ -255,3 +255,31 @@ Override `ORIGINAL_REPO`, `ORIGINAL_DATA`, or `REPRO_REPO` before submission if
 these differ from the preceding diagnostic. No analysis inputs, fitted outputs,
 or environment files are changed. A synthetic check exercises discovery, cache
 messages, relevant result selection, redaction, and overwrite protection.
+
+## Prithvi-300M income-disparity fold comparison
+
+After the Float32 full-model run, test its remaining ACS discrepancy:
+
+```bash
+cd "$SCRATCH/embeddings-health-reproduction"
+git pull --ff-only origin codex/reproduction-package
+sbatch code/analyses/slurm/compare_prithvi_300m_income_folds.sbatch
+```
+
+First copy the latest release `acs_folds.json` into the shared data directory if
+not already done. The current code pins the Tiny-corrected file, even though
+this diagnostic changes only 300M folds in memory. A mismatched download fails
+its checksum check before fitting; never bypass that check.
+
+The job fits five folds twice for income disparity, with Float32 predictors:
+current frozen assignments versus MA moved from fold 1 to 5 and TN from 5 to 1.
+It checks that these states have equal nonzero sample counts and the expected
+baseline assignments. Input matrices, outcomes, and other assignments are fixed.
+No release files or reference scores are modified. It requests four CPUs, 32 GB,
+and a two-hour time limit. A small synthetic test checks the swap and its guards;
+real fitting runs on Sherlock.
+
+Return `$SCRATCH/prithvi-300m-income-folds-JOBID/report.json` and, if the job fails,
+`prithvi-income-folds-JOBID.log` from the submission directory. Only
+`comparison_complete` means both variants finished. A matched single target is
+not a complete validation run. `DATA_DIR` and `REPRO_REPO` override shared paths.
