@@ -11,12 +11,43 @@ from types import SimpleNamespace
 TARGETS = ['median_family_income', 'income_disparity_ratio']
 
 
+def combine_states(directory, destination):
+    """Preserve CSV values and within-file order; record sorted source order."""
+    paths = sorted(directory.glob('*.csv'))
+    if not paths:
+        raise FileNotFoundError(f'No state CSVs in {directory}')
+    sources = []
+    header = None
+    with destination.open('xb') as output:
+        for path in paths:
+            digest = hashlib.sha256()
+            with path.open('rb') as stream:
+                first = stream.readline()
+                digest.update(first)
+                if not first:
+                    raise ValueError(f'Empty source CSV: {path}')
+                if header is None:
+                    header = first.rstrip(b'\r\n')
+                    output.write(header + b'\n')
+                elif first.rstrip(b'\r\n') != header:
+                    raise ValueError(f'State CSV column order/header differs: {path}')
+                last = b''
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    digest.update(block)
+                    output.write(block)
+                    last = block[-1:]
+                if last and last != b'\n':
+                    output.write(b'\n')
+            sources.append({'path': str(path), 'sha256': digest.hexdigest()})
+    return sources
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reproduction', type=Path, required=True)
     parser.add_argument('--original-repo', type=Path, required=True)
     parser.add_argument('--original-data', type=Path, required=True)
-    parser.add_argument('--embeddings', type=Path, required=True)
+    parser.add_argument('--embeddings', type=Path, required=True, help='Combined CSV or directory of state CSVs')
     parser.add_argument('--data-dir', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--threads', type=int, default=4)
@@ -52,7 +83,14 @@ def main():
     fit_function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'lgbm_cv_r2')
     # Preserve the source definition in the diagnostic, without running its fits.
     report['original_fit_source'] = ast.get_source_segment(raw, fit_function)
-    paths = {'embeddings': args.embeddings,
+    embedding_path = args.embeddings
+    if embedding_path.is_dir():
+        combined = args.output/'tiny_full_combined.csv'
+        report['state_sources_in_order'] = combine_states(embedding_path, combined)
+        report['combination_note'] = 'Sorted filenames; original within-file order preserved. This does not establish the historical combined-file order.'
+        embedding_path = combined
+        atomic_json(args.output/'report.json', report)
+    paths = {'embeddings': embedding_path,
              'acs': args.original_repo/'data/acs.csv',
              'places': args.original_data/'PLACES__Local_Data_for_Better_Health__Census_Tract_Data__2025_release.csv',
              'readi': args.original_data/'social_risk_indices/ReADI_CT_2022.csv',

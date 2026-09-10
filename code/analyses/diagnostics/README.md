@@ -209,7 +209,12 @@ any membership differences are reported instead of silently aligning the samples
 
 Default paths follow the original Tiny ACS launcher: original code under
 `$HOME/embeddings-health`, source files under `$SCRATCH/embeddings-health`, and
-Tiny's combined CSV under `prithvi_aggregated/prithvi_tiny_2022_all_tracts.csv`.
+Tiny's full state CSVs under `prithvi_aggregated_full/tiny/`.
+The diagnostic combines these into its own output directory, preserving values
+and within-file order and recording sorted filenames and source hashes. This
+order is explicit, but is not assumed to be the historical combined-file order.
+The older `prithvi_aggregated/prithvi_tiny_2022_all_tracts.csv` contains PCA64
+features and must not be used for the full-dimensional comparison.
 Override `ORIGINAL_REPO`, `ORIGINAL_DATA`, `EMBEDDINGS`, `DATA_DIR`, or `REPRO_REPO`
 if needed. Feature discrepancies can reveal a stale combined CSV from PCA64 work.
 The existing reproduction environment is used; the job requests 4 CPUs, 32 GB,
