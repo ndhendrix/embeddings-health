@@ -43,3 +43,7 @@ in fold 4. Its income-disparity folds place Tennessee in fold 1 and Massachusett
 in fold 5. The paired full-input diagnostic confirmed these assignments reproduce
 the original ACS means and fold SDs. `acs_folds.json` records the correction and
 its evidence hash; all other model/target assignments are preserved.
+
+For Prithvi-300M income disparity, Massachusetts is assigned to fold 5 and
+Tennessee to fold 1. With Float32 predictors, the paired fold comparison matches
+the original mean R² and fold SD. Other 300M target assignments are unchanged.
